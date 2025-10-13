@@ -3,18 +3,43 @@
     <aside class="nb-sidebar">
       <div class="nb-sidebar-group">
         <label class="nb-sidebar-field">
-          <span class="nb-sidebar-title">Válassz témát</span>
-          <select id="nb-type" class="nb-select"></select>
-        </label>
-      </div>
-      <div class="nb-sidebar-group">
-        <label class="nb-sidebar-field">
           <span class="nb-sidebar-title">Válassz terméket</span>
           <select id="nb-product" class="nb-select"></select>
         </label>
       </div>
       <div class="nb-sidebar-group">
+        <span class="nb-sidebar-title">Termék nézet</span>
+        <div id="nb-view-options" class="nb-view-options"></div>
+        <select id="nb-view" class="nb-hidden"></select>
+      </div>
+      <div class="nb-sidebar-group">
         <button id="nb-add-text" type="button" class="nb-side-button">Írj saját feliratot</button>
+      </div>
+      <div id="nb-text-settings" class="nb-sidebar-group nb-text-settings nb-hidden">
+        <div class="nb-text-row">
+          <label class="nb-text-label" for="nb-text-font">Betűtípus</label>
+          <select id="nb-text-font" class="nb-text-control"></select>
+        </div>
+        <div class="nb-text-row">
+          <label class="nb-text-label" for="nb-text-size">Méret</label>
+          <input type="number" id="nb-text-size" class="nb-text-control" min="8" max="200" step="1" value="48">
+        </div>
+        <div class="nb-text-row nb-text-row-inline">
+          <label class="nb-text-label">Igazítás</label>
+          <div class="nb-text-align">
+            <button type="button" class="nb-text-align-btn" data-align="left">Balra</button>
+            <button type="button" class="nb-text-align-btn" data-align="center">Közép</button>
+            <button type="button" class="nb-text-align-btn" data-align="right">Jobbra</button>
+          </div>
+        </div>
+        <div class="nb-text-row nb-text-row-inline">
+          <label class="nb-text-label" for="nb-text-color">Szín</label>
+          <input type="color" id="nb-text-color" class="nb-text-color" value="#000000">
+          <div class="nb-text-style">
+            <button type="button" id="nb-text-bold" class="nb-text-style-btn" data-style="bold">B</button>
+            <button type="button" id="nb-text-italic" class="nb-text-style-btn" data-style="italic">I</button>
+          </div>
+        </div>
       </div>
       <div class="nb-sidebar-group">
         <label for="nb-upload" class="nb-side-upload">Tölts fel saját mintát
@@ -51,10 +76,18 @@
           <div class="nb-summary-meta">
             <span id="nb-summary-type">–</span>
             <span id="nb-summary-color">–</span>
+            <span id="nb-summary-size">–</span>
           </div>
-          <div class="nb-summary-size" id="nb-summary-size">–</div>
         </div>
         <div class="nb-summary-price" id="nb-summary-price">&nbsp;</div>
+        <div class="nb-summary-qty">
+          <span class="nb-section-title">Darabszám</span>
+          <div class="nb-qty-control">
+            <button type="button" id="nb-qty-minus" class="nb-qty-btn">−</button>
+            <input type="number" id="nb-quantity" class="nb-qty-input" min="1" value="1">
+            <button type="button" id="nb-qty-plus" class="nb-qty-btn">+</button>
+          </div>
+        </div>
         <p class="nb-summary-note">+ szállítási idő 3-5 munkanap</p>
         <button id="nb-add-to-cart" type="button" class="nb-summary-button" disabled>Kosárba</button>
       </div>
