@@ -2,16 +2,11 @@
   <div class="nb-designer-shell">
     <aside class="nb-column nb-column--actions">
       <div class="nb-action-card nb-action-card--product">
-        <button type="button" class="nb-hero-button" data-nb-toggle="product">
+        <button type="button" class="nb-hero-button" id="nb-product-modal-trigger">
           <span class="nb-hero-icon">🛍️</span>
           <span>Válassz terméket</span>
         </button>
-        <div class="nb-card-body" data-nb-panel="product" hidden>
-          <div class="nb-pill-group" id="nb-type-pills"></div>
-          <label class="nb-field nb-field--select">
-            <span>Termék</span>
-            <select id="nb-product"></select>
-          </label>
+        <div class="nb-card-body">
           <div class="nb-size-group">
             <span class="nb-field-label">Méret</span>
             <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
@@ -93,6 +88,27 @@
   </div>
 
   <select id="nb-type" class="nb-hidden"></select>
+  <select id="nb-product" class="nb-hidden"></select>
   <select id="nb-color" class="nb-hidden"></select>
   <select id="nb-size" class="nb-hidden"></select>
+
+  <div class="nb-modal" id="nb-product-modal" hidden>
+    <div class="nb-modal-backdrop" data-nb-close="product-modal"></div>
+    <div class="nb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-product-modal-title">
+      <div class="nb-modal-header">
+        <h2 id="nb-product-modal-title">Válassz terméket</h2>
+        <button type="button" class="nb-modal-close" data-nb-close="product-modal" aria-label="Bezárás">×</button>
+      </div>
+      <div class="nb-modal-body">
+        <div class="nb-modal-section">
+          <h3>Terméktípus</h3>
+          <div class="nb-modal-type-list" id="nb-modal-type-list"></div>
+        </div>
+        <div class="nb-modal-section">
+          <h3>Termék</h3>
+          <div class="nb-modal-product-list" id="nb-modal-product-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
