@@ -20,6 +20,16 @@
     canvas_h: defaultCanvasSize.h
   };
 
+  const defaultCanvasSize = {w: c.width, h: c.height};
+  const fallbackArea = {
+    x: Math.round(defaultCanvasSize.w * 0.15),
+    y: Math.round(defaultCanvasSize.h * 0.15),
+    w: Math.round(defaultCanvasSize.w * 0.7),
+    h: Math.round(defaultCanvasSize.h * 0.7),
+    canvas_w: defaultCanvasSize.w,
+    canvas_h: defaultCanvasSize.h
+  };
+
   function getCatalog(){ return settings.catalog || {}; }
   function productList(){
     if (Array.isArray(settings.products) && settings.products.length){
