@@ -16,6 +16,50 @@
     canvas_h: defaultCanvasSize.h
   };
 
+  function parseNumeric(value){
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string'){
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const num = Number(trimmed);
+      if (Number.isFinite(num)) return num;
+    }
+    return null;
+  }
+
+  function numberOr(value, fallback){
+    const num = parseNumeric(value);
+    return num === null ? fallback : num;
+  }
+
+  function positiveNumberOr(value, fallback){
+    const num = parseNumeric(value);
+    return (num === null || num <= 0) ? fallback : num;
+  }
+
+  function loadMockupImage(url){
+    return new Promise((resolve, reject)=>{
+      if (!url){
+        reject(new Error('no-url'));
+        return;
+      }
+      const attempt = (crossOrigin, next)=>{
+        fabric.util.loadImage(url, (img, isError)=>{
+          if (isError || !img){
+            if (typeof next === 'function'){
+              next();
+            } else {
+              reject(new Error('mockup-load-failed'));
+            }
+            return;
+          }
+          resolve(new fabric.Image(img, {crossOrigin: crossOrigin || ''}));
+        }, null, crossOrigin);
+      };
+      attempt('anonymous', ()=>attempt(null, null));
+    });
+  }
+
   const typeSel = document.getElementById('nb-type');
   const productSel = document.getElementById('nb-product');
   const colorSel = document.getElementById('nb-color');
@@ -298,17 +342,21 @@
   }
 
   function referenceSizeForMockup(mk, area){
-    const areaW = area?.canvas_w;
-    const areaH = area?.canvas_h;
+    const areaW = positiveNumberOr(area?.canvas_w, null);
+    const areaH = positiveNumberOr(area?.canvas_h, null);
     if (areaW && areaH){
       return {w: areaW, h: areaH};
     }
     if (mk){
-      if (mk.canvas && mk.canvas.w && mk.canvas.h){
-        return {w: mk.canvas.w, h: mk.canvas.h};
+      const nestedW = positiveNumberOr(mk.canvas?.w, null);
+      const nestedH = positiveNumberOr(mk.canvas?.h, null);
+      if (nestedW && nestedH){
+        return {w: nestedW, h: nestedH};
       }
-      if (mk.canvas_w && mk.canvas_h){
-        return {w: mk.canvas_w, h: mk.canvas_h};
+      const canvasW = positiveNumberOr(mk.canvas_w, null);
+      const canvasH = positiveNumberOr(mk.canvas_h, null);
+      if (canvasW && canvasH){
+        return {w: canvasW, h: canvasH};
       }
     }
     return {w: defaultCanvasSize.w, h: defaultCanvasSize.h};
@@ -316,8 +364,10 @@
 
   function applyCanvasSize(size){
     const canvasElement = c.getElement();
-    const targetW = size?.w > 0 ? size.w : defaultCanvasSize.w;
-    const targetH = size?.h > 0 ? size.h : defaultCanvasSize.h;
+    const sizeW = positiveNumberOr(size?.w, defaultCanvasSize.w);
+    const sizeH = positiveNumberOr(size?.h, defaultCanvasSize.h);
+    const targetW = sizeW > 0 ? sizeW : defaultCanvasSize.w;
+    const targetH = sizeH > 0 ? sizeH : defaultCanvasSize.h;
     let changed = false;
     if (c.width !== targetW){
       c.setWidth(targetW);
@@ -427,10 +477,10 @@
     const appliedSize = applyCanvasSize(refSize);
 
     const baseArea = {
-      x: typeof areaRaw.x === 'number' ? areaRaw.x : fallbackArea.x,
-      y: typeof areaRaw.y === 'number' ? areaRaw.y : fallbackArea.y,
-      w: typeof areaRaw.w === 'number' ? areaRaw.w : fallbackArea.w,
-      h: typeof areaRaw.h === 'number' ? areaRaw.h : fallbackArea.h
+      x: numberOr(areaRaw.x, fallbackArea.x),
+      y: numberOr(areaRaw.y, fallbackArea.y),
+      w: positiveNumberOr(areaRaw.w, fallbackArea.w),
+      h: positiveNumberOr(areaRaw.h, fallbackArea.h)
     };
 
     const scaleX = refSize.w ? appliedSize.w / refSize.w : 1;
@@ -460,19 +510,28 @@
     c.__nb_area = area;
     c.__nb_area_rect = printArea;
 
+    const loadToken = Symbol('mockup');
+    c.__nb_bg_token = loadToken;
+    c.setBackgroundImage(null, c.renderAll.bind(c));
     if (mk && mk.image_url){
-      fabric.Image.fromURL(mk.image_url, img=>{
-        const scale = Math.min(c.width / img.width, c.height / img.height);
-        img.scale(scale);
-        img.set({left:0, top:0, selectable:false, evented:false, originX:'left', originY:'top'});
-        img.__nb_bg = true;
-        c.add(img);
-        img.moveTo(0);
-        if (c.__nb_area_rect){
-          c.__nb_area_rect.moveTo(1);
-        }
+      loadMockupImage(mk.image_url).then(img=>{
+        if (c.__nb_bg_token !== loadToken) return;
+        const scale = Math.min(c.width / img.width, c.height / img.height) || 1;
+        img.set({
+          left: 0,
+          top: 0,
+          originX: 'left',
+          originY: 'top',
+          selectable: false,
+          evented: false,
+          scaleX: scale,
+          scaleY: scale
+        });
+        c.setBackgroundImage(img, c.renderAll.bind(c));
+      }).catch(()=>{
+        if (c.__nb_bg_token !== loadToken) return;
         c.requestRenderAll();
-      }, {crossOrigin:'anonymous'});
+      });
     }
 
     enforceAllObjectsInside();
