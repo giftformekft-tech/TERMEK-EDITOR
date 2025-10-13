@@ -20,25 +20,116 @@
     canvas_h: defaultCanvasSize.h
   };
 
-  const defaultCanvasSize = {w: c.width, h: c.height};
-  const fallbackArea = {
-    x: Math.round(defaultCanvasSize.w * 0.15),
-    y: Math.round(defaultCanvasSize.h * 0.15),
-    w: Math.round(defaultCanvasSize.w * 0.7),
-    h: Math.round(defaultCanvasSize.h * 0.7),
-    canvas_w: defaultCanvasSize.w,
-    canvas_h: defaultCanvasSize.h
-  };
+  let catalogCache = null;
+  let productCache = null;
 
-  function getCatalog(){ return settings.catalog || {}; }
+  function normalizeProductId(value, fallback){
+    const candidates = [];
+    if (value && typeof value === 'object'){
+      ['product_id','id','ID','value','key','slug','pid'].forEach(prop=>{
+        if (value[prop] !== undefined && value[prop] !== null){
+          candidates.push(value[prop]);
+        }
+      });
+    }else{
+      candidates.push(value);
+    }
+    if (fallback !== undefined && fallback !== null){
+      candidates.push(fallback);
+    }
+    for (let i=0; i<candidates.length; i++){
+      const candidate = candidates[i];
+      if (candidate === null || candidate === undefined) continue;
+      if (typeof candidate === 'number' && Number.isFinite(candidate)){
+        return String(candidate);
+      }
+      if (typeof candidate === 'string'){
+        const trimmed = candidate.trim();
+        if (trimmed) return trimmed;
+      }
+    }
+    return null;
+  }
+
+  function normalizeCatalog(raw){
+    const map = {};
+    if (!raw) return map;
+    if (Array.isArray(raw)){
+      raw.forEach((entry, index)=>{
+        if (!entry) return;
+        const key = normalizeProductId(entry, index);
+        if (!key) return;
+        const clone = (entry && typeof entry === 'object') ? Object.assign({}, entry) : {};
+        if (clone.product_id === undefined){
+          const numeric = parseInt(key, 10);
+          clone.product_id = Number.isNaN(numeric) ? key : numeric;
+        }
+        map[key] = clone;
+      });
+      return map;
+    }
+    if (typeof raw === 'object'){
+      Object.keys(raw).forEach(originalKey=>{
+        const entry = raw[originalKey];
+        if (!entry) return;
+        const key = normalizeProductId(entry, originalKey);
+        if (!key) return;
+        const clone = (entry && typeof entry === 'object') ? Object.assign({}, entry) : {};
+        if (clone.product_id === undefined){
+          const numeric = parseInt(key, 10);
+          clone.product_id = Number.isNaN(numeric) ? key : numeric;
+        }
+        map[key] = clone;
+      });
+      return map;
+    }
+    return map;
+  }
+
+  function normalizedProductList(raw){
+    const list = [];
+    const addUnique = id=>{
+      if (!id) return;
+      if (!list.includes(id)) list.push(id);
+    };
+    if (Array.isArray(raw)){
+      raw.forEach(value=>{
+        const id = normalizeProductId(value);
+        addUnique(id);
+      });
+    }else if (raw && typeof raw === 'object'){
+      Object.keys(raw).forEach(key=>{
+        const id = normalizeProductId(raw[key], key);
+        addUnique(id);
+      });
+    }
+    return list;
+  }
+
+  function resetCaches(){
+    catalogCache = null;
+    productCache = null;
+  }
+
+  function getCatalog(){
+    if (!catalogCache){
+      catalogCache = normalizeCatalog(settings.catalog);
+      settings.catalog = catalogCache;
+    }
+    return catalogCache || {};
+  }
+
   function productList(){
-    if (Array.isArray(settings.products) && settings.products.length){
-      return settings.products;
+    if (!productCache){
+      const normalized = normalizedProductList(settings.products);
+      if (normalized.length){
+        productCache = normalized;
+        settings.products = normalized;
+      }else{
+        productCache = Object.keys(getCatalog());
+      }
     }
-    if (settings.catalog && typeof settings.catalog === 'object'){
-      return Object.keys(settings.catalog);
-    }
-    return [];
+    return productCache.slice();
   }
   function mockups(){ return settings.mockups || []; }
   function types(){ return settings.types || ['Póló eleje','Póló hátulja']; }
@@ -79,10 +170,11 @@
   function hydrateFromSettings(data){
     if (!data || typeof data !== 'object') return;
     if (Array.isArray(data.fonts)) settings.fonts = data.fonts;
-    if (Array.isArray(data.products)) settings.products = data.products;
+    if (data.products !== undefined) settings.products = data.products;
     if (Array.isArray(data.types)) settings.types = data.types;
-    if (data.catalog && typeof data.catalog === 'object') settings.catalog = data.catalog;
+    if (data.catalog !== undefined) settings.catalog = data.catalog;
     if (Array.isArray(data.mockups)) settings.mockups = data.mockups;
+    resetCaches();
     populateFontOptions();
     populateProducts();
     populateViews();
@@ -106,16 +198,23 @@
   function viewOptionsContainer(){ return viewOptionsWrap; }
 
   function currentSelection(){
-    const pid = parseInt(productSel.value||0, 10);
+    const rawValue = productSel ? productSel.value : '';
+    const catalog = getCatalog();
+    const normalizedKey = normalizeProductId(rawValue);
+    const lookupKey = normalizedKey || (rawValue ? String(rawValue) : '');
+    const cfg = (lookupKey && catalog[lookupKey]) || {};
+    const candidate = cfg.product_id !== undefined ? cfg.product_id : (normalizedKey || rawValue);
+    const pidNumber = parseInt(candidate, 10);
+    const pid = Number.isNaN(pidNumber) ? 0 : pidNumber;
+    const pidKey = normalizeProductId(candidate, lookupKey) || String(pid || '');
     const type = viewSel ? (viewSel.value||'') : '';
-    const color = colorSel.value||'';
-    const size = sizeSel.value||'';
-    const cfg = getCatalog()[pid] || {};
+    const color = colorSel ? (colorSel.value||'') : '';
+    const size = sizeSel ? (sizeSel.value||'') : '';
     const key = (type+'|'+color).toLowerCase();
     const mapping = (cfg.map||{})[key] || {};
     const mk = mockups()[parseInt(mapping.mockup_index||-1, 10)] || null;
     const quantity = quantityInput ? sanitizeQuantity(quantityInput.value) : 1;
-    return {pid, type, color, size, quantity, cfg, mapping, mockup: mk};
+    return {pid, pidKey, type, color, size, quantity, cfg, mapping, mockup: mk};
   }
 
   function normalizeKey(str){
@@ -225,7 +324,7 @@
 
   function viewKey(sel){
     const selection = sel || currentSelection();
-    const pid = selection?.pid ? String(selection.pid) : '0';
+    const pid = selection?.pidKey ? String(selection.pidKey) : (selection?.pid ? String(selection.pid) : '0');
     const type = selection?.type || 'default';
     return pid + '|' + type;
   }
@@ -442,7 +541,9 @@
   }
 
   function typesForProduct(pid){
-    const cfg = getCatalog()[pid] || {};
+    const catalog = getCatalog();
+    const key = normalizeProductId(pid);
+    const cfg = (key && catalog[key]) || (pid !== undefined ? catalog[String(pid)] : {}) || {};
     const list = Array.isArray(cfg.types) ? cfg.types : [];
     if (list.length){
       return list;
@@ -453,8 +554,8 @@
   function populateViews(){
     if (!viewSel) return;
     const prev = viewSel.value;
-    const pid = parseInt(productSel.value||0,10);
-    const views = typesForProduct(pid);
+    const productKey = normalizeProductId(productSel.value);
+    const views = typesForProduct(productKey);
     viewSel.innerHTML='';
     const wrap = viewOptionsContainer();
     if (wrap){ wrap.innerHTML=''; }
@@ -541,23 +642,24 @@
 
   function collectCurrentViewStates(){
     const sel = currentSelection();
-    const pidPrefix = String(sel.pid || 0) + '|';
+    const pidKey = sel.pidKey || String(sel.pid || 0);
+    const pidPrefix = pidKey + '|';
     const states={};
     const labels={};
     Object.entries(viewStates).forEach(([key, objects])=>{
       if (pidPrefix && !key.startsWith(pidPrefix)) return;
       const viewValue = key.slice(pidPrefix.length);
       states[viewValue] = objects;
-      labels[viewValue] = viewLabelForValue(sel.pid, viewValue);
+      labels[viewValue] = viewLabelForValue(pidKey, viewValue);
     });
     const currentKey = viewKey(sel).slice(pidPrefix.length);
-    typesForProduct(sel.pid).forEach(name=>{
+    typesForProduct(pidKey).forEach(name=>{
       const value = (name ?? '').toString().toLowerCase();
       if (!states[value]){
         states[value] = viewStates[pidPrefix + value] || [];
       }
       if (!labels[value]){
-        labels[value] = viewLabelForValue(sel.pid, value);
+        labels[value] = viewLabelForValue(pidKey, value);
       }
     });
     return {states, labels, current: currentKey};
@@ -625,9 +727,16 @@
     const prev = productSel.value;
     productSel.innerHTML='';
     (productList()).forEach(pid=>{
+      const key = normalizeProductId(pid);
+      const value = key || (pid !== undefined && pid !== null ? String(pid) : '');
+      if (!value) return;
+      const entry = (value && cat[value]) || (pid !== undefined ? cat[String(pid)] : {}) || {};
+      const labelSource = entry.title || entry.name || entry.label || entry.product_title;
+      const fallbackId = entry.product_id !== undefined ? entry.product_id : (value || pid || '');
+      const label = labelSource || ('Termék #'+ String(fallbackId));
       const o=document.createElement('option');
-      o.value=pid;
-      o.textContent=(cat[pid]?.title||('Termék #'+pid));
+      o.value=value;
+      o.textContent=label;
       productSel.appendChild(o);
     });
     if (productSel.options.length){
@@ -637,8 +746,9 @@
   }
 
   function populateColorsSizes(){
-    const pid = parseInt(productSel.value||0, 10);
-    const cfg = getCatalog()[pid] || {};
+    const productKey = normalizeProductId(productSel.value);
+    const catalog = getCatalog();
+    const cfg = (productKey && catalog[productKey]) || (productSel.value ? catalog[String(productSel.value)] : {}) || {};
     const prevColor = colorSel.value;
     const prevSize = sizeSel.value;
 
