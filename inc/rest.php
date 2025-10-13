@@ -49,7 +49,8 @@ add_action('rest_api_init', function(){
         'preview_url'  => get_post_meta($design_id,'preview_url',true),
       ];
       $variation_id = 0;
-      $added = WC()->cart->add_to_cart($product_id, 1, $variation_id, $attrs, $cart_item_data);
+      $qty = max(1, intval($req->get_param('quantity')));
+      $added = WC()->cart->add_to_cart($product_id, $qty, $variation_id, $attrs, $cart_item_data);
       if (! $added) return new WP_Error('cart','Nem sikerült kosárba tenni', ['status'=>500]);
       return ['ok'=>true,'redirect'=>wc_get_cart_url()];
     }
