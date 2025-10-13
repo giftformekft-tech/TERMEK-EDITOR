@@ -7,7 +7,7 @@
   </div>
 
   <div class="nb-canvas-wrap">
-    <canvas id="nb-canvas" width="700" height="900"></canvas>
+    <canvas id="nb-canvas" width="480" height="640"></canvas>
     <div class="nb-tools">
       <button id="nb-add-text" class="button">Szöveg</button>
       <input type="file" id="nb-upload" accept="image/png,image/jpeg,image/svg+xml" />
