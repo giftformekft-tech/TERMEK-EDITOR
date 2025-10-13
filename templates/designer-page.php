@@ -28,6 +28,23 @@
         <button type="button" id="nb-clear-design" class="nb-subtle-link">Terv ürítése</button>
       </div>
 
+    </aside>
+
+    <main class="nb-column nb-column--stage">
+      <div class="nb-product-stage">
+        <div class="nb-product-frame">
+          <canvas id="nb-canvas" width="480" height="640"></canvas>
+        </div>
+      </div>
+      <div class="nb-stage-controls">
+        <div class="nb-stage-row">
+          <span class="nb-stage-label">Termék színe</span>
+          <div id="nb-color-swatches" class="nb-color-swatches"></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="nb-column nb-column--summary">
       <div class="nb-action-card">
         <button type="button" id="nb-add-text" class="nb-hero-button nb-hero-button--accent">
           <span class="nb-hero-icon">✎</span>
@@ -60,23 +77,6 @@
           </div>
         </div>
       </div>
-    </aside>
-
-    <main class="nb-column nb-column--stage">
-      <div class="nb-product-stage">
-        <div class="nb-product-frame">
-          <canvas id="nb-canvas" width="480" height="640"></canvas>
-        </div>
-      </div>
-      <div class="nb-stage-controls">
-        <div class="nb-stage-row">
-          <span class="nb-stage-label">Termék színe</span>
-          <div id="nb-color-swatches" class="nb-color-swatches"></div>
-        </div>
-      </div>
-    </main>
-
-    <aside class="nb-column nb-column--summary">
       <div class="nb-summary-card">
         <div class="nb-product-heading">
           <h2 id="nb-product-title">Termék</h2>
