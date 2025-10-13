@@ -277,6 +277,130 @@
     designObjects().forEach(obj=>keepObjectInside(obj));
   }
 
+  function currentSelection(){
+    const pid = parseInt(productSel.value||0, 10);
+    const type = typeSel.value||'';
+    const color = colorSel.value||'';
+    const cfg = getCatalog()[pid] || {};
+    const key = (type+'|'+color).toLowerCase();
+    const mapping = (cfg.map||{})[key] || {};
+    const mk = mockups()[parseInt(mapping.mockup_index||-1, 10)] || null;
+    return {pid, type, color, cfg, mapping, mockup: mk};
+  }
+
+  function referenceSizeForMockup(mk, area){
+    const areaW = area?.canvas_w;
+    const areaH = area?.canvas_h;
+    if (areaW && areaH){
+      return {w: areaW, h: areaH};
+    }
+    if (mk){
+      if (mk.canvas && mk.canvas.w && mk.canvas.h){
+        return {w: mk.canvas.w, h: mk.canvas.h};
+      }
+      if (mk.canvas_w && mk.canvas_h){
+        return {w: mk.canvas_w, h: mk.canvas_h};
+      }
+    }
+    return {w: defaultCanvasSize.w, h: defaultCanvasSize.h};
+  }
+
+  function applyCanvasSize(size){
+    const canvasEl = c.getElement();
+    let changed = false;
+    const targetW = size?.w > 0 ? size.w : defaultCanvasSize.w;
+    const targetH = size?.h > 0 ? size.h : defaultCanvasSize.h;
+    if (c.width !== targetW){
+      c.setWidth(targetW);
+      canvasEl.width = targetW;
+      canvasEl.style.width = targetW + 'px';
+      changed = true;
+    }
+    if (c.height !== targetH){
+      c.setHeight(targetH);
+      canvasEl.height = targetH;
+      canvasEl.style.height = targetH + 'px';
+      changed = true;
+    }
+    if (changed){
+      c.calcOffset();
+    }
+    return {w: targetW, h: targetH};
+  }
+
+  function isDesignObject(obj){
+    return !!obj && !obj.__nb_bg && !obj.__nb_area;
+  }
+
+  function designObjects(){
+    return c.getObjects().filter(isDesignObject);
+  }
+
+  function fitWithinArea(obj){
+    const area = c.__nb_area || fallbackArea;
+    if (!area) return;
+    obj.setCoords();
+    let rect = obj.getBoundingRect(true, true);
+    if (!rect.width || !rect.height) return;
+    let scaled = false;
+    if (rect.width > area.w){
+      const scale = area.w / rect.width;
+      obj.scaleX *= scale;
+      obj.scaleY *= scale;
+      scaled = true;
+    }
+    if (scaled){
+      obj.setCoords();
+      rect = obj.getBoundingRect(true, true);
+    }
+    if (rect.height > area.h){
+      const scale = area.h / rect.height;
+      obj.scaleX *= scale;
+      obj.scaleY *= scale;
+      obj.setCoords();
+    }
+  }
+
+  function constrainToArea(obj){
+    const area = c.__nb_area || fallbackArea;
+    if (!area) return;
+    obj.setCoords();
+    let rect = obj.getBoundingRect(true, true);
+    if (rect.left < area.x){
+      obj.left += area.x - rect.left;
+    }
+    if (rect.top < area.y){
+      obj.top += area.y - rect.top;
+    }
+    obj.setCoords();
+    rect = obj.getBoundingRect(true, true);
+    const areaRight = area.x + area.w;
+    const areaBottom = area.y + area.h;
+    const rectRight = rect.left + rect.width;
+    const rectBottom = rect.top + rect.height;
+    if (rectRight > areaRight){
+      obj.left -= rectRight - areaRight;
+    }
+    if (rectBottom > areaBottom){
+      obj.top -= rectBottom - areaBottom;
+    }
+    obj.setCoords();
+  }
+
+  function keepObjectInside(obj, options){
+    if (!isDesignObject(obj)) return;
+    const opts = Object.assign({fit:true}, options||{});
+    if (opts.fit){
+      fitWithinArea(obj);
+    }
+    constrainToArea(obj);
+    c.requestRenderAll();
+  }
+
+  function enforceAllObjectsInside(){
+    designObjects().forEach(obj=>keepObjectInside(obj));
+  }
+
   function populateTypes(){
     const prev = typeSel.value;
     typeSel.innerHTML='';
@@ -454,6 +578,13 @@
   productSel.onchange = ()=>{ populateColorsSizes(); setMockupBgAndArea(); };
   colorSel.onchange = ()=>{ highlightColor(colorSel.value); updateSummary(); setMockupBgAndArea(); };
   sizeSel.onchange = ()=>{ highlightSize(sizeSel.value); updateSummary(); };
+
+  // Apply constraints on interactions
+  c.on('object:added', e=>{ keepObjectInside(e.target); });
+  c.on('object:moving', e=>{ keepObjectInside(e.target, {fit:false}); });
+  c.on('object:scaling', e=>{ keepObjectInside(e.target); });
+  c.on('object:rotating', e=>{ keepObjectInside(e.target); });
+  c.on('object:modified', e=>{ keepObjectInside(e.target); });
 
   // Apply constraints on interactions
   c.on('object:added', e=>{ keepObjectInside(e.target); });
