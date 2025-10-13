@@ -41,6 +41,21 @@
   const uploadInput = document.getElementById('nb-upload');
   const addTextBtn = document.getElementById('nb-add-text');
 
+  const toggleButtons = Array.from(document.querySelectorAll('[data-nb-toggle]'));
+  toggleButtons.forEach(btn=>{
+    const target = btn.dataset.nbToggle;
+    if (!target) return;
+    const panel = document.querySelector(`[data-nb-panel="${target}"]`);
+    if (!panel) return;
+    let expanded = !panel.hasAttribute('hidden');
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    btn.addEventListener('click', ()=>{
+      expanded = !expanded;
+      panel.hidden = !expanded;
+      btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    });
+  });
+
   const loadedFontUrls = new Set();
   const designState = {savedDesignId:null};
 
