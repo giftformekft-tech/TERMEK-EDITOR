@@ -714,6 +714,7 @@
   populateFontOptions();
   populateTypes();
   populateProducts();
+  populateViews();
   populateColorsSizes();
   initAlignDefault();
   setMockupBgAndArea();
