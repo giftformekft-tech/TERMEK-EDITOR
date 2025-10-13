@@ -1,16 +1,12 @@
 (function(){
-  function run(){
-  const settings = (typeof NB_DESIGNER!=='undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
-  if (typeof fabric === 'undefined' || typeof fabric.Canvas !== 'function'){
-    return;
-  }
-  const canvasElement = document.getElementById('nb-canvas');
-  if (!canvasElement){
-    return;
-  }
-  const c = new fabric.Canvas(canvasElement,{preserveObjectStacking:true, backgroundColor:'#fff'});
+  if (typeof fabric === 'undefined') return;
+  const canvasEl = document.getElementById('nb-canvas');
+  if (!canvasEl) return;
 
-  const defaultCanvasSize = {w: c.width, h: c.height};
+  const settings = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
+  const c = new fabric.Canvas('nb-canvas', {preserveObjectStacking:true, backgroundColor:'#fff'});
+
+  const defaultCanvasSize = {w:c.width, h:c.height};
   const fallbackArea = {
     x: Math.round(defaultCanvasSize.w * 0.15),
     y: Math.round(defaultCanvasSize.h * 0.15),
@@ -20,445 +16,369 @@
     canvas_h: defaultCanvasSize.h
   };
 
-  let catalogCache = null;
-  let productCache = null;
-
-  function normalizeProductId(value, fallback){
-    const candidates = [];
-    if (value && typeof value === 'object'){
-      ['product_id','id','ID','value','key','slug','pid'].forEach(prop=>{
-        if (value[prop] !== undefined && value[prop] !== null){
-          candidates.push(value[prop]);
-        }
-      });
-    }else{
-      candidates.push(value);
-    }
-    if (fallback !== undefined && fallback !== null){
-      candidates.push(fallback);
-    }
-    for (let i=0; i<candidates.length; i++){
-      const candidate = candidates[i];
-      if (candidate === null || candidate === undefined) continue;
-      if (typeof candidate === 'number' && Number.isFinite(candidate)){
-        return String(candidate);
-      }
-      if (typeof candidate === 'string'){
-        const trimmed = candidate.trim();
-        if (trimmed) return trimmed;
-      }
+  function parseNumeric(value){
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string'){
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const num = Number(trimmed);
+      if (Number.isFinite(num)) return num;
     }
     return null;
   }
 
-  function normalizeCatalog(raw){
-    const map = {};
-    if (!raw) return map;
-    if (Array.isArray(raw)){
-      raw.forEach((entry, index)=>{
-        if (!entry) return;
-        const key = normalizeProductId(entry, index);
-        if (!key) return;
-        const clone = (entry && typeof entry === 'object') ? Object.assign({}, entry) : {};
-        if (clone.product_id === undefined){
-          const numeric = parseInt(key, 10);
-          clone.product_id = Number.isNaN(numeric) ? key : numeric;
-        }
-        map[key] = clone;
-      });
-      return map;
-    }
-    if (typeof raw === 'object'){
-      Object.keys(raw).forEach(originalKey=>{
-        const entry = raw[originalKey];
-        if (!entry) return;
-        const key = normalizeProductId(entry, originalKey);
-        if (!key) return;
-        const clone = (entry && typeof entry === 'object') ? Object.assign({}, entry) : {};
-        if (clone.product_id === undefined){
-          const numeric = parseInt(key, 10);
-          clone.product_id = Number.isNaN(numeric) ? key : numeric;
-        }
-        map[key] = clone;
-      });
-      return map;
-    }
-    return map;
+  function numberOr(value, fallback){
+    const num = parseNumeric(value);
+    return num === null ? fallback : num;
   }
 
-  function normalizedProductList(raw){
-    const list = [];
-    const addUnique = id=>{
-      if (!id) return;
-      if (!list.includes(id)) list.push(id);
-    };
-    if (Array.isArray(raw)){
-      raw.forEach(value=>{
-        const id = normalizeProductId(value);
-        addUnique(id);
-      });
-    }else if (raw && typeof raw === 'object'){
-      Object.keys(raw).forEach(key=>{
-        const id = normalizeProductId(raw[key], key);
-        addUnique(id);
-      });
-    }
-    return list;
+  function positiveNumberOr(value, fallback){
+    const num = parseNumeric(value);
+    return (num === null || num <= 0) ? fallback : num;
   }
 
-  function resetCaches(){
-    catalogCache = null;
-    productCache = null;
-  }
-
-  function getCatalog(){
-    if (!catalogCache){
-      catalogCache = normalizeCatalog(settings.catalog);
-      settings.catalog = catalogCache;
-    }
-    return catalogCache || {};
-  }
-
-  function productList(){
-    if (!productCache){
-      const normalized = normalizedProductList(settings.products);
-      if (normalized.length){
-        productCache = normalized;
-        settings.products = normalized;
-      }else{
-        productCache = Object.keys(getCatalog());
+  function loadMockupImage(url){
+    return new Promise((resolve, reject)=>{
+      if (!url){
+        reject(new Error('no-url'));
+        return;
       }
-    }
-    return productCache.slice();
+      const attempt = (crossOrigin, next)=>{
+        fabric.util.loadImage(url, (img, isError)=>{
+          if (isError || !img){
+            if (typeof next === 'function'){
+              next();
+            } else {
+              reject(new Error('mockup-load-failed'));
+            }
+            return;
+          }
+          resolve(new fabric.Image(img, {crossOrigin: crossOrigin || ''}));
+        }, null, crossOrigin);
+      };
+      attempt('anonymous', ()=>attempt(null, null));
+    });
   }
+
+  const typeSel = document.getElementById('nb-type');
+  const productSel = document.getElementById('nb-product');
+  const colorSel = document.getElementById('nb-color');
+  const sizeSel = document.getElementById('nb-size');
+  if (!typeSel || !productSel || !colorSel || !sizeSel) return;
+  const typePills = document.getElementById('nb-type-pills');
+  const colorSwatches = document.getElementById('nb-color-swatches');
+  const sizeButtonsWrap = document.getElementById('nb-size-buttons');
+  const selectionSummaryEl = document.getElementById('nb-selection-summary');
+  const productTitleEl = document.getElementById('nb-product-title');
+  const productMetaEl = document.getElementById('nb-product-meta');
+  const priceDisplayEl = document.getElementById('nb-price-display');
+  const fontFamilySel = document.getElementById('nb-font-family');
+  const fontSizeInput = document.getElementById('nb-font-size');
+  const fontSizeValue = document.getElementById('nb-font-size-value');
+  const fontColorInput = document.getElementById('nb-font-color');
+  const fontBoldToggle = document.getElementById('nb-font-bold');
+  const fontItalicToggle = document.getElementById('nb-font-italic');
+  const alignButtons = Array.from(document.querySelectorAll('[data-nb-align]'));
+  const clearButton = document.getElementById('nb-clear-design');
+  const addToCartBtn = document.getElementById('nb-add-to-cart');
+  const saveBtn = document.getElementById('nb-save');
+  const uploadInput = document.getElementById('nb-upload');
+  const addTextBtn = document.getElementById('nb-add-text');
+
+  const toggleButtons = Array.from(document.querySelectorAll('[data-nb-toggle]'));
+  toggleButtons.forEach(btn=>{
+    const target = btn.dataset.nbToggle;
+    if (!target) return;
+    const panel = document.querySelector(`[data-nb-panel="${target}"]`);
+    if (!panel) return;
+    let expanded = !panel.hasAttribute('hidden');
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    btn.addEventListener('click', ()=>{
+      expanded = !expanded;
+      panel.hidden = !expanded;
+      btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    });
+  });
+
+  const loadedFontUrls = new Set();
+  const designState = {savedDesignId:null};
+
+  function getCatalog(){ return settings.catalog || {}; }
+  function productList(){ return settings.products || []; }
   function mockups(){ return settings.mockups || []; }
-  function types(){ return settings.types || ['Póló eleje','Póló hátulja']; }
+  function types(){ return settings.types || ['Póló','Pulóver']; }
+  function fontEntries(){ return settings.fonts || []; }
 
-  const productSel=document.getElementById('nb-product');
-  const viewSel=document.getElementById('nb-view');
-  const colorSel=document.getElementById('nb-color');
-  const sizeSel=document.getElementById('nb-size');
-  if (!productSel || !viewSel || !colorSel || !sizeSel){
-    return;
-  }
-  const colorSwatchesWrap=document.getElementById('nb-color-swatches');
-  const sizeOptionsWrap=document.getElementById('nb-size-options');
-  const viewOptionsWrap=document.getElementById('nb-view-options');
-  const productTitleEl=document.getElementById('nb-product-title');
-  const summaryTypeEl=document.getElementById('nb-summary-type');
-  const summaryColorEl=document.getElementById('nb-summary-color');
-  const summarySizeEl=document.getElementById('nb-summary-size');
-  const summaryPriceEl=document.getElementById('nb-summary-price');
-  const quantityInput=document.getElementById('nb-quantity');
-  const qtyMinusBtn=document.getElementById('nb-qty-minus');
-  const qtyPlusBtn=document.getElementById('nb-qty-plus');
-  const addToCartBtn=document.getElementById('nb-add-to-cart');
-  const textSettings=document.getElementById('nb-text-settings');
-  const textFontSelect=document.getElementById('nb-text-font');
-  const textSizeInput=document.getElementById('nb-text-size');
-  const textColorInput=document.getElementById('nb-text-color');
-  const textAlignButtons=Array.from(document.querySelectorAll('.nb-text-align-btn'));
-  const textBoldBtn=document.getElementById('nb-text-bold');
-  const textItalicBtn=document.getElementById('nb-text-italic');
-
-  const viewStates={};
-  let remoteSettingsRequested=false;
-  let lastSelectionKey=null;
-  let savedDesignId=null;
-  let isRestoring=false;
-
-  function hydrateFromSettings(data){
-    if (!data || typeof data !== 'object') return;
-    if (Array.isArray(data.fonts)) settings.fonts = data.fonts;
-    if (data.products !== undefined) settings.products = data.products;
-    if (Array.isArray(data.types)) settings.types = data.types;
-    if (data.catalog !== undefined) settings.catalog = data.catalog;
-    if (Array.isArray(data.mockups)) settings.mockups = data.mockups;
-    resetCaches();
-    populateFontOptions();
-    populateProducts();
-    populateViews();
-    populateColorsSizes();
-    setMockupBgAndArea();
-    restoreDesignForKey(viewKey());
-    updateSummary();
-    updateLastSelectionKey();
-  }
-
-  function maybeFetchRemoteSettings(){
-    if (productSel.options.length || remoteSettingsRequested) return;
-    if (typeof NB_DESIGNER === 'undefined' || !NB_DESIGNER.rest) return;
-    remoteSettingsRequested=true;
-    fetch(NB_DESIGNER.rest+'settings',{credentials:'same-origin'})
-      .then(res=>res.ok ? res.json() : null)
-      .then(data=>{ if (data && typeof data === 'object'){ hydrateFromSettings(data); } })
-      .catch(()=>{});
-  }
-
-  function viewOptionsContainer(){ return viewOptionsWrap; }
-
-  function currentSelection(){
-    const rawValue = productSel ? productSel.value : '';
-    const catalog = getCatalog();
-    const normalizedKey = normalizeProductId(rawValue);
-    const lookupKey = normalizedKey || (rawValue ? String(rawValue) : '');
-    const cfg = (lookupKey && catalog[lookupKey]) || {};
-    const candidate = cfg.product_id !== undefined ? cfg.product_id : (normalizedKey || rawValue);
-    const pidNumber = parseInt(candidate, 10);
-    const pid = Number.isNaN(pidNumber) ? 0 : pidNumber;
-    const pidKey = normalizeProductId(candidate, lookupKey) || String(pid || '');
-    const type = viewSel ? (viewSel.value||'') : '';
-    const color = colorSel ? (colorSel.value||'') : '';
-    const size = sizeSel ? (sizeSel.value||'') : '';
-    const key = (type+'|'+color).toLowerCase();
-    const mapping = (cfg.map||{})[key] || {};
-    const mk = mockups()[parseInt(mapping.mockup_index||-1, 10)] || null;
-    const quantity = quantityInput ? sanitizeQuantity(quantityInput.value) : 1;
-    return {pid, pidKey, type, color, size, quantity, cfg, mapping, mockup: mk};
-  }
-
-  function normalizeKey(str){
-    const lower = (str||'').toString().toLowerCase();
-    if (typeof lower.normalize === 'function'){
-      return lower.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  function parseFontEntry(entry){
+    if (typeof entry !== 'string') return null;
+    const parts = entry.split('|').map(p=>p.trim()).filter(Boolean);
+    if (!parts.length) return null;
+    if (parts.length === 1){
+      return {label: parts[0], family: parts[0], url: ''};
     }
-    return lower;
-  }
-
-  function colorNameToCss(name){
-    if (!name) return '#ddd';
-    const trimmed = name.toString().trim();
-    if (/^#/.test(trimmed) || /^rgb/.test(trimmed)) return trimmed;
-    const key = normalizeKey(trimmed);
-    const map = {
-      fekete:'#111111', black:'#111111',
-      feher:'#ffffff', white:'#ffffff',
-      piros:'#e53935', red:'#e53935',
-      voros:'#c62828', bordo:'#7b1e3c', burgundy:'#7b1e3c',
-      narancs:'#fb8c00', orange:'#fb8c00',
-      sarga:'#fdd835', yellow:'#fdd835',
-      arany:'#d4af37', gold:'#d4af37',
-      ezust:'#c0c0c0', silver:'#c0c0c0',
-      zold:'#43a047', green:'#43a047',
-      sotetzold:'#2e7d32', vilagoszold:'#81c784', lime:'#81c784',
-      kek:'#1e88e5', blue:'#1e88e5',
-      sotetkek:'#1565c0', navy:'#1565c0',
-      vilagoskek:'#64b5f6', lightblue:'#64b5f6',
-      lila:'#8e24aa', purple:'#8e24aa',
-      pink:'#f06292', magenta:'#d81b60',
-      barna:'#8d6e63', brown:'#8d6e63',
-      krem:'#f5e6c4', cream:'#f5e6c4', beige:'#d7c0a6',
-      szurke:'#9e9e9e', grey:'#9e9e9e', gray:'#9e9e9e',
-      sotetszurke:'#616161', vilagosszurke:'#cfcfcf',
-      grafit:'#4b4b4b', charcoal:'#4b4b4b',
-      oliva:'#556b2f', olive:'#556b2f',
-      menta:'#98ff98', mint:'#98ff98',
-      turkiz:'#00bcd4', turquoise:'#00bcd4'
-    };
-    if (map[key]) return map[key];
-    const parts = key.split(/[^a-z0-9]+/);
-    for (let i=0;i<parts.length;i++){
-      const part = parts[i];
-      if (map[part]) return map[part];
+    if (parts.length === 2){
+      return {label: parts[0], family: parts[0], url: parts[1]};
     }
-    return '#ddd';
+    return {label: parts[0], family: parts[1], url: parts[2]};
   }
 
-  function toNumber(value, fallback){
-    const num = parseFloat(value);
-    return Number.isFinite(num) ? num : fallback;
+  function ensureFontLoaded(font){
+    if (!font || !font.url || loadedFontUrls.has(font.url)) return;
+    loadedFontUrls.add(font.url);
+    if (/\.(woff2?|ttf|otf|eot)$/i.test(font.url) && typeof FontFace !== 'undefined'){
+      try {
+        const face = new FontFace(font.family, `url(${font.url})`);
+        face.load().then(f=>{
+          if (document.fonts && document.fonts.add){
+            document.fonts.add(f);
+          }
+          c.requestRenderAll();
+        }).catch(()=>{});
+      } catch(e){ /* ignore */ }
+    } else {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = font.url;
+      document.head.appendChild(link);
+    }
   }
 
-  function sanitizeQuantity(value){
-    const num = parseInt(value, 10);
-    return Number.isFinite(num) && num > 0 ? num : 1;
+  function addFontOption(font){
+    if (!fontFamilySel || !font || !font.family) return;
+    const exists = Array.from(fontFamilySel.options).some(opt=>opt.value === font.family);
+    if (exists) return;
+    const opt = document.createElement('option');
+    opt.value = font.family;
+    opt.textContent = font.label || font.family;
+    fontFamilySel.appendChild(opt);
+    ensureFontLoaded(font);
   }
 
-  function rgbToHex(str){
-    if (typeof str !== 'string') return '#000000';
-    const match = str.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-    if (!match) return '#000000';
-    const r = Math.max(0, Math.min(255, parseInt(match[1],10))).toString(16).padStart(2,'0');
-    const g = Math.max(0, Math.min(255, parseInt(match[2],10))).toString(16).padStart(2,'0');
-    const b = Math.max(0, Math.min(255, parseInt(match[3],10))).toString(16).padStart(2,'0');
-    return '#'+r+g+b;
+  function populateFontOptions(){
+    if (!fontFamilySel) return;
+    fontFamilySel.innerHTML = '';
+    const defaults = [
+      {label:'Arial', family:'Arial'},
+      {label:'Roboto', family:'Roboto', url:'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap'},
+      {label:'Montserrat', family:'Montserrat', url:'https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap'},
+      {label:'Lato', family:'Lato', url:'https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap'}
+    ];
+    defaults.forEach(addFontOption);
+    fontEntries().map(parseFontEntry).forEach(addFontOption);
+    if (!fontFamilySel.value && fontFamilySel.options.length){
+      fontFamilySel.value = fontFamilySel.options[0].value;
+    }
   }
 
-  function selectedOptionText(sel){
-    if (!sel || sel.selectedIndex < 0) return '';
-    const opt = sel.options[sel.selectedIndex];
-    return opt ? (opt.textContent || opt.innerText || '') : '';
+  function formatColorLabel(str){
+    if (typeof str !== 'string') return '';
+    const trimmed = str.trim();
+    const bracket = trimmed.replace(/\s*\([^)]*\)\s*$/, '');
+    if (bracket.length) return bracket;
+    return trimmed;
   }
 
-  function highlightColor(value){
-    if (!colorSwatchesWrap) return;
-    Array.from(colorSwatchesWrap.querySelectorAll('.nb-color-swatch')).forEach(btn=>{
-      btn.classList.toggle('active', btn.dataset.value === value);
-    });
+  function colorCodeFromText(str){
+    if (typeof str !== 'string') return '';
+    const hexMatch = str.match(/#([0-9a-f]{3,8})/i);
+    if (hexMatch) return `#${hexMatch[1]}`;
+    const cleaned = str.replace(/\([^)]*\)/g,'').trim().toLowerCase();
+    const canCheck = typeof CSS !== 'undefined' && typeof CSS.supports === 'function';
+    if (cleaned && canCheck && CSS.supports('color', cleaned)) return cleaned;
+    return '';
   }
 
-  function highlightSize(value){
-    if (!sizeOptionsWrap) return;
-    Array.from(sizeOptionsWrap.querySelectorAll('.nb-size-option')).forEach(btn=>{
-      btn.classList.toggle('active', btn.dataset.value === value);
-    });
-  }
-
-  function highlightView(value){
-    const wrap = viewOptionsContainer();
-    if (!wrap) return;
-    Array.from(wrap.querySelectorAll('.nb-view-option')).forEach(btn=>{
-      btn.classList.toggle('active', btn.dataset.value === value);
-    });
-  }
-
-  function toggleTextSettings(show){
-    if (!textSettings) return;
-    textSettings.classList.toggle('nb-hidden', !show);
-  }
-
-  function isTextObject(obj){
-    if (!obj) return false;
-    return obj.type === 'textbox' || obj.type === 'text' || obj.type === 'i-text';
-  }
-
-  function viewKey(sel){
-    const selection = sel || currentSelection();
-    const pid = selection?.pidKey ? String(selection.pidKey) : (selection?.pid ? String(selection.pid) : '0');
-    const type = selection?.type || 'default';
-    return pid + '|' + type;
-  }
-
-  function storeCurrentDesign(key){
-    if (!key || isRestoring) return;
-    const objects = designObjects().map(obj=>obj.toObject(['fontFamily','fontWeight','fontStyle','textAlign','charSpacing','lineHeight','styles','fill']));
-    viewStates[key] = objects;
-  }
-
-  function clearDesignObjects(){
-    designObjects().forEach(obj=>c.remove(obj));
-  }
-
-  function restoreDesignForKey(key){
-    clearDesignObjects();
-    const stored = viewStates[key] || [];
-    viewStates[key] = stored;
-    if (!stored.length){
-      c.requestRenderAll();
+  function ensureSelectValue(selectEl){
+    if (!selectEl) return;
+    const values = Array.from(selectEl.options).map(o=>o.value);
+    if (!values.length){
+      selectEl.value = '';
       return;
     }
-    isRestoring=true;
-    fabric.util.enlivenObjects(stored, objects=>{
-      objects.forEach(obj=>{
-        c.add(obj);
-      });
-      isRestoring=false;
-      enforceAllObjectsInside();
-      c.requestRenderAll();
+    if (!values.includes(selectEl.value)){
+      selectEl.value = values[0];
+    }
+  }
+
+  function renderTypePills(){
+    if (!typePills) return;
+    typePills.innerHTML = '';
+    Array.from(typeSel.options).forEach(opt=>{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'nb-pill' + (opt.value === typeSel.value ? ' is-active' : '');
+      btn.textContent = opt.dataset.label || opt.textContent;
+      btn.onclick = () => {
+        typeSel.value = opt.value;
+        renderTypePills();
+        setMockupBgAndArea();
+        updateSelectionSummary();
+      };
+      typePills.appendChild(btn);
+    });
+    if (!typeSel.options.length){
+      const span = document.createElement('div');
+      span.className = 'nb-empty';
+      span.textContent = 'Nincs típus konfigurálva.';
+      typePills.appendChild(span);
+    }
+  }
+
+  function renderColorSwatches(){
+    if (!colorSwatches) return;
+    colorSwatches.innerHTML = '';
+    const options = Array.from(colorSel.options);
+    if (!options.length){
+      const empty = document.createElement('div');
+      empty.className = 'nb-empty';
+      empty.textContent = 'Ehhez a termékhez nincs szín beállítva.';
+      colorSwatches.appendChild(empty);
+      return;
+    }
+    options.forEach(opt=>{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'nb-swatch' + (opt.value === colorSel.value ? ' is-active' : '');
+      const colorCode = colorCodeFromText(opt.dataset.rawColor || opt.dataset.original || opt.textContent);
+      if (colorCode){
+        btn.style.setProperty('--swatch-color', colorCode);
+      }
+      const label = opt.dataset.display || opt.textContent;
+      btn.innerHTML = `<span class="nb-swatch-color"></span><span class="nb-swatch-label">${label}</span>`;
+      btn.onclick = ()=>{
+        colorSel.value = opt.value;
+        renderColorSwatches();
+        setMockupBgAndArea();
+        updateSelectionSummary();
+      };
+      colorSwatches.appendChild(btn);
     });
   }
 
-  function updateLastSelectionKey(){
-    lastSelectionKey = viewKey();
-  }
-
-  function markDirty(){
-    if (savedDesignId){
-      savedDesignId=null;
-      if (addToCartBtn){ addToCartBtn.disabled=true; }
+  function renderSizeButtons(){
+    if (!sizeButtonsWrap) return;
+    sizeButtonsWrap.innerHTML = '';
+    const options = Array.from(sizeSel.options);
+    if (!options.length){
+      const empty = document.createElement('div');
+      empty.className = 'nb-empty';
+      empty.textContent = 'Nincs méret megadva.';
+      sizeButtonsWrap.appendChild(empty);
+      return;
     }
+    options.forEach(opt=>{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'nb-pill' + (opt.value === sizeSel.value ? ' is-active' : '');
+      btn.textContent = opt.textContent;
+      btn.onclick = ()=>{
+        sizeSel.value = opt.value;
+        renderSizeButtons();
+        updateSelectionSummary();
+      };
+      sizeButtonsWrap.appendChild(btn);
+    });
   }
 
-  function triggerChange(el){
-    if (!el) return;
-    let ev;
-    if (typeof Event === 'function'){ ev = new Event('change', {bubbles:true}); }
-    else {
-      ev = document.createEvent('Event');
-      ev.initEvent('change', true, true);
-    }
-    el.dispatchEvent(ev);
+  function getColorLabel(){
+    const opt = Array.from(colorSel.options).find(o=>o.value === colorSel.value);
+    return opt ? (opt.dataset.original || opt.textContent) : '';
   }
 
-  function formatHUF(value){
-    if (typeof value !== 'number' || Number.isNaN(value)) return null;
-    try{
-      return new Intl.NumberFormat('hu-HU',{style:'currency',currency:'HUF',maximumFractionDigits:0}).format(value);
-    }catch(e){
-      return Math.round(value)+' Ft';
-    }
-  }
-
-  function calculateDisplayedPrice(sel){
-    if (!sel || !sel.mapping) return null;
-    const base = parseFloat(sel.mapping.base_fee);
-    if (Number.isNaN(base)) return null;
-    let price = base;
-    const surcharges = sel.cfg?.size_surcharge || {};
-    if (sel.size && surcharges && Object.prototype.hasOwnProperty.call(surcharges, sel.size)){
-      const add = parseFloat(surcharges[sel.size]);
-      if (!Number.isNaN(add)) price += add;
-    }
-    return price;
-  }
-
-  function updateSummary(){
+  function updateSelectionSummary(){
     const sel = currentSelection();
+    const typeLabel = typeSel.selectedOptions[0]?.dataset?.label || typeSel.selectedOptions[0]?.textContent || '';
+    const colorLabel = getColorLabel();
+    const sizeLabel = sizeSel.value || '';
     if (productTitleEl){
-      const label = selectedOptionText(productSel) || 'Válaszd ki a terméket';
-      productTitleEl.textContent = label;
+      productTitleEl.textContent = sel.cfg?.title || 'Termék';
     }
-    if (summaryTypeEl){
-      summaryTypeEl.textContent = selectedOptionText(viewSel) || '–';
+    if (productMetaEl){
+      const parts = [];
+      if (typeLabel) parts.push(`Típus: ${typeLabel}`);
+      if (colorLabel) parts.push(`Szín: ${colorLabel}`);
+      if (sizeLabel) parts.push(`Méret: ${sizeLabel}`);
+      productMetaEl.textContent = parts.join(' • ');
     }
-    if (summaryColorEl){
-      const colorLabel = selectedOptionText(colorSel);
-      summaryColorEl.textContent = colorLabel || '–';
+    if (selectionSummaryEl){
+      selectionSummaryEl.innerHTML = '';
+      if (typeLabel){
+        const chip = document.createElement('span');
+        chip.textContent = `Típus: ${typeLabel}`;
+        selectionSummaryEl.appendChild(chip);
+      }
+      if (colorLabel){
+        const chip = document.createElement('span');
+        chip.textContent = `Szín: ${colorLabel}`;
+        selectionSummaryEl.appendChild(chip);
+      }
+      if (sizeLabel){
+        const chip = document.createElement('span');
+        chip.textContent = `Méret: ${sizeLabel}`;
+        selectionSummaryEl.appendChild(chip);
+      }
     }
-    if (summarySizeEl){
-      summarySizeEl.textContent = sel.size ? sel.size.toUpperCase() : '–';
+    updatePriceDisplay();
+  }
+
+  function updatePriceDisplay(){
+    if (!priceDisplayEl) return;
+    if (designState.savedDesignId){
+      priceDisplayEl.textContent = `Mentve (#${designState.savedDesignId})`;
+    } else {
+      priceDisplayEl.textContent = 'Az egyedi felár a mentés után kerül kiszámításra.';
     }
-    if (summaryPriceEl){
-      const price = calculateDisplayedPrice(sel);
-      const qty = quantityInput ? sanitizeQuantity(quantityInput.value) : 1;
-      const total = price !== null ? price * qty : null;
-      const formatted = total !== null ? formatHUF(total) : null;
-      summaryPriceEl.textContent = formatted || ' ';
-    }
+  }
+
+  function currentSelection(){
+    const pid = parseInt(productSel.value || 0, 10);
+    const type = typeSel.value || '';
+    const color = colorSel.value || '';
+    const cfg = getCatalog()[pid] || {};
+    const key = (type + '|' + color).toLowerCase();
+    const mapping = (cfg.map || {})[key] || {};
+    const mk = mockups()[parseInt(mapping.mockup_index || -1, 10)] || null;
+    return {pid, type, color, cfg, mapping, mockup: mk};
   }
 
   function referenceSizeForMockup(mk, area){
-    const areaW = toNumber(area?.canvas_w, null);
-    const areaH = toNumber(area?.canvas_h, null);
+    const areaW = positiveNumberOr(area?.canvas_w, null);
+    const areaH = positiveNumberOr(area?.canvas_h, null);
     if (areaW && areaH){
       return {w: areaW, h: areaH};
     }
     if (mk){
-      if (mk.canvas && mk.canvas.w && mk.canvas.h){
-        return {w: toNumber(mk.canvas.w, defaultCanvasSize.w), h: toNumber(mk.canvas.h, defaultCanvasSize.h)};
+      const nestedW = positiveNumberOr(mk.canvas?.w, null);
+      const nestedH = positiveNumberOr(mk.canvas?.h, null);
+      if (nestedW && nestedH){
+        return {w: nestedW, h: nestedH};
       }
-      if (mk.canvas_w && mk.canvas_h){
-        return {w: toNumber(mk.canvas_w, defaultCanvasSize.w), h: toNumber(mk.canvas_h, defaultCanvasSize.h)};
+      const canvasW = positiveNumberOr(mk.canvas_w, null);
+      const canvasH = positiveNumberOr(mk.canvas_h, null);
+      if (canvasW && canvasH){
+        return {w: canvasW, h: canvasH};
       }
     }
     return {w: defaultCanvasSize.w, h: defaultCanvasSize.h};
   }
 
   function applyCanvasSize(size){
-    const canvasEl = c.getElement();
+    const canvasElement = c.getElement();
+    const sizeW = positiveNumberOr(size?.w, defaultCanvasSize.w);
+    const sizeH = positiveNumberOr(size?.h, defaultCanvasSize.h);
+    const targetW = sizeW > 0 ? sizeW : defaultCanvasSize.w;
+    const targetH = sizeH > 0 ? sizeH : defaultCanvasSize.h;
     let changed = false;
-    const targetW = toNumber(size?.w, defaultCanvasSize.w) || defaultCanvasSize.w;
-    const targetH = toNumber(size?.h, defaultCanvasSize.h) || defaultCanvasSize.h;
     if (c.width !== targetW){
       c.setWidth(targetW);
-      canvasEl.width = targetW;
-      canvasEl.style.width = targetW + 'px';
+      canvasElement.width = targetW;
+      canvasElement.style.width = targetW + 'px';
       changed = true;
     }
     if (c.height !== targetH){
       c.setHeight(targetH);
-      canvasEl.height = targetH;
-      canvasEl.style.height = targetH + 'px';
+      canvasElement.height = targetH;
+      canvasElement.style.height = targetH + 'px';
       changed = true;
     }
     if (changed){
@@ -528,7 +448,7 @@
 
   function keepObjectInside(obj, options){
     if (!isDesignObject(obj)) return;
-    const opts = Object.assign({fit:true}, options||{});
+    const opts = Object.assign({fit:true}, options || {});
     if (opts.fit){
       fitWithinArea(obj);
     }
@@ -540,299 +460,27 @@
     designObjects().forEach(obj=>keepObjectInside(obj));
   }
 
-  function typesForProduct(pid){
-    const catalog = getCatalog();
-    const key = normalizeProductId(pid);
-    const cfg = (key && catalog[key]) || (pid !== undefined ? catalog[String(pid)] : {}) || {};
-    const list = Array.isArray(cfg.types) ? cfg.types : [];
-    if (list.length){
-      return list;
-    }
-    return types();
-  }
-
-  function populateViews(){
-    if (!viewSel) return;
-    const prev = viewSel.value;
-    const productKey = normalizeProductId(productSel.value);
-    const views = typesForProduct(productKey);
-    viewSel.innerHTML='';
-    const wrap = viewOptionsContainer();
-    if (wrap){ wrap.innerHTML=''; }
-    views.forEach(v=>{
-      const value = (v ?? '').toString().toLowerCase();
-      const o=document.createElement('option');
-      o.value=value;
-      o.textContent=v;
-      viewSel.appendChild(o);
-      if (wrap){
-        const btn=document.createElement('button');
-        btn.type='button';
-        btn.className='nb-view-option';
-        btn.dataset.value=value;
-        btn.textContent=v;
-        btn.addEventListener('click', ()=>{
-          if (viewSel.value === value) return;
-          storeCurrentDesign(lastSelectionKey);
-          viewSel.value=value;
-          triggerChange(viewSel);
-        });
-        wrap.appendChild(btn);
-      }
-    });
-    if (viewSel.options.length){
-      const values = Array.from(viewSel.options).map(opt=>opt.value);
-      const target = (prev && values.includes(prev)) ? prev : viewSel.options[0].value;
-      viewSel.value = target;
-    }else{
-      viewSel.value='';
-    }
-    highlightView(viewSel.value);
-  }
-
-  function availableFonts(){
-    const list=[];
-    if (Array.isArray(settings.fonts)){
-      settings.fonts.forEach(f=>{
-        if (!f) return;
-        const str = f.toString().trim();
-        if (!str) return;
-        if (/^https?:/i.test(str)){
-          const last = str.split('/').pop() || '';
-          const name = last.split('.')[0] || last;
-          const pretty = name.replace(/[-_]+/g,' ');
-          if (pretty) list.push(pretty.charAt(0).toUpperCase()+pretty.slice(1));
-        }else{
-          list.push(str);
-        }
-      });
-    }
-    ['Montserrat','Arial','Helvetica','Roboto','Open Sans','Oswald','Times New Roman'].forEach(font=>list.push(font));
-    const unique=[];
-    list.forEach(font=>{
-      const normalized = font.trim();
-      if (!normalized) return;
-      if (!unique.includes(normalized)) unique.push(normalized);
-    });
-    return unique;
-  }
-
-  function populateFontOptions(){
-    if (!textFontSelect) return;
-    const prev = textFontSelect.value;
-    textFontSelect.innerHTML='';
-    availableFonts().forEach(font=>{
-      const opt=document.createElement('option');
-      opt.value=font;
-      opt.textContent=font;
-      textFontSelect.appendChild(opt);
-    });
-    if (textFontSelect.options.length){
-      const values = Array.from(textFontSelect.options).map(opt=>opt.value);
-      textFontSelect.value = (prev && values.includes(prev)) ? prev : textFontSelect.options[0].value;
-    }
-  }
-
-  function viewLabelForValue(pid, value){
-    const list = typesForProduct(pid);
-    const lower = (value || '').toString().toLowerCase();
-    const found = list.find(v=>v.toLowerCase() === lower);
-    return found || value;
-  }
-
-  function collectCurrentViewStates(){
-    const sel = currentSelection();
-    const pidKey = sel.pidKey || String(sel.pid || 0);
-    const pidPrefix = pidKey + '|';
-    const states={};
-    const labels={};
-    Object.entries(viewStates).forEach(([key, objects])=>{
-      if (pidPrefix && !key.startsWith(pidPrefix)) return;
-      const viewValue = key.slice(pidPrefix.length);
-      states[viewValue] = objects;
-      labels[viewValue] = viewLabelForValue(pidKey, viewValue);
-    });
-    const currentKey = viewKey(sel).slice(pidPrefix.length);
-    typesForProduct(pidKey).forEach(name=>{
-      const value = (name ?? '').toString().toLowerCase();
-      if (!states[value]){
-        states[value] = viewStates[pidPrefix + value] || [];
-      }
-      if (!labels[value]){
-        labels[value] = viewLabelForValue(pidKey, value);
-      }
-    });
-    return {states, labels, current: currentKey};
-  }
-
-  function ensureFontOption(font){
-    if (!textFontSelect || !font) return;
-    const values = Array.from(textFontSelect.options).map(opt=>opt.value);
-    if (!values.includes(font)){
-      const opt=document.createElement('option');
-      opt.value=font;
-      opt.textContent=font;
-      textFontSelect.appendChild(opt);
-    }
-  }
-
-  function applyToActiveText(mutator){
-    const obj = c.getActiveObject();
-    if (!isTextObject(obj)) return null;
-    mutator(obj);
-    markDirty();
-    obj.setCoords();
-    c.requestRenderAll();
-    storeCurrentDesign(viewKey());
-    return obj;
-  }
-
-  function syncTextControls(obj){
-    if (!obj || !isTextObject(obj)){ toggleTextSettings(false); return; }
-    toggleTextSettings(true);
-    if (textFontSelect){
-      const font = (obj.fontFamily || textFontSelect.value || '').toString();
-      if (font){
-        ensureFontOption(font);
-        textFontSelect.value = font;
-      }
-    }
-    if (textSizeInput){
-      textSizeInput.value = Math.round(obj.fontSize || 48);
-    }
-    if (textColorInput){
-      if (typeof obj.fill === 'string' && /^#/.test(obj.fill)){
-        textColorInput.value = obj.fill;
-      }else if (typeof obj.fill === 'string' && /^rgb/.test(obj.fill)){
-        textColorInput.value = rgbToHex(obj.fill);
-      }
-    }
-    textAlignButtons.forEach(btn=>{
-      const align = btn.dataset.align;
-      btn.classList.toggle('active', align === obj.textAlign);
-    });
-    if (textBoldBtn){
-      const weight = (obj.fontWeight || '').toString().toLowerCase();
-      const isBold = weight === 'bold' || parseInt(weight,10) >= 600;
-      textBoldBtn.classList.toggle('active', !!isBold);
-    }
-    if (textItalicBtn){
-      const style = (obj.fontStyle || '').toString().toLowerCase();
-      textItalicBtn.classList.toggle('active', style === 'italic');
-    }
-  }
-
-  function populateProducts(){
-    const cat = getCatalog();
-    const prev = productSel.value;
-    productSel.innerHTML='';
-    (productList()).forEach(pid=>{
-      const key = normalizeProductId(pid);
-      const value = key || (pid !== undefined && pid !== null ? String(pid) : '');
-      if (!value) return;
-      const entry = (value && cat[value]) || (pid !== undefined ? cat[String(pid)] : {}) || {};
-      const labelSource = entry.title || entry.name || entry.label || entry.product_title;
-      const fallbackId = entry.product_id !== undefined ? entry.product_id : (value || pid || '');
-      const label = labelSource || ('Termék #'+ String(fallbackId));
-      const o=document.createElement('option');
-      o.value=value;
-      o.textContent=label;
-      productSel.appendChild(o);
-    });
-    if (productSel.options.length){
-      const values = Array.from(productSel.options).map(opt=>opt.value);
-      productSel.value = (prev && values.includes(prev)) ? prev : productSel.options[0].value;
-    }
-  }
-
-  function populateColorsSizes(){
-    const productKey = normalizeProductId(productSel.value);
-    const catalog = getCatalog();
-    const cfg = (productKey && catalog[productKey]) || (productSel.value ? catalog[String(productSel.value)] : {}) || {};
-    const prevColor = colorSel.value;
-    const prevSize = sizeSel.value;
-
-    colorSel.innerHTML='';
-    if (colorSwatchesWrap) colorSwatchesWrap.innerHTML='';
-    (cfg.colors||[]).forEach(cn=>{
-      const label = (cn ?? '').toString();
-      const value = label.toLowerCase();
-      const o=document.createElement('option');
-      o.value=value;
-      o.textContent=label;
-      colorSel.appendChild(o);
-      if (colorSwatchesWrap){
-        const btn=document.createElement('button');
-        btn.type='button';
-        btn.className='nb-color-swatch';
-        btn.dataset.value=value;
-        btn.dataset.label=label;
-        btn.style.setProperty('--swatch-color', colorNameToCss(label));
-        btn.title=label;
-        btn.addEventListener('click', ()=>{
-          colorSel.value=value;
-          triggerChange(colorSel);
-        });
-        colorSwatchesWrap.appendChild(btn);
-      }
-    });
-    if (colorSel.options.length){
-      const values = Array.from(colorSel.options).map(opt=>opt.value);
-      const target = (prevColor && values.includes(prevColor)) ? prevColor : colorSel.options[0].value;
-      colorSel.value = target;
-    }else{
-      colorSel.value='';
-    }
-    highlightColor(colorSel.value);
-
-    sizeSel.innerHTML='';
-    if (sizeOptionsWrap) sizeOptionsWrap.innerHTML='';
-    (cfg.sizes||[]).forEach(sz=>{
-      const label = (sz ?? '').toString();
-      const value = label;
-      const o=document.createElement('option');
-      o.value=value;
-      o.textContent=label;
-      sizeSel.appendChild(o);
-      if (sizeOptionsWrap){
-        const btn=document.createElement('button');
-        btn.type='button';
-        btn.className='nb-size-option';
-        btn.dataset.value=value;
-        btn.textContent=label;
-        btn.addEventListener('click', ()=>{
-          sizeSel.value=value;
-          triggerChange(sizeSel);
-        });
-        sizeOptionsWrap.appendChild(btn);
-      }
-    });
-    if (sizeSel.options.length){
-      const values = Array.from(sizeSel.options).map(opt=>opt.value);
-      const target = (prevSize && values.includes(prevSize)) ? prevSize : sizeSel.options[0].value;
-      sizeSel.value = target;
-    }else{
-      sizeSel.value='';
-    }
-    highlightSize(sizeSel.value);
-    updateSummary();
+  function markDesignDirty(){
+    designState.savedDesignId = null;
+    if (addToCartBtn) addToCartBtn.disabled = true;
+    updatePriceDisplay();
   }
 
   function setMockupBgAndArea(){
     const {mockup: mk} = currentSelection();
 
-    c.getObjects().slice().forEach(obj=>{ if (obj.__nb_bg){ c.remove(obj); } });
-    c.getObjects().slice().forEach(obj=>{ if (obj.__nb_area){ c.remove(obj); } });
+    c.getObjects().slice().forEach(obj=>{ if (obj.__nb_bg) c.remove(obj); });
+    c.getObjects().slice().forEach(obj=>{ if (obj.__nb_area) c.remove(obj); });
 
     const areaRaw = mk && mk.area ? Object.assign({}, mk.area) : Object.assign({}, fallbackArea);
     const refSize = referenceSizeForMockup(mk, areaRaw);
     const appliedSize = applyCanvasSize(refSize);
 
     const baseArea = {
-      x: toNumber(areaRaw.x, fallbackArea.x),
-      y: toNumber(areaRaw.y, fallbackArea.y),
-      w: toNumber(areaRaw.w, fallbackArea.w),
-      h: toNumber(areaRaw.h, fallbackArea.h)
+      x: numberOr(areaRaw.x, fallbackArea.x),
+      y: numberOr(areaRaw.y, fallbackArea.y),
+      w: positiveNumberOr(areaRaw.w, fallbackArea.w),
+      h: positiveNumberOr(areaRaw.h, fallbackArea.h)
     };
 
     const scaleX = refSize.w ? appliedSize.w / refSize.w : 1;
@@ -850,315 +498,406 @@
       top: area.y,
       width: area.w,
       height: area.h,
-      originX: 'left',
-      originY: 'top',
-      fill: 'rgba(0,0,0,0)',
-      stroke: '#888',
+      fill: 'rgba(59,130,246,0.08)',
+      stroke: '#2563eb',
       strokeWidth: 2,
-      strokeDashArray: [5,5],
+      strokeDashArray: [10,6],
       selectable: false,
       evented: false
     });
-    printArea.__nb_area=true;
+    printArea.__nb_area = true;
     c.add(printArea);
     c.__nb_area = area;
     c.__nb_area_rect = printArea;
 
+    const loadToken = Symbol('mockup');
+    c.__nb_bg_token = loadToken;
+    c.setBackgroundImage(null, c.renderAll.bind(c));
     if (mk && mk.image_url){
-      fabric.Image.fromURL(mk.image_url, img=>{
-        const scale = Math.min(c.width / img.width, c.height / img.height);
-        img.scale(scale);
-        img.set({left:0, top:0, selectable:false, evented:false, originX:'left', originY:'top'});
-        img.__nb_bg=true;
-        c.add(img);
-        img.moveTo(0);
-        if (c.__nb_area_rect){
-          c.__nb_area_rect.moveTo(1);
-        }
+      loadMockupImage(mk.image_url).then(img=>{
+        if (c.__nb_bg_token !== loadToken) return;
+        const scale = Math.min(c.width / img.width, c.height / img.height) || 1;
+        img.set({
+          left: 0,
+          top: 0,
+          originX: 'left',
+          originY: 'top',
+          selectable: false,
+          evented: false,
+          scaleX: scale,
+          scaleY: scale
+        });
+        c.setBackgroundImage(img, c.renderAll.bind(c));
+      }).catch(()=>{
+        if (c.__nb_bg_token !== loadToken) return;
         c.requestRenderAll();
-      }, {crossOrigin:'anonymous'});
+      });
     }
 
     enforceAllObjectsInside();
   }
 
-  // Initial populate
+  function applyToActiveText(cb){
+    const obj = c.getActiveObject();
+    if (!obj || obj.type !== 'textbox') return;
+    cb(obj);
+    obj.setCoords();
+    c.requestRenderAll();
+    markDesignDirty();
+  }
+
+  function activeTextbox(){
+    const obj = c.getActiveObject();
+    return (obj && obj.type === 'textbox') ? obj : null;
+  }
+
+  function toHexColor(color){
+    if (!color) return '#000000';
+    if (/^#[0-9a-f]{3,8}$/i.test(color)) return color;
+    const tester = document.createElement('canvas');
+    tester.width = tester.height = 1;
+    const ctx = tester.getContext && tester.getContext('2d');
+    if (!ctx) return '#000000';
+    try{
+      ctx.fillStyle = color;
+      return ctx.fillStyle || '#000000';
+    }catch(e){
+      return '#000000';
+    }
+  }
+
+  function setPressed(btn, state){
+    if (!btn) return;
+    btn.setAttribute('aria-pressed', state ? 'true' : 'false');
+    if (state){
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  }
+
+  function syncTextControls(){
+    const textbox = activeTextbox();
+    const hasTextbox = !!textbox;
+    const controls = [fontFamilySel, fontSizeInput, fontColorInput, fontBoldToggle, fontItalicToggle].concat(alignButtons);
+    controls.forEach(ctrl=>{ if (ctrl) ctrl.disabled = !hasTextbox; });
+    if (!hasTextbox){
+      setPressed(fontBoldToggle, false);
+      setPressed(fontItalicToggle, false);
+      alignButtons.forEach(btn=>setPressed(btn, false));
+      if (fontSizeValue) fontSizeValue.textContent = (fontSizeInput ? fontSizeInput.value : '0') + ' px';
+      return;
+    }
+    if (fontFamilySel){
+      const exists = Array.from(fontFamilySel.options).some(opt=>opt.value === textbox.fontFamily);
+      if (!exists && textbox.fontFamily){
+        const opt = document.createElement('option');
+        opt.value = textbox.fontFamily;
+        opt.textContent = textbox.fontFamily;
+        fontFamilySel.appendChild(opt);
+      }
+      if (textbox.fontFamily){
+        fontFamilySel.value = textbox.fontFamily;
+      }
+    }
+    if (fontSizeInput){
+      const size = Math.round(textbox.fontSize || parseInt(fontSizeInput.value,10) || 48);
+      fontSizeInput.value = size;
+      if (fontSizeValue) fontSizeValue.textContent = size + ' px';
+    }
+    if (fontColorInput){
+      fontColorInput.value = toHexColor(textbox.fill || '#000000');
+    }
+    setPressed(fontBoldToggle, (textbox.fontWeight || '').toString().toLowerCase() === 'bold' || parseInt(textbox.fontWeight,10) >= 600);
+    setPressed(fontItalicToggle, (textbox.fontStyle || '').toString().toLowerCase() === 'italic');
+    alignButtons.forEach(btn=>{
+      setPressed(btn, textbox.textAlign === btn.dataset.nbAlign);
+    });
+  }
+
+  function currentFontFamily(){
+    return fontFamilySel && fontFamilySel.value ? fontFamilySel.value : 'Arial';
+  }
+
+  function currentFontSize(){
+    return fontSizeInput ? parseInt(fontSizeInput.value, 10) || 48 : 48;
+  }
+
+  function currentFontColor(){
+    return fontColorInput && fontColorInput.value ? fontColorInput.value : '#000000';
+  }
+
+  function currentFontWeight(){
+    return fontBoldToggle && fontBoldToggle.getAttribute('aria-pressed') === 'true' ? '700' : '400';
+  }
+
+  function currentFontStyle(){
+    return fontItalicToggle && fontItalicToggle.getAttribute('aria-pressed') === 'true' ? 'italic' : 'normal';
+  }
+
+  function currentTextAlign(){
+    const btn = alignButtons.find(b=>b.getAttribute('aria-pressed') === 'true');
+    return btn ? btn.dataset.nbAlign : 'center';
+  }
+
+  function initAlignDefault(){
+    if (!alignButtons.length) return;
+    let found = alignButtons.some(btn=>btn.getAttribute('aria-pressed') === 'true');
+    if (!found){
+      const centerBtn = alignButtons.find(btn=>btn.dataset.nbAlign === 'center');
+      if (centerBtn){
+        setPressed(centerBtn, true);
+      }
+    }
+  }
+
+  function populateTypes(){
+    typeSel.innerHTML = '';
+    types().forEach(t=>{
+      const label = (t || '').toString().trim();
+      if (!label) return;
+      const opt = document.createElement('option');
+      opt.value = label.toLowerCase();
+      opt.textContent = label;
+      opt.dataset.label = label;
+      typeSel.appendChild(opt);
+    });
+    ensureSelectValue(typeSel);
+    renderTypePills();
+  }
+
+  function populateProducts(){
+    const cat = getCatalog();
+    productSel.innerHTML = '';
+    productList().forEach(pid=>{
+      const cfg = cat[pid] || {};
+      const opt = document.createElement('option');
+      opt.value = pid;
+      opt.textContent = cfg.title || ('Termék #' + pid);
+      productSel.appendChild(opt);
+    });
+    ensureSelectValue(productSel);
+  }
+
+  function populateColorsSizes(){
+    const pid = parseInt(productSel.value || 0, 10);
+    const cfg = getCatalog()[pid] || {};
+    colorSel.innerHTML = '';
+    (cfg.colors || []).forEach(colorName=>{
+      const original = (colorName || '').toString().trim();
+      if (!original) return;
+      const opt = document.createElement('option');
+      opt.value = original.toLowerCase();
+      opt.textContent = formatColorLabel(original);
+      opt.dataset.original = original;
+      opt.dataset.display = formatColorLabel(original);
+      opt.dataset.rawColor = original;
+      colorSel.appendChild(opt);
+    });
+    ensureSelectValue(colorSel);
+    renderColorSwatches();
+
+    sizeSel.innerHTML = '';
+    (cfg.sizes || []).forEach(size=>{
+      const val = (size || '').toString().trim();
+      if (!val) return;
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = val;
+      sizeSel.appendChild(opt);
+    });
+    ensureSelectValue(sizeSel);
+    renderSizeButtons();
+  }
+
+  // initial populate
   populateFontOptions();
+  populateTypes();
   populateProducts();
   populateViews();
   populateColorsSizes();
+  initAlignDefault();
   setMockupBgAndArea();
-  restoreDesignForKey(viewKey());
-  updateSummary();
-  updateLastSelectionKey();
-  maybeFetchRemoteSettings();
+  updateSelectionSummary();
+  syncTextControls();
 
-  if (productSel){
-    productSel.addEventListener('change', ()=>{
-      const prevKey = lastSelectionKey;
-      if (prevKey){ storeCurrentDesign(prevKey); }
-      populateViews();
-      populateColorsSizes();
-      setMockupBgAndArea();
-      restoreDesignForKey(viewKey());
-      updateSummary();
-      updateLastSelectionKey();
-      markDirty();
-    });
-  }
+  if (typeSel) typeSel.onchange = ()=>{ renderTypePills(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
+  if (productSel) productSel.onchange = ()=>{ populateColorsSizes(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
+  if (colorSel) colorSel.onchange = ()=>{ renderColorSwatches(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
+  if (sizeSel) sizeSel.onchange = ()=>{ renderSizeButtons(); updateSelectionSummary(); markDesignDirty(); };
 
-  if (viewSel){
-    viewSel.addEventListener('change', ()=>{
-      const prevKey = lastSelectionKey;
-      if (prevKey && prevKey !== viewKey()){ storeCurrentDesign(prevKey); }
-      highlightView(viewSel.value);
-      setMockupBgAndArea();
-      restoreDesignForKey(viewKey());
-      updateSummary();
-      updateLastSelectionKey();
-    });
-  }
-
-  if (colorSel){
-    colorSel.addEventListener('change', ()=>{
-      storeCurrentDesign(viewKey());
-      highlightColor(colorSel.value);
-      updateSummary();
-      setMockupBgAndArea();
-      restoreDesignForKey(viewKey());
-      markDirty();
-    });
-  }
-
-  if (sizeSel){
-    sizeSel.addEventListener('change', ()=>{
-      highlightSize(sizeSel.value);
-      updateSummary();
-      storeCurrentDesign(viewKey());
-      markDirty();
-    });
-  }
-
-  // Apply constraints on interactions
-  c.on('object:added', e=>{
-    const obj = e.target;
-    if (!obj || isRestoring) return;
-    if (isDesignObject(obj)){
-      keepObjectInside(obj);
-      markDirty();
-      storeCurrentDesign(viewKey());
-    }
-  });
+  c.on('object:added', e=>{ if (isDesignObject(e.target)){ keepObjectInside(e.target); markDesignDirty(); }});
   c.on('object:moving', e=>{ keepObjectInside(e.target, {fit:false}); });
-  c.on('object:scaling', e=>{ keepObjectInside(e.target); });
-  c.on('object:rotating', e=>{ keepObjectInside(e.target); });
-  c.on('object:modified', e=>{
-    const obj = e.target;
-    if (!obj) return;
-    keepObjectInside(obj);
-    if (isDesignObject(obj)){
-      markDirty();
-      storeCurrentDesign(viewKey());
-    }
-  });
-  c.on('object:removed', e=>{
-    if (isRestoring) return;
-    if (isDesignObject(e.target)){
-      markDirty();
-      storeCurrentDesign(viewKey());
-    }
-  });
+  c.on('object:scaling', e=>{ keepObjectInside(e.target); markDesignDirty(); });
+  c.on('object:rotating', e=>{ keepObjectInside(e.target); markDesignDirty(); });
+  c.on('object:modified', e=>{ if (isDesignObject(e.target)) markDesignDirty(); });
+  c.on('object:removed', e=>{ if (isDesignObject(e.target)) markDesignDirty(); });
+  c.on('selection:created', ()=>{ syncTextControls(); });
+  c.on('selection:updated', ()=>{ syncTextControls(); });
+  c.on('selection:cleared', ()=>{ syncTextControls(); });
 
-  function handleSelectionChange(){
-    syncTextControls(c.getActiveObject());
+  if (fontFamilySel){
+    fontFamilySel.onchange = ()=>{
+      const family = fontFamilySel.value;
+      applyToActiveText(obj=>{ obj.set('fontFamily', family); });
+    };
   }
 
-  c.on('selection:created', handleSelectionChange);
-  c.on('selection:updated', handleSelectionChange);
-  c.on('selection:cleared', ()=>{ toggleTextSettings(false); });
+  if (fontSizeInput){
+    fontSizeInput.oninput = ()=>{
+      const size = parseInt(fontSizeInput.value, 10) || 12;
+      if (fontSizeValue) fontSizeValue.textContent = size + ' px';
+      applyToActiveText(obj=>{ obj.set('fontSize', size); });
+    };
+  }
 
-  // Tools
-  document.getElementById('nb-add-text').onclick = () => {
-    const a = c.__nb_area || fallbackArea;
-    const textboxWidth = Math.max(60, a.w - 20);
-    const t = new fabric.Textbox('Saját szöveg',{
-      fill:'#000',
-      fontSize:48,
-      width: textboxWidth,
-      left:a.x + 10,
-      top:a.y + 10,
-      fontFamily: textFontSelect ? textFontSelect.value : undefined
-    });
-    c.add(t).setActiveObject(t);
-    keepObjectInside(t);
-    syncTextControls(t);
-    markDirty();
-    storeCurrentDesign(viewKey());
-  };
+  if (fontColorInput){
+    fontColorInput.onchange = ()=>{
+      const color = fontColorInput.value || '#000000';
+      applyToActiveText(obj=>{ obj.set('fill', color); });
+    };
+  }
 
-  const uploadInput = document.getElementById('nb-upload');
+  if (fontBoldToggle){
+    fontBoldToggle.onclick = ()=>{
+      const next = fontBoldToggle.getAttribute('aria-pressed') !== 'true';
+      setPressed(fontBoldToggle, next);
+      applyToActiveText(obj=>{ obj.set('fontWeight', next ? '700' : '400'); });
+    };
+  }
+
+  if (fontItalicToggle){
+    fontItalicToggle.onclick = ()=>{
+      const next = fontItalicToggle.getAttribute('aria-pressed') !== 'true';
+      setPressed(fontItalicToggle, next);
+      applyToActiveText(obj=>{ obj.set('fontStyle', next ? 'italic' : 'normal'); });
+    };
+  }
+
+  alignButtons.forEach(btn=>{
+    btn.onclick = ()=>{
+      alignButtons.forEach(other=>setPressed(other, other === btn));
+      const value = btn.dataset.nbAlign || 'left';
+      applyToActiveText(obj=>{ obj.set('textAlign', value); });
+    };
+  });
+
+  if (addTextBtn){
+    addTextBtn.onclick = () => {
+      const a = c.__nb_area || fallbackArea;
+      const textboxWidth = Math.max(80, a.w - 40);
+      const t = new fabric.Textbox('Írd ide a feliratot',{ 
+        fill: currentFontColor(),
+        fontSize: currentFontSize(),
+        width: textboxWidth,
+        left: a.x + (a.w - textboxWidth)/2,
+        top: a.y + 20,
+        fontFamily: currentFontFamily(),
+        fontWeight: currentFontWeight(),
+        fontStyle: currentFontStyle(),
+        textAlign: currentTextAlign(),
+        cornerStyle:'circle',
+        transparentCorners:false,
+        lockScalingFlip:true
+      });
+      c.add(t).setActiveObject(t);
+      keepObjectInside(t);
+      syncTextControls();
+    };
+  }
+
   if (uploadInput){
-    uploadInput.onchange = e=>{
-      const f=e.target.files[0]; if(!f) return;
-      const url=URL.createObjectURL(f);
+    uploadInput.addEventListener('change', e=>{
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const url = URL.createObjectURL(f);
       fabric.Image.fromURL(url, img=>{
         URL.revokeObjectURL(url);
         const a = c.__nb_area || fallbackArea;
-        const maxW=a.w*0.95, maxH=a.h*0.95;
+        const maxW = a.w * 0.95;
+        const maxH = a.h * 0.95;
         const scale = Math.min(1, maxW / img.width, maxH / img.height);
         img.scale(scale);
         img.set({
-          left:a.x + (a.w - img.getScaledWidth())/2,
-          top:a.y + (a.h - img.getScaledHeight())/2,
-          selectable:true,
-          cornerStyle:'circle',
-          transparentCorners:false,
-          lockScalingFlip:true
+          left: a.x + (a.w - img.getScaledWidth())/2,
+          top: a.y + (a.h - img.getScaledHeight())/2,
+          selectable: true,
+          cornerStyle: 'circle',
+          transparentCorners: false,
+          lockScalingFlip: true
         });
         c.add(img);
         c.setActiveObject(img);
         keepObjectInside(img);
-        markDirty();
-        storeCurrentDesign(viewKey());
       });
+      e.target.value = '';
+    });
+  }
+
+  if (clearButton){
+    clearButton.onclick = ()=>{
+      designObjects().forEach(obj=>c.remove(obj));
+      c.discardActiveObject();
+      c.requestRenderAll();
+      markDesignDirty();
+      syncTextControls();
     };
   }
 
-  if (quantityInput){
-    quantityInput.value = sanitizeQuantity(quantityInput.value);
-    quantityInput.addEventListener('change', ()=>{
-      quantityInput.value = sanitizeQuantity(quantityInput.value);
-      updateSummary();
-    });
-    quantityInput.addEventListener('input', ()=>{
-      quantityInput.value = sanitizeQuantity(quantityInput.value);
-      updateSummary();
-    });
-  }
-  if (qtyMinusBtn){
-    qtyMinusBtn.addEventListener('click', ()=>{
-      if (!quantityInput) return;
-      const next = Math.max(1, sanitizeQuantity(quantityInput.value) - 1);
-      quantityInput.value = next;
-      updateSummary();
-    });
-  }
-  if (qtyPlusBtn){
-    qtyPlusBtn.addEventListener('click', ()=>{
-      if (!quantityInput) return;
-      const next = sanitizeQuantity(quantityInput.value) + 1;
-      quantityInput.value = next;
-      updateSummary();
-    });
-  }
-
-  if (textFontSelect){
-    textFontSelect.addEventListener('change', ()=>{
-      const font = textFontSelect.value;
-      applyToActiveText(obj=>obj.set('fontFamily', font));
-      syncTextControls(c.getActiveObject());
-    });
-  }
-  if (textSizeInput){
-    const applySize = ()=>{
-      const size = parseFloat(textSizeInput.value);
-      if (!Number.isFinite(size) || size <= 0) return;
-      applyToActiveText(obj=>obj.set('fontSize', size));
-    };
-    textSizeInput.addEventListener('change', applySize);
-    textSizeInput.addEventListener('input', applySize);
-  }
-  if (textColorInput){
-    textColorInput.addEventListener('input', ()=>{
-      const color = textColorInput.value;
-      applyToActiveText(obj=>obj.set('fill', color));
-    });
-  }
-  textAlignButtons.forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const align = btn.dataset.align;
-      const result = applyToActiveText(obj=>obj.set('textAlign', align));
-      if (!result) return;
-      textAlignButtons.forEach(other=>other.classList.toggle('active', other === btn));
-    });
-  });
-  if (textBoldBtn){
-    textBoldBtn.addEventListener('click', ()=>{
-      const obj = c.getActiveObject();
-      if (!isTextObject(obj)) return;
-      const willBeBold = !textBoldBtn.classList.contains('active');
-      applyToActiveText(target=>target.set('fontWeight', willBeBold ? 'bold' : 'normal'));
-      textBoldBtn.classList.toggle('active', willBeBold);
-    });
-  }
-  if (textItalicBtn){
-    textItalicBtn.addEventListener('click', ()=>{
-      const obj = c.getActiveObject();
-      if (!isTextObject(obj)) return;
-      const willBeItalic = !textItalicBtn.classList.contains('active');
-      applyToActiveText(target=>target.set('fontStyle', willBeItalic ? 'italic' : 'normal'));
-      textItalicBtn.classList.toggle('active', willBeItalic);
-    });
-  }
-
-  const saveBtn = document.getElementById('nb-save');
+  let saving = false;
   if (saveBtn){
     saveBtn.onclick = async ()=>{
-      storeCurrentDesign(viewKey());
-      const png = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
-      const sel = currentSelection();
-      const size  = sizeSel.value||'';
-      const price_ctx = {product_id:sel.pid, type:sel.type, color:sel.color, size, quantity:sel.quantity};
-      const viewPayload = collectCurrentViewStates();
-      const meta={
-        width_mm:300,
-        height_mm:400,
-        dpi:300,
-        product_id:sel.pid,
-        attributes_json:{pa_type:sel.type, pa_color: sel.color, pa_size: size},
-        price_ctx,
-        quantity: sel.quantity,
-        view_states:viewPayload.states,
-        view_labels:viewPayload.labels,
-        active_view:viewPayload.current
-      };
-      const layersPayload = {
-        active_view: viewPayload.current,
-        active_canvas: c.toJSON(),
-        views: viewPayload.states
-      };
+      if (saving) return;
+      saving = true;
       try{
-        const res = await fetch(NB_DESIGNER.rest+'save',{method:'POST',
-          headers:{'X-WP-Nonce':NB_DESIGNER.nonce,'Content-Type':'application/json'},
-          body:JSON.stringify({png_base64:png, layers:layersPayload, meta})
+        const png = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
+        const sel = currentSelection();
+        const size = sizeSel.value || '';
+        const price_ctx = {product_id: sel.pid, type: sel.type, color: sel.color, size};
+        const meta = {width_mm:300, height_mm:400, dpi:300, product_id: sel.pid, attributes_json:{pa_type: sel.type, pa_color: sel.color, pa_size: size}, price_ctx};
+        const res = await fetch(NB_DESIGNER.rest + 'save', {
+          method:'POST',
+          headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
+          body: JSON.stringify({png_base64: png, layers: c.toJSON(), meta})
         });
-        const j=await res.json(); if(!res.ok){alert(j.message||'Mentési hiba'); return;}
-        savedDesignId=j.design_id;
-        if (addToCartBtn){ addToCartBtn.disabled=false; }
-        alert('Mentve! ID: '+savedDesignId);
-      }catch(e){ alert('Hálózati hiba'); }
+        const j = await res.json();
+        if (!res.ok){
+          alert(j.message || 'Mentési hiba');
+          return;
+        }
+        designState.savedDesignId = j.design_id;
+        if (addToCartBtn) addToCartBtn.disabled = false;
+        alert('Mentve! ID: ' + designState.savedDesignId);
+        updatePriceDisplay();
+      }catch(e){
+        alert('Hálózati hiba');
+      } finally {
+        saving = false;
+      }
     };
   }
 
   if (addToCartBtn){
-    addToCartBtn.disabled=true;
     addToCartBtn.onclick = async ()=>{
-      if(!savedDesignId) return alert('Előbb ments!');
+      if (!designState.savedDesignId){
+        alert('Előbb mentsd a tervet!');
+        return;
+      }
       try{
-        const res = await fetch(NB_DESIGNER.rest+'add-to-cart',{method:'POST',
-          headers:{'X-WP-Nonce':NB_DESIGNER.nonce,'Content-Type':'application/json'},
-          body:JSON.stringify({design_id:savedDesignId, quantity: currentSelection().quantity})
+        const res = await fetch(NB_DESIGNER.rest + 'add-to-cart', {
+          method:'POST',
+          headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
+          body: JSON.stringify({design_id: designState.savedDesignId})
         });
-        const j=await res.json(); if(!res.ok){alert(j.message||'Kosár hiba'); return;}
+        const j = await res.json();
+        if (!res.ok){
+          alert(j.message || 'Kosár hiba');
+          return;
+        }
         window.location = j.redirect;
-      }catch(e){ alert('Hálózati hiba'); }
+      }catch(e){
+        alert('Hálózati hiba');
+      }
     };
-  }
-  }
-
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', run);
-  } else {
-    run();
   }
 })();

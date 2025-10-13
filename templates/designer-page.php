@@ -1,96 +1,98 @@
 <div id="nb-designer">
-  <div class="nb-layout">
-    <aside class="nb-sidebar">
-      <div class="nb-sidebar-group">
-        <label class="nb-sidebar-field">
-          <span class="nb-sidebar-title">Válassz terméket</span>
-          <select id="nb-product" class="nb-select"></select>
-        </label>
-      </div>
-      <div class="nb-sidebar-group">
-        <span class="nb-sidebar-title">Termék nézet</span>
-        <div id="nb-view-options" class="nb-view-options"></div>
-        <select id="nb-view" class="nb-hidden"></select>
-      </div>
-      <div class="nb-sidebar-group">
-        <button id="nb-add-text" type="button" class="nb-side-button">Írj saját feliratot</button>
-      </div>
-      <div id="nb-text-settings" class="nb-sidebar-group nb-text-settings nb-hidden">
-        <div class="nb-text-row">
-          <label class="nb-text-label" for="nb-text-font">Betűtípus</label>
-          <select id="nb-text-font" class="nb-text-control"></select>
-        </div>
-        <div class="nb-text-row">
-          <label class="nb-text-label" for="nb-text-size">Méret</label>
-          <input type="number" id="nb-text-size" class="nb-text-control" min="8" max="200" step="1" value="48">
-        </div>
-        <div class="nb-text-row nb-text-row-inline">
-          <label class="nb-text-label">Igazítás</label>
-          <div class="nb-text-align">
-            <button type="button" class="nb-text-align-btn" data-align="left">Balra</button>
-            <button type="button" class="nb-text-align-btn" data-align="center">Közép</button>
-            <button type="button" class="nb-text-align-btn" data-align="right">Jobbra</button>
-          </div>
-        </div>
-        <div class="nb-text-row nb-text-row-inline">
-          <label class="nb-text-label" for="nb-text-color">Szín</label>
-          <input type="color" id="nb-text-color" class="nb-text-color" value="#000000">
-          <div class="nb-text-style">
-            <button type="button" id="nb-text-bold" class="nb-text-style-btn" data-style="bold">B</button>
-            <button type="button" id="nb-text-italic" class="nb-text-style-btn" data-style="italic">I</button>
+  <div class="nb-designer-shell">
+    <aside class="nb-column nb-column--actions">
+      <div class="nb-action-card nb-action-card--product">
+        <button type="button" class="nb-hero-button" data-nb-toggle="product">
+          <span class="nb-hero-icon">🛍️</span>
+          <span>Válassz terméket</span>
+        </button>
+        <div class="nb-card-body" data-nb-panel="product" hidden>
+          <div class="nb-pill-group" id="nb-type-pills"></div>
+          <label class="nb-field nb-field--select">
+            <span>Termék</span>
+            <select id="nb-product"></select>
+          </label>
+          <div class="nb-size-group">
+            <span class="nb-field-label">Méret</span>
+            <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
           </div>
         </div>
       </div>
-      <div class="nb-sidebar-group">
-        <label for="nb-upload" class="nb-side-upload">Tölts fel saját mintát
+
+      <div class="nb-action-card">
+        <label class="nb-hero-button nb-hero-button--upload">
+          <span class="nb-hero-icon">⬆</span>
+          <span>Tölts fel saját képet</span>
           <input type="file" id="nb-upload" accept="image/png,image/jpeg,image/svg+xml" />
         </label>
+        <button type="button" id="nb-clear-design" class="nb-subtle-link">Terv ürítése</button>
       </div>
-      <div class="nb-sidebar-group nb-sidebar-actions">
-        <button id="nb-save" type="button" class="nb-side-primary">Terv mentése</button>
+
+      <div class="nb-action-card">
+        <button type="button" id="nb-add-text" class="nb-hero-button nb-hero-button--accent">
+          <span class="nb-hero-icon">✎</span>
+          <span>Írj saját feliratot</span>
+        </button>
+        <div class="nb-card-body nb-card-body--text">
+          <label class="nb-field nb-field--select">
+            <span>Betűtípus</span>
+            <select id="nb-font-family"></select>
+          </label>
+          <label class="nb-field">
+            <span>Betűméret</span>
+            <div class="nb-range">
+              <input type="range" id="nb-font-size" min="12" max="120" value="48">
+              <span id="nb-font-size-value">48 px</span>
+            </div>
+          </label>
+          <label class="nb-field nb-field--color">
+            <span>Betűszín</span>
+            <input type="color" id="nb-font-color" value="#000000">
+          </label>
+          <div class="nb-text-style">
+            <button type="button" class="nb-toggle" id="nb-font-bold" aria-pressed="false">B</button>
+            <button type="button" class="nb-toggle" id="nb-font-italic" aria-pressed="false"><em>I</em></button>
+            <div class="nb-align-group">
+              <button type="button" class="nb-toggle" data-nb-align="left" aria-pressed="false">⟸</button>
+              <button type="button" class="nb-toggle" data-nb-align="center" aria-pressed="false">≡</button>
+              <button type="button" class="nb-toggle" data-nb-align="right" aria-pressed="false">⟹</button>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
 
-    <main class="nb-main">
-      <div class="nb-main-top">
-        <div class="nb-color-picker">
-          <span class="nb-section-title">Minta színe</span>
-          <div id="nb-color-swatches" class="nb-color-swatches"></div>
-          <select id="nb-color" class="nb-hidden"></select>
+    <main class="nb-column nb-column--stage">
+      <div class="nb-product-stage">
+        <div class="nb-product-frame">
+          <canvas id="nb-canvas" width="480" height="640"></canvas>
         </div>
       </div>
-      <div class="nb-canvas-frame">
-        <canvas id="nb-canvas" width="480" height="640"></canvas>
-      </div>
-      <div class="nb-size-picker">
-        <span class="nb-section-title">Válassz méretet</span>
-        <div id="nb-size-options" class="nb-size-options"></div>
-        <select id="nb-size" class="nb-hidden"></select>
+      <div class="nb-stage-controls">
+        <div class="nb-stage-row">
+          <span class="nb-stage-label">Termék színe</span>
+          <div id="nb-color-swatches" class="nb-color-swatches"></div>
+        </div>
       </div>
     </main>
 
-    <aside class="nb-summary">
+    <aside class="nb-column nb-column--summary">
       <div class="nb-summary-card">
-        <div class="nb-summary-header">
-          <h3 id="nb-product-title">Válaszd ki a terméket</h3>
-          <div class="nb-summary-meta">
-            <span id="nb-summary-type">–</span>
-            <span id="nb-summary-color">–</span>
-            <span id="nb-summary-size">–</span>
-          </div>
+        <div class="nb-product-heading">
+          <h2 id="nb-product-title">Termék</h2>
+          <div class="nb-price-display" id="nb-price-display"></div>
         </div>
-        <div class="nb-summary-price" id="nb-summary-price">&nbsp;</div>
-        <div class="nb-summary-qty">
-          <span class="nb-section-title">Darabszám</span>
-          <div class="nb-qty-control">
-            <button type="button" id="nb-qty-minus" class="nb-qty-btn">−</button>
-            <input type="number" id="nb-quantity" class="nb-qty-input" min="1" value="1">
-            <button type="button" id="nb-qty-plus" class="nb-qty-btn">+</button>
-          </div>
+        <div id="nb-product-meta" class="nb-product-meta"></div>
+        <div class="nb-selection-summary" id="nb-selection-summary"></div>
+        <div class="nb-summary-actions">
+          <button id="nb-add-to-cart" class="nb-cart-button" disabled>Kosárba</button>
+          <button id="nb-save" class="nb-save-button">Mentés</button>
         </div>
-        <p class="nb-summary-note">+ szállítási idő 3-5 munkanap</p>
-        <button id="nb-add-to-cart" type="button" class="nb-summary-button" disabled>Kosárba</button>
       </div>
     </aside>
   </div>
+
+  <select id="nb-type" class="nb-hidden"></select>
+  <select id="nb-color" class="nb-hidden"></select>
+  <select id="nb-size" class="nb-hidden"></select>
 </div>
