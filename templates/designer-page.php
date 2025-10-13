@@ -2,16 +2,15 @@
   <div class="nb-designer-shell">
     <aside class="nb-column nb-column--actions">
       <div class="nb-action-card nb-action-card--product">
-        <button type="button" class="nb-hero-button" data-nb-toggle="product">
+        <button type="button" class="nb-hero-button" id="nb-product-modal-trigger">
           <span class="nb-hero-icon">🛍️</span>
           <span>Válassz terméket</span>
         </button>
-        <div class="nb-card-body" data-nb-panel="product" hidden>
-          <div class="nb-pill-group" id="nb-type-pills"></div>
-          <label class="nb-field nb-field--select">
-            <span>Termék</span>
-            <select id="nb-product"></select>
-          </label>
+        <button type="button" class="nb-hero-button nb-hero-button--secondary" id="nb-color-modal-trigger">
+          <span class="nb-hero-icon">🎨</span>
+          <span id="nb-color-modal-label">Válassz színt</span>
+        </button>
+        <div class="nb-card-body">
           <div class="nb-size-group">
             <span class="nb-field-label">Méret</span>
             <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
@@ -28,6 +27,17 @@
         <button type="button" id="nb-clear-design" class="nb-subtle-link">Terv ürítése</button>
       </div>
 
+    </aside>
+
+    <main class="nb-column nb-column--stage">
+      <div class="nb-product-stage">
+        <div class="nb-product-frame">
+          <canvas id="nb-canvas" width="480" height="640"></canvas>
+        </div>
+      </div>
+    </main>
+
+    <aside class="nb-column nb-column--summary">
       <div class="nb-action-card">
         <button type="button" id="nb-add-text" class="nb-hero-button nb-hero-button--accent">
           <span class="nb-hero-icon">✎</span>
@@ -60,23 +70,6 @@
           </div>
         </div>
       </div>
-    </aside>
-
-    <main class="nb-column nb-column--stage">
-      <div class="nb-product-stage">
-        <div class="nb-product-frame">
-          <canvas id="nb-canvas" width="480" height="640"></canvas>
-        </div>
-      </div>
-      <div class="nb-stage-controls">
-        <div class="nb-stage-row">
-          <span class="nb-stage-label">Termék színe</span>
-          <div id="nb-color-swatches" class="nb-color-swatches"></div>
-        </div>
-      </div>
-    </main>
-
-    <aside class="nb-column nb-column--summary">
       <div class="nb-summary-card">
         <div class="nb-product-heading">
           <h2 id="nb-product-title">Termék</h2>
@@ -93,6 +86,39 @@
   </div>
 
   <select id="nb-type" class="nb-hidden"></select>
+  <select id="nb-product" class="nb-hidden"></select>
   <select id="nb-color" class="nb-hidden"></select>
   <select id="nb-size" class="nb-hidden"></select>
+
+  <div class="nb-modal" id="nb-product-modal" hidden>
+    <div class="nb-modal-backdrop" data-nb-close="product-modal"></div>
+    <div class="nb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-product-modal-title">
+      <div class="nb-modal-header">
+        <h2 id="nb-product-modal-title">Válassz terméket</h2>
+        <button type="button" class="nb-modal-close" data-nb-close="product-modal" aria-label="Bezárás">×</button>
+      </div>
+      <div class="nb-modal-body">
+        <div class="nb-modal-section">
+          <h3>Terméktípus</h3>
+          <div class="nb-modal-type-list" id="nb-modal-type-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nb-modal" id="nb-color-modal" hidden>
+    <div class="nb-modal-backdrop" data-nb-close="color-modal"></div>
+    <div class="nb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-color-modal-title">
+      <div class="nb-modal-header">
+        <h2 id="nb-color-modal-title">Válassz színt</h2>
+        <button type="button" class="nb-modal-close" data-nb-close="color-modal" aria-label="Bezárás">×</button>
+      </div>
+      <div class="nb-modal-body">
+        <div class="nb-modal-section">
+          <h3>Elérhető színek</h3>
+          <div class="nb-modal-color-grid" id="nb-modal-color-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
