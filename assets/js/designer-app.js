@@ -93,7 +93,6 @@
   const productModal = document.getElementById('nb-product-modal');
   const productModalTrigger = document.getElementById('nb-product-modal-trigger');
   const modalTypeList = document.getElementById('nb-modal-type-list');
-  const modalProductList = document.getElementById('nb-modal-product-list');
   const colorSwatches = document.getElementById('nb-color-swatches');
   const sizeButtonsWrap = document.getElementById('nb-size-buttons');
   const selectionSummaryEl = document.getElementById('nb-selection-summary');
@@ -341,12 +340,13 @@
       btn.className = 'nb-modal-type' + (normalized === currentValue ? ' is-active' : '');
       btn.textContent = label;
       btn.onclick = ()=>{
-        if (normalizedTypeValue(typeSel.value) !== normalized){
-          typeSel.value = normalized;
+        const currentNormalized = normalizedTypeValue(typeSel.value);
+        if (currentNormalized !== normalized){
+          const match = Array.from(typeSel.options).find(opt=>normalizedTypeValue(opt.value) === normalized);
+          typeSel.value = match ? match.value : normalized;
           dispatchChangeEvent(typeSel);
         }
-        renderModalTypes();
-        renderModalProducts();
+        closeProductModal();
       };
       modalTypeList.appendChild(btn);
     });
@@ -366,38 +366,6 @@
     return productSel.options[0]?.value || '';
   }
 
-  function renderModalProducts(){
-    if (!modalProductList) return;
-    modalProductList.innerHTML = '';
-    const cat = getCatalog();
-    const currentType = typeSel.value;
-    const currentProduct = productSel.value || '';
-    let hasMatches = false;
-    productList().forEach(pid=>{
-      const cfg = cat[pid] || {};
-      if (!productSupportsType(cfg, currentType)) return;
-      hasMatches = true;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'nb-modal-product' + (String(pid) === currentProduct ? ' is-active' : '');
-      btn.innerHTML = `<span class="nb-modal-product-title">${cfg.title || ('Termék #'+pid)}</span>`;
-      btn.onclick = ()=>{
-        if (productSel.value !== String(pid)){
-          productSel.value = String(pid);
-          dispatchChangeEvent(productSel);
-        }
-        closeProductModal();
-      };
-      modalProductList.appendChild(btn);
-    });
-    if (!hasMatches){
-      const empty = document.createElement('div');
-      empty.className = 'nb-modal-empty';
-      empty.textContent = 'Ehhez a típushoz nincs elérhető termék.';
-      modalProductList.appendChild(empty);
-    }
-  }
-
   function ensureProductMatchesType(){
     if (!productSel.options.length) return;
     const currentType = typeSel.value;
@@ -414,7 +382,6 @@
   function openProductModal(){
     if (!productModal) return;
     renderModalTypes();
-    renderModalProducts();
     productModal.hidden = false;
     document.body.classList.add('nb-modal-open');
   }
@@ -892,7 +859,6 @@
     ensureSelectValue(typeSel);
     renderModalTypes();
     ensureProductMatchesType();
-    renderModalProducts();
   }
 
   function populateProducts(){
@@ -907,7 +873,6 @@
     });
     ensureSelectValue(productSel);
     ensureProductMatchesType();
-    renderModalProducts();
   }
 
   function populateColorsSizes(){
@@ -954,14 +919,12 @@
   if (typeSel) typeSel.onchange = ()=>{
     ensureProductMatchesType();
     renderModalTypes();
-    renderModalProducts();
     setMockupBgAndArea();
     updateSelectionSummary();
     markDesignDirty();
   };
   if (productSel) productSel.onchange = ()=>{
     populateColorsSizes();
-    renderModalProducts();
     setMockupBgAndArea();
     updateSelectionSummary();
     markDesignDirty();

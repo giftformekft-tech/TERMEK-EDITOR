@@ -104,10 +104,6 @@
           <h3>Terméktípus</h3>
           <div class="nb-modal-type-list" id="nb-modal-type-list"></div>
         </div>
-        <div class="nb-modal-section">
-          <h3>Termék</h3>
-          <div class="nb-modal-product-list" id="nb-modal-product-list"></div>
-        </div>
       </div>
     </div>
   </div>
