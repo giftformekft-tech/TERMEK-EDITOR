@@ -1,6 +1,24 @@
 (function(){
+  function run(){
   const settings = (typeof NB_DESIGNER!=='undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
-  const c = new fabric.Canvas('nb-canvas',{preserveObjectStacking:true, backgroundColor:'#fff'});
+  if (typeof fabric === 'undefined' || typeof fabric.Canvas !== 'function'){
+    return;
+  }
+  const canvasElement = document.getElementById('nb-canvas');
+  if (!canvasElement){
+    return;
+  }
+  const c = new fabric.Canvas(canvasElement,{preserveObjectStacking:true, backgroundColor:'#fff'});
+
+  const defaultCanvasSize = {w: c.width, h: c.height};
+  const fallbackArea = {
+    x: Math.round(defaultCanvasSize.w * 0.15),
+    y: Math.round(defaultCanvasSize.h * 0.15),
+    w: Math.round(defaultCanvasSize.w * 0.7),
+    h: Math.round(defaultCanvasSize.h * 0.7),
+    canvas_w: defaultCanvasSize.w,
+    canvas_h: defaultCanvasSize.h
+  };
 
   const defaultCanvasSize = {w: c.width, h: c.height};
   const fallbackArea = {
@@ -13,7 +31,15 @@
   };
 
   function getCatalog(){ return settings.catalog || {}; }
-  function productList(){ return settings.products || []; }
+  function productList(){
+    if (Array.isArray(settings.products) && settings.products.length){
+      return settings.products;
+    }
+    if (settings.catalog && typeof settings.catalog === 'object'){
+      return Object.keys(settings.catalog);
+    }
+    return [];
+  }
   function mockups(){ return settings.mockups || []; }
   function types(){ return settings.types || ['Póló eleje','Póló hátulja']; }
 
@@ -21,6 +47,9 @@
   const viewSel=document.getElementById('nb-view');
   const colorSel=document.getElementById('nb-color');
   const sizeSel=document.getElementById('nb-size');
+  if (!productSel || !viewSel || !colorSel || !sizeSel){
+    return;
+  }
   const colorSwatchesWrap=document.getElementById('nb-color-swatches');
   const sizeOptionsWrap=document.getElementById('nb-size-options');
   const viewOptionsWrap=document.getElementById('nb-view-options');
@@ -42,9 +71,37 @@
   const textItalicBtn=document.getElementById('nb-text-italic');
 
   const viewStates={};
+  let remoteSettingsRequested=false;
   let lastSelectionKey=null;
   let savedDesignId=null;
   let isRestoring=false;
+
+  function hydrateFromSettings(data){
+    if (!data || typeof data !== 'object') return;
+    if (Array.isArray(data.fonts)) settings.fonts = data.fonts;
+    if (Array.isArray(data.products)) settings.products = data.products;
+    if (Array.isArray(data.types)) settings.types = data.types;
+    if (data.catalog && typeof data.catalog === 'object') settings.catalog = data.catalog;
+    if (Array.isArray(data.mockups)) settings.mockups = data.mockups;
+    populateFontOptions();
+    populateProducts();
+    populateViews();
+    populateColorsSizes();
+    setMockupBgAndArea();
+    restoreDesignForKey(viewKey());
+    updateSummary();
+    updateLastSelectionKey();
+  }
+
+  function maybeFetchRemoteSettings(){
+    if (productSel.options.length || remoteSettingsRequested) return;
+    if (typeof NB_DESIGNER === 'undefined' || !NB_DESIGNER.rest) return;
+    remoteSettingsRequested=true;
+    fetch(NB_DESIGNER.rest+'settings',{credentials:'same-origin'})
+      .then(res=>res.ok ? res.json() : null)
+      .then(data=>{ if (data && typeof data === 'object'){ hydrateFromSettings(data); } })
+      .catch(()=>{});
+  }
 
   function viewOptionsContainer(){ return viewOptionsWrap; }
 
@@ -724,6 +781,7 @@
   restoreDesignForKey(viewKey());
   updateSummary();
   updateLastSelectionKey();
+  maybeFetchRemoteSettings();
 
   if (productSel){
     productSel.addEventListener('change', ()=>{
@@ -985,5 +1043,12 @@
         window.location = j.redirect;
       }catch(e){ alert('Hálózati hiba'); }
     };
+  }
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
   }
 })();
