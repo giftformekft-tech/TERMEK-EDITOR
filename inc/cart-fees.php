@@ -1,0 +1,54 @@
+<?php
+if ( ! defined('ABSPATH') ) exit;
+
+function nb_calc_fee_for_design($design_id){
+  $settings = get_option('nb_settings',[]);
+  $global_per = isset($settings['fee_per_cm2']) ? floatval($settings['fee_per_cm2']) : 3;
+  $global_min = isset($settings['min_fee']) ? floatval($settings['min_fee']) : 990;
+
+  $w = floatval(get_post_meta($design_id,'width_mm',true))/10;
+  $h = floatval(get_post_meta($design_id,'height_mm',true))/10;
+  $area_cm2 = max(0,$w*$h);
+
+  $price_ctx = json_decode(get_post_meta($design_id,'price_ctx',true), true) ?: [];
+  $pid = intval($price_ctx['product_id'] ?? get_post_meta($design_id,'product_id',true));
+  $type = strtolower($price_ctx['type'] ?? '');
+  $color = strtolower($price_ctx['color'] ?? '');
+  $size  = $price_ctx['size'] ?? '';
+
+  $per = $global_per; $min = $global_min; $base = 0; $size_add = 0;
+
+  if (!empty($settings['catalog'][$pid])){
+    $cfg = $settings['catalog'][$pid];
+    $key = $type.'|'.$color;
+    if (!empty($cfg['map'][$key])){
+      $m = $cfg['map'][$key];
+      if (isset($m['fee_per_cm2']) && $m['fee_per_cm2']!=='') $per = floatval($m['fee_per_cm2']);
+      if (isset($m['min_fee']) && $m['min_fee']!=='') $min = floatval($m['min_fee']);
+      if (isset($m['base_fee']) && $m['base_fee']!=='') $base = floatval($m['base_fee']);
+    }
+    if (!empty($cfg['size_surcharge'][$size])) $size_add = floatval($cfg['size_surcharge'][$size]);
+  }
+
+  $fee = max($min, round($area_cm2 * $per)) + $base + $size_add;
+  return max(0,$fee);
+}
+
+add_action('woocommerce_cart_calculate_fees', function($cart){
+  if ( is_admin() && ! defined('DOING_AJAX') ) return;
+  $total_fee = 0; $has=false;
+  foreach ($cart->get_cart() as $item){
+    if (!empty($item['nb_design_id'])){
+      $has=true;
+      $total_fee += nb_calc_fee_for_design($item['nb_design_id']);
+    }
+  }
+  if ($has && $total_fee>0){
+    $cart->add_fee(__('Egyedi nyomat','nb'), $total_fee, true);
+  }
+});
+
+add_action('woocommerce_checkout_create_order_line_item', function($item, $cart_item_key, $values, $order){
+  if (!empty($values['nb_design_id'])) $item->add_meta_data('nb_design_id',$values['nb_design_id']);
+  if (!empty($values['preview_url']))  $item->add_meta_data('preview_url',$values['preview_url']);
+},10,4);
