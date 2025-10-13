@@ -583,6 +583,7 @@
 
   function preferredCanvasBounds(){
     const stageColumn = canvasEl.closest('.nb-column--stage');
+    const stageFrame = canvasEl.closest('.nb-product-frame');
     let widthAvailable = defaultCanvasSize.w;
     let heightAvailable = defaultCanvasSize.h;
     if (stageColumn){
@@ -594,8 +595,17 @@
         heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 48));
       }
     }
+    if (stageFrame){
+      const rect = stageFrame.getBoundingClientRect();
+      if (rect && rect.width){
+        widthAvailable = Math.max(widthAvailable, Math.floor(rect.width - 36));
+      }
+      if (rect && rect.height){
+        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 36));
+      }
+    }
     if (window.innerHeight){
-      heightAvailable = Math.max(heightAvailable, Math.floor(window.innerHeight - 160));
+      heightAvailable = Math.max(heightAvailable, Math.floor(window.innerHeight - 140));
     }
     return {w: widthAvailable, h: heightAvailable};
   }
