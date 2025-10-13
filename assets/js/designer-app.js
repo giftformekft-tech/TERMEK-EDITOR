@@ -591,11 +591,11 @@
         widthAvailable = Math.max(320, Math.floor(rect.width - 48));
       }
       if (rect && rect.height){
-        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 80));
+        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 48));
       }
     }
     if (window.innerHeight){
-      heightAvailable = Math.max(heightAvailable, Math.floor(window.innerHeight - 220));
+      heightAvailable = Math.max(heightAvailable, Math.floor(window.innerHeight - 160));
     }
     return {w: widthAvailable, h: heightAvailable};
   }
