@@ -3,10 +3,14 @@
   const canvasEl = document.getElementById('nb-canvas');
   if (!canvasEl) return;
 
+  const baseCanvasSize = {
+    w: parseInt(canvasEl.getAttribute('width'), 10) || canvasEl.width || 480,
+    h: parseInt(canvasEl.getAttribute('height'), 10) || canvasEl.height || 640
+  };
   const settings = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
   const c = new fabric.Canvas('nb-canvas', {preserveObjectStacking:true, backgroundColor:'#fff'});
 
-  const defaultCanvasSize = {w:c.width, h:c.height};
+  const defaultCanvasSize = {w:baseCanvasSize.w, h:baseCanvasSize.h};
   const fallbackArea = {
     x: Math.round(defaultCanvasSize.w * 0.15),
     y: Math.round(defaultCanvasSize.h * 0.15),
@@ -60,12 +64,36 @@
     });
   }
 
+  function mockupImageUrl(mk){
+    if (!mk || typeof mk !== 'object') return '';
+    const candidates = [
+      mk.image_url,
+      mk.imageUrl,
+      mk.url,
+      mk.image,
+      mk.src,
+      mk.background_url,
+      mk.backgroundUrl,
+      mk.background
+    ];
+    for (let i=0;i<candidates.length;i++){
+      const value = candidates[i];
+      if (typeof value === 'string' && value.trim()){
+        return value.trim();
+      }
+    }
+    return '';
+  }
+
   const typeSel = document.getElementById('nb-type');
   const productSel = document.getElementById('nb-product');
   const colorSel = document.getElementById('nb-color');
   const sizeSel = document.getElementById('nb-size');
   if (!typeSel || !productSel || !colorSel || !sizeSel) return;
-  const typePills = document.getElementById('nb-type-pills');
+  const productModal = document.getElementById('nb-product-modal');
+  const productModalTrigger = document.getElementById('nb-product-modal-trigger');
+  const modalTypeList = document.getElementById('nb-modal-type-list');
+  const modalProductList = document.getElementById('nb-modal-product-list');
   const colorSwatches = document.getElementById('nb-color-swatches');
   const sizeButtonsWrap = document.getElementById('nb-size-buttons');
   const selectionSummaryEl = document.getElementById('nb-selection-summary');
@@ -85,27 +113,38 @@
   const uploadInput = document.getElementById('nb-upload');
   const addTextBtn = document.getElementById('nb-add-text');
 
-  const toggleButtons = Array.from(document.querySelectorAll('[data-nb-toggle]'));
-  toggleButtons.forEach(btn=>{
-    const target = btn.dataset.nbToggle;
-    if (!target) return;
-    const panel = document.querySelector(`[data-nb-panel="${target}"]`);
-    if (!panel) return;
-    let expanded = !panel.hasAttribute('hidden');
-    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    btn.addEventListener('click', ()=>{
-      expanded = !expanded;
-      panel.hidden = !expanded;
-      btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    });
-  });
-
   const loadedFontUrls = new Set();
   const designState = {savedDesignId:null};
 
   function getCatalog(){ return settings.catalog || {}; }
   function productList(){ return settings.products || []; }
-  function mockups(){ return settings.mockups || []; }
+  function mockups(){
+    const raw = settings.mockups;
+    if (Array.isArray(raw)){
+      return raw.filter(Boolean);
+    }
+    if (raw && typeof raw === 'object'){
+      return Object.keys(raw).map(key=>raw[key]).filter(Boolean);
+    }
+    return [];
+  }
+
+  function mockupIndexById(id, arr){
+    if (id === undefined || id === null) return -1;
+    const key = String(id).trim();
+    if (!key) return -1;
+    const list = Array.isArray(arr) ? arr : mockups();
+    const keyNumeric = parseNumeric(key);
+    for (let i=0;i<list.length;i++){
+      const mk = list[i];
+      if (!mk || mk.id === undefined || mk.id === null) continue;
+      const mkId = String(mk.id).trim();
+      if (!mkId) continue;
+      if (mkId === key) return i;
+      if (keyNumeric !== null && mkId === String(keyNumeric)) return i;
+    }
+    return -1;
+  }
   function types(){ return settings.types || ['Póló','Pulóver']; }
   function fontEntries(){ return settings.fonts || []; }
 
@@ -178,6 +217,18 @@
     return trimmed;
   }
 
+  function normalizedTypeValue(value){
+    if (value === undefined || value === null) return '';
+    return value.toString().trim().toLowerCase();
+  }
+
+  function productSupportsType(cfg, typeValue){
+    const normalized = normalizedTypeValue(typeValue);
+    if (!normalized) return true;
+    const list = Array.isArray(cfg?.types) && cfg.types.length ? cfg.types : types();
+    return list.some(entry=>normalizedTypeValue(entry) === normalized);
+  }
+
   function colorCodeFromText(str){
     if (typeof str !== 'string') return '';
     const hexMatch = str.match(/#([0-9a-f]{3,8})/i);
@@ -200,27 +251,17 @@
     }
   }
 
-  function renderTypePills(){
-    if (!typePills) return;
-    typePills.innerHTML = '';
-    Array.from(typeSel.options).forEach(opt=>{
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'nb-pill' + (opt.value === typeSel.value ? ' is-active' : '');
-      btn.textContent = opt.dataset.label || opt.textContent;
-      btn.onclick = () => {
-        typeSel.value = opt.value;
-        renderTypePills();
-        setMockupBgAndArea();
-        updateSelectionSummary();
-      };
-      typePills.appendChild(btn);
-    });
-    if (!typeSel.options.length){
-      const span = document.createElement('div');
-      span.className = 'nb-empty';
-      span.textContent = 'Nincs típus konfigurálva.';
-      typePills.appendChild(span);
+  function dispatchChangeEvent(el){
+    if (!el) return;
+    try {
+      const evt = new Event('change', {bubbles:true});
+      el.dispatchEvent(evt);
+    } catch (err){
+      if (typeof document !== 'undefined' && document.createEvent){
+        const legacyEvt = document.createEvent('Event');
+        legacyEvt.initEvent('change', true, false);
+        el.dispatchEvent(legacyEvt);
+      }
     }
   }
 
@@ -280,6 +321,110 @@
     });
   }
 
+  function renderModalTypes(){
+    if (!modalTypeList) return;
+    modalTypeList.innerHTML = '';
+    const typeOptions = types();
+    if (!typeOptions.length){
+      const empty = document.createElement('div');
+      empty.className = 'nb-modal-empty';
+      empty.textContent = 'Nincs típus konfigurálva.';
+      modalTypeList.appendChild(empty);
+      return;
+    }
+    const currentValue = normalizedTypeValue(typeSel.value);
+    typeOptions.forEach(label=>{
+      const normalized = normalizedTypeValue(label);
+      if (!normalized) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'nb-modal-type' + (normalized === currentValue ? ' is-active' : '');
+      btn.textContent = label;
+      btn.onclick = ()=>{
+        if (normalizedTypeValue(typeSel.value) !== normalized){
+          typeSel.value = normalized;
+          dispatchChangeEvent(typeSel);
+        }
+        renderModalTypes();
+        renderModalProducts();
+      };
+      modalTypeList.appendChild(btn);
+    });
+  }
+
+  function firstProductForType(typeValue){
+    const cat = getCatalog();
+    const normalized = normalizedTypeValue(typeValue);
+    const list = productList();
+    for (let i=0;i<list.length;i++){
+      const pid = list[i];
+      const cfg = cat[pid] || {};
+      if (!normalized || productSupportsType(cfg, normalized)){
+        return String(pid);
+      }
+    }
+    return productSel.options[0]?.value || '';
+  }
+
+  function renderModalProducts(){
+    if (!modalProductList) return;
+    modalProductList.innerHTML = '';
+    const cat = getCatalog();
+    const currentType = typeSel.value;
+    const currentProduct = productSel.value || '';
+    let hasMatches = false;
+    productList().forEach(pid=>{
+      const cfg = cat[pid] || {};
+      if (!productSupportsType(cfg, currentType)) return;
+      hasMatches = true;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'nb-modal-product' + (String(pid) === currentProduct ? ' is-active' : '');
+      btn.innerHTML = `<span class="nb-modal-product-title">${cfg.title || ('Termék #'+pid)}</span>`;
+      btn.onclick = ()=>{
+        if (productSel.value !== String(pid)){
+          productSel.value = String(pid);
+          dispatchChangeEvent(productSel);
+        }
+        closeProductModal();
+      };
+      modalProductList.appendChild(btn);
+    });
+    if (!hasMatches){
+      const empty = document.createElement('div');
+      empty.className = 'nb-modal-empty';
+      empty.textContent = 'Ehhez a típushoz nincs elérhető termék.';
+      modalProductList.appendChild(empty);
+    }
+  }
+
+  function ensureProductMatchesType(){
+    if (!productSel.options.length) return;
+    const currentType = typeSel.value;
+    const pid = parseInt(productSel.value || 0, 10);
+    const cfg = getCatalog()[pid] || {};
+    if (productSel.value && productSupportsType(cfg, currentType)) return;
+    const fallback = firstProductForType(currentType);
+    if (fallback && productSel.value !== fallback){
+      productSel.value = fallback;
+      dispatchChangeEvent(productSel);
+    }
+  }
+
+  function openProductModal(){
+    if (!productModal) return;
+    renderModalTypes();
+    renderModalProducts();
+    productModal.hidden = false;
+    document.body.classList.add('nb-modal-open');
+  }
+
+  function closeProductModal(){
+    if (!productModal) return;
+    productModal.hidden = true;
+    document.body.classList.remove('nb-modal-open');
+  }
+
   function getColorLabel(){
     const opt = Array.from(colorSel.options).find(o=>o.value === colorSel.value);
     return opt ? (opt.dataset.original || opt.textContent) : '';
@@ -330,6 +475,57 @@
     }
   }
 
+  function resolveMockupPointer(value, arr){
+    if (value === undefined || value === null) return -1;
+    const list = Array.isArray(arr) ? arr : mockups();
+    if (!list.length) return -1;
+    const numeric = parseNumeric(value);
+    if (numeric !== null){
+      const idx = Math.floor(numeric);
+      if (Number.isFinite(idx) && idx >= 0 && idx < list.length) return idx;
+      const byId = mockupIndexById(numeric, list);
+      if (byId >= 0) return byId;
+    }
+    const str = String(value).trim();
+    if (!str) return -1;
+    const direct = mockupIndexById(str, list);
+    if (direct >= 0) return direct;
+    const tokens = str.match(/-?\d+/g);
+    if (tokens){
+      for (let i=0;i<tokens.length;i++){
+        const token = parseInt(tokens[i], 10);
+        if (!Number.isFinite(token)) continue;
+        if (token >= 0 && token < list.length) return token;
+        const byId = mockupIndexById(token, list);
+        if (byId >= 0) return byId;
+      }
+    }
+    return -1;
+  }
+
+  function normalizedMockupIndex(value, arr){
+    return resolveMockupPointer(value, arr);
+  }
+
+  function resolveMockupIndex(mapping, arr){
+    const list = Array.isArray(arr) ? arr : mockups();
+    if (!mapping || typeof mapping !== 'object'){
+      return normalizedMockupIndex(mapping, list);
+    }
+    const candidates = [
+      mapping.mockup_index,
+      mapping.mockupIndex,
+      mapping.mockup_id,
+      mapping.mockupId,
+      mapping.mockup
+    ];
+    for (let i=0;i<candidates.length;i++){
+      const idx = normalizedMockupIndex(candidates[i], list);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+
   function currentSelection(){
     const pid = parseInt(productSel.value || 0, 10);
     const type = typeSel.value || '';
@@ -337,7 +533,9 @@
     const cfg = getCatalog()[pid] || {};
     const key = (type + '|' + color).toLowerCase();
     const mapping = (cfg.map || {})[key] || {};
-    const mk = mockups()[parseInt(mapping.mockup_index || -1, 10)] || null;
+    const list = mockups();
+    const mkIndex = resolveMockupIndex(mapping, list);
+    const mk = mkIndex >= 0 ? (list[mkIndex] || null) : null;
     return {pid, type, color, cfg, mapping, mockup: mk};
   }
 
@@ -362,29 +560,57 @@
     return {w: defaultCanvasSize.w, h: defaultCanvasSize.h};
   }
 
+  function preferredCanvasBounds(){
+    const stageColumn = canvasEl.closest('.nb-column--stage');
+    let widthAvailable = defaultCanvasSize.w;
+    let heightAvailable = defaultCanvasSize.h;
+    if (stageColumn){
+      const rect = stageColumn.getBoundingClientRect();
+      if (rect && rect.width){
+        widthAvailable = Math.max(320, Math.floor(rect.width - 48));
+      }
+      if (rect && rect.height){
+        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 80));
+      }
+    }
+    if (window.innerHeight){
+      heightAvailable = Math.max(heightAvailable, Math.floor(window.innerHeight - 220));
+    }
+    return {w: widthAvailable, h: heightAvailable};
+  }
+
   function applyCanvasSize(size){
     const canvasElement = c.getElement();
     const sizeW = positiveNumberOr(size?.w, defaultCanvasSize.w);
     const sizeH = positiveNumberOr(size?.h, defaultCanvasSize.h);
     const targetW = sizeW > 0 ? sizeW : defaultCanvasSize.w;
     const targetH = sizeH > 0 ? sizeH : defaultCanvasSize.h;
+    const bounds = preferredCanvasBounds();
+    const scaleX = bounds.w / targetW;
+    const scaleY = bounds.h / targetH;
+    let scale = Math.min(scaleX, scaleY);
+    if (!Number.isFinite(scale) || scale <= 0){
+      scale = 1;
+    }
+    const appliedW = Math.max(320, Math.round(targetW * scale));
+    const appliedH = Math.max(320, Math.round(targetH * scale));
     let changed = false;
-    if (c.width !== targetW){
-      c.setWidth(targetW);
-      canvasElement.width = targetW;
-      canvasElement.style.width = targetW + 'px';
+    if (c.width !== appliedW){
+      c.setWidth(appliedW);
+      canvasElement.width = appliedW;
+      canvasElement.style.width = appliedW + 'px';
       changed = true;
     }
-    if (c.height !== targetH){
-      c.setHeight(targetH);
-      canvasElement.height = targetH;
-      canvasElement.style.height = targetH + 'px';
+    if (c.height !== appliedH){
+      c.setHeight(appliedH);
+      canvasElement.height = appliedH;
+      canvasElement.style.height = appliedH + 'px';
       changed = true;
     }
-    if (changed){
+    if (changed && c.calcOffset){
       c.calcOffset();
     }
-    return {w: targetW, h: targetH};
+    return {w: appliedW, h: appliedH};
   }
 
   function isDesignObject(obj){
@@ -513,8 +739,9 @@
     const loadToken = Symbol('mockup');
     c.__nb_bg_token = loadToken;
     c.setBackgroundImage(null, c.renderAll.bind(c));
-    if (mk && mk.image_url){
-      loadMockupImage(mk.image_url).then(img=>{
+    const mockupUrl = mockupImageUrl(mk);
+    if (mockupUrl){
+      loadMockupImage(mockupUrl).then(img=>{
         if (c.__nb_bg_token !== loadToken) return;
         const scale = Math.min(c.width / img.width, c.height / img.height) || 1;
         img.set({
@@ -663,7 +890,9 @@
       typeSel.appendChild(opt);
     });
     ensureSelectValue(typeSel);
-    renderTypePills();
+    renderModalTypes();
+    ensureProductMatchesType();
+    renderModalProducts();
   }
 
   function populateProducts(){
@@ -677,6 +906,8 @@
       productSel.appendChild(opt);
     });
     ensureSelectValue(productSel);
+    ensureProductMatchesType();
+    renderModalProducts();
   }
 
   function populateColorsSizes(){
@@ -720,8 +951,21 @@
   updateSelectionSummary();
   syncTextControls();
 
-  if (typeSel) typeSel.onchange = ()=>{ renderTypePills(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
-  if (productSel) productSel.onchange = ()=>{ populateColorsSizes(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
+  if (typeSel) typeSel.onchange = ()=>{
+    ensureProductMatchesType();
+    renderModalTypes();
+    renderModalProducts();
+    setMockupBgAndArea();
+    updateSelectionSummary();
+    markDesignDirty();
+  };
+  if (productSel) productSel.onchange = ()=>{
+    populateColorsSizes();
+    renderModalProducts();
+    setMockupBgAndArea();
+    updateSelectionSummary();
+    markDesignDirty();
+  };
   if (colorSel) colorSel.onchange = ()=>{ renderColorSwatches(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
   if (sizeSel) sizeSel.onchange = ()=>{ renderSizeButtons(); updateSelectionSummary(); markDesignDirty(); };
 
@@ -779,6 +1023,34 @@
       const value = btn.dataset.nbAlign || 'left';
       applyToActiveText(obj=>{ obj.set('textAlign', value); });
     };
+  });
+
+  if (productModalTrigger){
+    productModalTrigger.addEventListener('click', openProductModal);
+  }
+
+  if (productModal){
+    const closeButtons = Array.from(productModal.querySelectorAll('[data-nb-close="product-modal"]'));
+    closeButtons.forEach(btn=>btn.addEventListener('click', closeProductModal));
+    productModal.addEventListener('click', evt=>{
+      if (evt.target && evt.target.dataset && evt.target.dataset.nbClose === 'product-modal'){
+        closeProductModal();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', evt=>{
+    if (evt.key === 'Escape' && productModal && !productModal.hidden){
+      closeProductModal();
+    }
+  });
+
+  let resizeRaf = null;
+  window.addEventListener('resize', ()=>{
+    if (resizeRaf) cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(()=>{
+      setMockupBgAndArea();
+    });
   });
 
   if (addTextBtn){
