@@ -6,6 +6,10 @@
           <span class="nb-hero-icon">🛍️</span>
           <span>Válassz terméket</span>
         </button>
+        <button type="button" class="nb-hero-button nb-hero-button--secondary" id="nb-color-modal-trigger">
+          <span class="nb-hero-icon">🎨</span>
+          <span id="nb-color-modal-label">Válassz színt</span>
+        </button>
         <div class="nb-card-body">
           <div class="nb-size-group">
             <span class="nb-field-label">Méret</span>
@@ -29,12 +33,6 @@
       <div class="nb-product-stage">
         <div class="nb-product-frame">
           <canvas id="nb-canvas" width="480" height="640"></canvas>
-        </div>
-      </div>
-      <div class="nb-stage-controls">
-        <div class="nb-stage-row">
-          <span class="nb-stage-label">Termék színe</span>
-          <div id="nb-color-swatches" class="nb-color-swatches"></div>
         </div>
       </div>
     </main>
@@ -103,6 +101,22 @@
         <div class="nb-modal-section">
           <h3>Terméktípus</h3>
           <div class="nb-modal-type-list" id="nb-modal-type-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nb-modal" id="nb-color-modal" hidden>
+    <div class="nb-modal-backdrop" data-nb-close="color-modal"></div>
+    <div class="nb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-color-modal-title">
+      <div class="nb-modal-header">
+        <h2 id="nb-color-modal-title">Válassz színt</h2>
+        <button type="button" class="nb-modal-close" data-nb-close="color-modal" aria-label="Bezárás">×</button>
+      </div>
+      <div class="nb-modal-body">
+        <div class="nb-modal-section">
+          <h3>Elérhető színek</h3>
+          <div class="nb-modal-color-grid" id="nb-modal-color-list"></div>
         </div>
       </div>
     </div>

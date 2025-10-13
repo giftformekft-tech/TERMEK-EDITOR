@@ -93,7 +93,10 @@
   const productModal = document.getElementById('nb-product-modal');
   const productModalTrigger = document.getElementById('nb-product-modal-trigger');
   const modalTypeList = document.getElementById('nb-modal-type-list');
-  const colorSwatches = document.getElementById('nb-color-swatches');
+  const colorModal = document.getElementById('nb-color-modal');
+  const colorModalTrigger = document.getElementById('nb-color-modal-trigger');
+  const modalColorList = document.getElementById('nb-modal-color-list');
+  const colorModalLabel = document.getElementById('nb-color-modal-label');
   const sizeButtonsWrap = document.getElementById('nb-size-buttons');
   const selectionSummaryEl = document.getElementById('nb-selection-summary');
   const productTitleEl = document.getElementById('nb-product-title');
@@ -264,35 +267,54 @@
     }
   }
 
-  function renderColorSwatches(){
-    if (!colorSwatches) return;
-    colorSwatches.innerHTML = '';
+  function renderColorChoices(){
+    if (!modalColorList){
+      updateColorTriggerLabel();
+      return;
+    }
+    modalColorList.innerHTML = '';
     const options = Array.from(colorSel.options);
-    if (!options.length){
+    const hasOptions = options.length > 0;
+    if (colorModalTrigger){
+      if (hasOptions){
+        colorModalTrigger.removeAttribute('disabled');
+      } else {
+        colorModalTrigger.setAttribute('disabled', 'disabled');
+      }
+    }
+    if (!hasOptions){
       const empty = document.createElement('div');
-      empty.className = 'nb-empty';
+      empty.className = 'nb-modal-empty';
       empty.textContent = 'Ehhez a termékhez nincs szín beállítva.';
-      colorSwatches.appendChild(empty);
+      modalColorList.appendChild(empty);
+      closeColorModal();
+      updateColorTriggerLabel();
       return;
     }
     options.forEach(opt=>{
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'nb-swatch' + (opt.value === colorSel.value ? ' is-active' : '');
+      btn.className = 'nb-modal-swatch' + (opt.value === colorSel.value ? ' is-active' : '');
       const colorCode = colorCodeFromText(opt.dataset.rawColor || opt.dataset.original || opt.textContent);
       if (colorCode){
         btn.style.setProperty('--swatch-color', colorCode);
       }
       const label = opt.dataset.display || opt.textContent;
-      btn.innerHTML = `<span class="nb-swatch-color"></span><span class="nb-swatch-label">${label}</span>`;
+      btn.innerHTML = `<span class="nb-modal-swatch-color"></span><span class="nb-modal-swatch-label">${label}</span>`;
       btn.onclick = ()=>{
+        const previous = colorSel.value;
         colorSel.value = opt.value;
-        renderColorSwatches();
-        setMockupBgAndArea();
-        updateSelectionSummary();
+        if (colorSel.value !== previous){
+          dispatchChangeEvent(colorSel);
+        } else {
+          renderColorChoices();
+          updateColorTriggerLabel();
+        }
+        closeColorModal();
       };
-      colorSwatches.appendChild(btn);
+      modalColorList.appendChild(btn);
     });
+    updateColorTriggerLabel();
   }
 
   function renderSizeButtons(){
@@ -379,22 +401,51 @@
     }
   }
 
+  function updateModalBodyState(){
+    const anyOpen = (productModal && !productModal.hidden) || (colorModal && !colorModal.hidden);
+    if (anyOpen){
+      document.body.classList.add('nb-modal-open');
+    } else {
+      document.body.classList.remove('nb-modal-open');
+    }
+  }
+
   function openProductModal(){
     if (!productModal) return;
     renderModalTypes();
     productModal.hidden = false;
-    document.body.classList.add('nb-modal-open');
+    updateModalBodyState();
   }
 
   function closeProductModal(){
     if (!productModal) return;
     productModal.hidden = true;
-    document.body.classList.remove('nb-modal-open');
+    updateModalBodyState();
+  }
+
+  function openColorModal(){
+    if (!colorModal) return;
+    renderColorChoices();
+    if (colorModalTrigger && colorModalTrigger.hasAttribute('disabled')) return;
+    colorModal.hidden = false;
+    updateModalBodyState();
+  }
+
+  function closeColorModal(){
+    if (!colorModal) return;
+    colorModal.hidden = true;
+    updateModalBodyState();
   }
 
   function getColorLabel(){
     const opt = Array.from(colorSel.options).find(o=>o.value === colorSel.value);
-    return opt ? (opt.dataset.original || opt.textContent) : '';
+    return opt ? (opt.dataset.display || opt.dataset.original || opt.textContent) : '';
+  }
+
+  function updateColorTriggerLabel(){
+    if (!colorModalLabel) return;
+    const label = getColorLabel();
+    colorModalLabel.textContent = label ? `Szín: ${label}` : 'Válassz színt';
   }
 
   function updateSelectionSummary(){
@@ -430,15 +481,18 @@
         selectionSummaryEl.appendChild(chip);
       }
     }
+    updateColorTriggerLabel();
     updatePriceDisplay();
   }
 
   function updatePriceDisplay(){
     if (!priceDisplayEl) return;
+    priceDisplayEl.classList.remove('nb-price-display--pending');
     if (designState.savedDesignId){
       priceDisplayEl.textContent = `Mentve (#${designState.savedDesignId})`;
     } else {
       priceDisplayEl.textContent = 'Az egyedi felár a mentés után kerül kiszámításra.';
+      priceDisplayEl.classList.add('nb-price-display--pending');
     }
   }
 
@@ -891,7 +945,7 @@
       colorSel.appendChild(opt);
     });
     ensureSelectValue(colorSel);
-    renderColorSwatches();
+    renderColorChoices();
 
     sizeSel.innerHTML = '';
     (cfg.sizes || []).forEach(size=>{
@@ -929,7 +983,7 @@
     updateSelectionSummary();
     markDesignDirty();
   };
-  if (colorSel) colorSel.onchange = ()=>{ renderColorSwatches(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
+  if (colorSel) colorSel.onchange = ()=>{ renderColorChoices(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
   if (sizeSel) sizeSel.onchange = ()=>{ renderSizeButtons(); updateSelectionSummary(); markDesignDirty(); };
 
   c.on('object:added', e=>{ if (isDesignObject(e.target)){ keepObjectInside(e.target); markDesignDirty(); }});
@@ -1002,9 +1056,29 @@
     });
   }
 
+  if (colorModalTrigger){
+    colorModalTrigger.addEventListener('click', openColorModal);
+  }
+
+  if (colorModal){
+    const closeButtons = Array.from(colorModal.querySelectorAll('[data-nb-close="color-modal"]'));
+    closeButtons.forEach(btn=>btn.addEventListener('click', closeColorModal));
+    colorModal.addEventListener('click', evt=>{
+      if (evt.target && evt.target.dataset && evt.target.dataset.nbClose === 'color-modal'){
+        closeColorModal();
+      }
+    });
+  }
+
   document.addEventListener('keydown', evt=>{
-    if (evt.key === 'Escape' && productModal && !productModal.hidden){
-      closeProductModal();
+    if (evt.key === 'Escape'){
+      if (colorModal && !colorModal.hidden){
+        closeColorModal();
+        return;
+      }
+      if (productModal && !productModal.hidden){
+        closeProductModal();
+      }
     }
   });
 
