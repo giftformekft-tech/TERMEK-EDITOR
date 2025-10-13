@@ -330,6 +330,11 @@
     }
   }
 
+  function normalizedMockupIndex(value){
+    const num = Math.floor(numberOr(value, -1));
+    return Number.isFinite(num) && num >= 0 ? num : -1;
+  }
+
   function currentSelection(){
     const pid = parseInt(productSel.value || 0, 10);
     const type = typeSel.value || '';
@@ -337,7 +342,8 @@
     const cfg = getCatalog()[pid] || {};
     const key = (type + '|' + color).toLowerCase();
     const mapping = (cfg.map || {})[key] || {};
-    const mk = mockups()[parseInt(mapping.mockup_index || -1, 10)] || null;
+    const mkIndex = normalizedMockupIndex(mapping.mockup_index);
+    const mk = mkIndex >= 0 ? (mockups()[mkIndex] || null) : null;
     return {pid, type, color, cfg, mapping, mockup: mk};
   }
 
