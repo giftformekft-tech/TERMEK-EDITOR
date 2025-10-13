@@ -60,6 +60,27 @@
     });
   }
 
+  function mockupImageUrl(mk){
+    if (!mk || typeof mk !== 'object') return '';
+    const candidates = [
+      mk.image_url,
+      mk.imageUrl,
+      mk.url,
+      mk.image,
+      mk.src,
+      mk.background_url,
+      mk.backgroundUrl,
+      mk.background
+    ];
+    for (let i=0;i<candidates.length;i++){
+      const value = candidates[i];
+      if (typeof value === 'string' && value.trim()){
+        return value.trim();
+      }
+    }
+    return '';
+  }
+
   const typeSel = document.getElementById('nb-type');
   const productSel = document.getElementById('nb-product');
   const colorSel = document.getElementById('nb-color');
@@ -105,7 +126,33 @@
 
   function getCatalog(){ return settings.catalog || {}; }
   function productList(){ return settings.products || []; }
-  function mockups(){ return settings.mockups || []; }
+  function mockups(){
+    const raw = settings.mockups;
+    if (Array.isArray(raw)){
+      return raw.filter(Boolean);
+    }
+    if (raw && typeof raw === 'object'){
+      return Object.keys(raw).map(key=>raw[key]).filter(Boolean);
+    }
+    return [];
+  }
+
+  function mockupIndexById(id, arr){
+    if (id === undefined || id === null) return -1;
+    const key = String(id).trim();
+    if (!key) return -1;
+    const list = Array.isArray(arr) ? arr : mockups();
+    const keyNumeric = parseNumeric(key);
+    for (let i=0;i<list.length;i++){
+      const mk = list[i];
+      if (!mk || mk.id === undefined || mk.id === null) continue;
+      const mkId = String(mk.id).trim();
+      if (!mkId) continue;
+      if (mkId === key) return i;
+      if (keyNumeric !== null && mkId === String(keyNumeric)) return i;
+    }
+    return -1;
+  }
   function types(){ return settings.types || ['Póló','Pulóver']; }
   function fontEntries(){ return settings.fonts || []; }
 
@@ -330,6 +377,57 @@
     }
   }
 
+  function resolveMockupPointer(value, arr){
+    if (value === undefined || value === null) return -1;
+    const list = Array.isArray(arr) ? arr : mockups();
+    if (!list.length) return -1;
+    const numeric = parseNumeric(value);
+    if (numeric !== null){
+      const idx = Math.floor(numeric);
+      if (Number.isFinite(idx) && idx >= 0 && idx < list.length) return idx;
+      const byId = mockupIndexById(numeric, list);
+      if (byId >= 0) return byId;
+    }
+    const str = String(value).trim();
+    if (!str) return -1;
+    const direct = mockupIndexById(str, list);
+    if (direct >= 0) return direct;
+    const tokens = str.match(/-?\d+/g);
+    if (tokens){
+      for (let i=0;i<tokens.length;i++){
+        const token = parseInt(tokens[i], 10);
+        if (!Number.isFinite(token)) continue;
+        if (token >= 0 && token < list.length) return token;
+        const byId = mockupIndexById(token, list);
+        if (byId >= 0) return byId;
+      }
+    }
+    return -1;
+  }
+
+  function normalizedMockupIndex(value, arr){
+    return resolveMockupPointer(value, arr);
+  }
+
+  function resolveMockupIndex(mapping, arr){
+    const list = Array.isArray(arr) ? arr : mockups();
+    if (!mapping || typeof mapping !== 'object'){
+      return normalizedMockupIndex(mapping, list);
+    }
+    const candidates = [
+      mapping.mockup_index,
+      mapping.mockupIndex,
+      mapping.mockup_id,
+      mapping.mockupId,
+      mapping.mockup
+    ];
+    for (let i=0;i<candidates.length;i++){
+      const idx = normalizedMockupIndex(candidates[i], list);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+
   function currentSelection(){
     const pid = parseInt(productSel.value || 0, 10);
     const type = typeSel.value || '';
@@ -337,7 +435,9 @@
     const cfg = getCatalog()[pid] || {};
     const key = (type + '|' + color).toLowerCase();
     const mapping = (cfg.map || {})[key] || {};
-    const mk = mockups()[parseInt(mapping.mockup_index || -1, 10)] || null;
+    const list = mockups();
+    const mkIndex = resolveMockupIndex(mapping, list);
+    const mk = mkIndex >= 0 ? (list[mkIndex] || null) : null;
     return {pid, type, color, cfg, mapping, mockup: mk};
   }
 
@@ -513,8 +613,9 @@
     const loadToken = Symbol('mockup');
     c.__nb_bg_token = loadToken;
     c.setBackgroundImage(null, c.renderAll.bind(c));
-    if (mk && mk.image_url){
-      loadMockupImage(mk.image_url).then(img=>{
+    const mockupUrl = mockupImageUrl(mk);
+    if (mockupUrl){
+      loadMockupImage(mockupUrl).then(img=>{
         if (c.__nb_bg_token !== loadToken) return;
         const scale = Math.min(c.width / img.width, c.height / img.height) || 1;
         img.set({
