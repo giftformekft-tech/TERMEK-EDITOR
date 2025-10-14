@@ -646,19 +646,30 @@
     if (!Number.isFinite(scale) || scale <= 0){
       scale = 1;
     }
-    const appliedW = Math.max(1, Math.round(targetW * scale));
-    const appliedH = Math.max(1, Math.round(targetH * scale));
+
+    let appliedW = Math.max(1, Math.round(targetW * scale));
+    let appliedH = Math.max(1, Math.round(targetH * scale));
+
+    const canvasContainer = canvasElement?.parentElement || null;
+    const containerRect = canvasContainer && typeof canvasContainer.getBoundingClientRect === 'function'
+      ? canvasContainer.getBoundingClientRect()
+      : null;
+    const containerWidth = containerRect && containerRect.width ? Math.floor(containerRect.width) : 0;
+    if (containerWidth && appliedW > containerWidth){
+      const containerScale = containerWidth / appliedW;
+      appliedW = Math.max(1, Math.round(appliedW * containerScale));
+      appliedH = Math.max(1, Math.round(appliedH * containerScale));
+    }
+
     let changed = false;
     if (c.width !== appliedW){
       c.setWidth(appliedW);
       canvasElement.width = appliedW;
-      canvasElement.style.width = appliedW + 'px';
       changed = true;
     }
     if (c.height !== appliedH){
       c.setHeight(appliedH);
       canvasElement.height = appliedH;
-      canvasElement.style.height = appliedH + 'px';
       changed = true;
     }
     canvasElement.style.maxWidth = '100%';
