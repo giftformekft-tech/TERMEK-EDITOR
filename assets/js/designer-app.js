@@ -589,7 +589,7 @@
     if (stageColumn){
       const rect = stageColumn.getBoundingClientRect();
       if (rect && rect.width){
-        widthAvailable = Math.max(320, Math.floor(rect.width - 48));
+        widthAvailable = Math.max(220, Math.floor(rect.width - 32));
       }
       if (rect && rect.height){
         heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 48));
@@ -598,16 +598,20 @@
     if (stageFrame){
       const rect = stageFrame.getBoundingClientRect();
       if (rect && rect.width){
-        widthAvailable = Math.max(widthAvailable, Math.floor(rect.width - 36));
+        widthAvailable = Math.max(widthAvailable, Math.floor(rect.width - 24));
       }
       if (rect && rect.height){
         heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 36));
       }
     }
+    if (window.innerWidth){
+      const viewportWidth = Math.max(220, Math.floor(window.innerWidth - 32));
+      widthAvailable = Math.min(widthAvailable, viewportWidth);
+    }
     if (window.innerHeight){
       heightAvailable = Math.max(heightAvailable, Math.floor(window.innerHeight - 140));
     }
-    return {w: widthAvailable, h: heightAvailable};
+    return {w: Math.max(widthAvailable, 220), h: Math.max(heightAvailable, 220)};
   }
 
   function applyCanvasSize(size){
@@ -623,8 +627,8 @@
     if (!Number.isFinite(scale) || scale <= 0){
       scale = 1;
     }
-    const appliedW = Math.max(320, Math.round(targetW * scale));
-    const appliedH = Math.max(320, Math.round(targetH * scale));
+    const appliedW = Math.max(1, Math.round(targetW * scale));
+    const appliedH = Math.max(1, Math.round(targetH * scale));
     let changed = false;
     if (c.width !== appliedW){
       c.setWidth(appliedW);
@@ -638,6 +642,9 @@
       canvasElement.style.height = appliedH + 'px';
       changed = true;
     }
+    canvasElement.style.maxWidth = '100%';
+    canvasElement.style.width = appliedW + 'px';
+    canvasElement.style.height = appliedH + 'px';
     if (changed && c.calcOffset){
       c.calcOffset();
     }
