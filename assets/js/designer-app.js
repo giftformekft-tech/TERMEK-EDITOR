@@ -675,21 +675,25 @@
       appliedH = Math.max(1, Math.round(appliedH * containerScale));
     }
 
-    let changed = false;
-    if (c.width !== appliedW){
-      c.setWidth(appliedW);
-      canvasElement.width = appliedW;
-      changed = true;
+    const dims = {width: appliedW, height: appliedH};
+    const cssDims = {cssOnly: true};
+    c.setDimensions(dims);
+    c.setDimensions(dims, cssDims);
+    canvasElement.width = appliedW;
+    canvasElement.height = appliedH;
+
+    const canvasWrapper = canvasElement.parentElement;
+    if (canvasWrapper){
+      canvasWrapper.style.maxWidth = '100%';
+      canvasWrapper.style.width = appliedW + 'px';
+      canvasWrapper.style.height = appliedH + 'px';
     }
-    if (c.height !== appliedH){
-      c.setHeight(appliedH);
-      canvasElement.height = appliedH;
-      changed = true;
-    }
+
     canvasElement.style.maxWidth = '100%';
     canvasElement.style.width = appliedW + 'px';
     canvasElement.style.height = appliedH + 'px';
-    if (changed && c.calcOffset){
+
+    if (c.calcOffset){
       c.calcOffset();
     }
     return {w: appliedW, h: appliedH};

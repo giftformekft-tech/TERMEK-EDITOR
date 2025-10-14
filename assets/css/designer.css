@@ -97,8 +97,7 @@ body.nb-modal-open{overflow:hidden}
   .nb-column--stage{min-height:auto}
   .nb-product-stage{padding:0}
   .nb-product-frame{width:100%;max-width:100%}
-  .nb-product-frame .canvas-container{width:100%}
-  #nb-canvas{width:100%;height:auto}
+  .nb-product-frame .canvas-container{width:auto;max-width:100%}
   .nb-stage-controls{padding:14px}
   .nb-summary-card{padding:22px}
 }
