@@ -584,30 +584,53 @@
   function preferredCanvasBounds(){
     const stageColumn = canvasEl.closest('.nb-column--stage');
     const stageFrame = canvasEl.closest('.nb-product-frame');
-    let widthAvailable = defaultCanvasSize.w;
-    let heightAvailable = defaultCanvasSize.h;
+    const widthConstraints = [];
+    const heightConstraints = [];
+
     if (stageColumn){
       const rect = stageColumn.getBoundingClientRect();
-      if (rect && rect.width){
-        widthAvailable = Math.max(320, Math.floor(rect.width - 48));
-      }
-      if (rect && rect.height){
-        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 48));
+      if (rect){
+        if (rect.width){
+          widthConstraints.push(Math.floor(rect.width - 24));
+        }
+        if (rect.height){
+          heightConstraints.push(Math.floor(rect.height - 32));
+        }
       }
     }
+
     if (stageFrame){
       const rect = stageFrame.getBoundingClientRect();
-      if (rect && rect.width){
-        widthAvailable = Math.max(widthAvailable, Math.floor(rect.width - 36));
+      if (rect){
+        if (rect.width){
+          widthConstraints.push(Math.floor(rect.width - 16));
+        }
+        if (rect.height){
+          heightConstraints.push(Math.floor(rect.height - 24));
+        }
       }
-      if (rect && rect.height){
-        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 36));
-      }
+    }
+
+    if (window.innerWidth){
+      widthConstraints.push(Math.floor(window.innerWidth - 32));
     }
     if (window.innerHeight){
-      heightAvailable = Math.max(heightAvailable, Math.floor(window.innerHeight - 140));
+      heightConstraints.push(Math.floor(window.innerHeight - 140));
     }
-    return {w: widthAvailable, h: heightAvailable};
+
+    const positiveMin = (values, fallback) => {
+      const filtered = values.filter(v => Number.isFinite(v) && v > 0);
+      if (!filtered.length) return fallback;
+      return Math.max(220, Math.min(...filtered));
+    };
+
+    const widthAvailable = positiveMin(widthConstraints, defaultCanvasSize.w);
+    const heightAvailable = positiveMin(heightConstraints, defaultCanvasSize.h);
+
+    return {
+      w: Math.max(widthAvailable, 220),
+      h: Math.max(heightAvailable, 220)
+    };
   }
 
   function applyCanvasSize(size){
@@ -623,21 +646,35 @@
     if (!Number.isFinite(scale) || scale <= 0){
       scale = 1;
     }
-    const appliedW = Math.max(320, Math.round(targetW * scale));
-    const appliedH = Math.max(320, Math.round(targetH * scale));
+
+    let appliedW = Math.max(1, Math.round(targetW * scale));
+    let appliedH = Math.max(1, Math.round(targetH * scale));
+
+    const canvasContainer = canvasElement?.parentElement || null;
+    const containerRect = canvasContainer && typeof canvasContainer.getBoundingClientRect === 'function'
+      ? canvasContainer.getBoundingClientRect()
+      : null;
+    const containerWidth = containerRect && containerRect.width ? Math.floor(containerRect.width) : 0;
+    if (containerWidth && appliedW > containerWidth){
+      const containerScale = containerWidth / appliedW;
+      appliedW = Math.max(1, Math.round(appliedW * containerScale));
+      appliedH = Math.max(1, Math.round(appliedH * containerScale));
+    }
+
     let changed = false;
     if (c.width !== appliedW){
       c.setWidth(appliedW);
       canvasElement.width = appliedW;
-      canvasElement.style.width = appliedW + 'px';
       changed = true;
     }
     if (c.height !== appliedH){
       c.setHeight(appliedH);
       canvasElement.height = appliedH;
-      canvasElement.style.height = appliedH + 'px';
       changed = true;
     }
+    canvasElement.style.maxWidth = '100%';
+    canvasElement.style.width = appliedW + 'px';
+    canvasElement.style.height = appliedH + 'px';
     if (changed && c.calcOffset){
       c.calcOffset();
     }
@@ -977,6 +1014,7 @@
   populateColorsSizes();
   initAlignDefault();
   setMockupBgAndArea();
+  requestAnimationFrame(()=>{ setMockupBgAndArea(); });
   updateSelectionSummary();
   syncTextControls();
 
@@ -1098,6 +1136,10 @@
     resizeRaf = requestAnimationFrame(()=>{
       setMockupBgAndArea();
     });
+  });
+
+  window.addEventListener('load', ()=>{
+    setMockupBgAndArea();
   });
 
   if (addTextBtn){
