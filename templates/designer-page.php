@@ -2,18 +2,18 @@
   <div class="nb-designer-shell">
     <aside class="nb-column nb-column--actions">
       <div class="nb-action-card nb-action-card--product">
-        <button type="button" class="nb-hero-button" id="nb-product-modal-trigger">
+        <button type="button" class="nb-hero-button" id="nb-product-modal-trigger" data-nb-trigger="product-modal">
           <span class="nb-hero-icon">🛍️</span>
           <span>Válassz terméket</span>
         </button>
-        <button type="button" class="nb-hero-button nb-hero-button--secondary" id="nb-color-modal-trigger">
+        <button type="button" class="nb-hero-button nb-hero-button--secondary" id="nb-color-modal-trigger" data-nb-trigger="color-modal">
           <span class="nb-hero-icon">🎨</span>
           <span id="nb-color-modal-label">Válassz színt</span>
         </button>
         <div class="nb-card-body">
           <div class="nb-size-group">
             <span class="nb-field-label">Méret</span>
-            <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
+            <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact" data-nb-size-buttons></div>
           </div>
         </div>
       </div>
@@ -33,6 +33,28 @@
       <div class="nb-product-stage">
         <div class="nb-product-frame">
           <canvas id="nb-canvas" width="480" height="640"></canvas>
+        </div>
+        <div class="nb-mobile-toolbar" aria-label="Tervező eszközök">
+          <button type="button" class="nb-mobile-action" data-nb-trigger="product-modal" aria-label="Termékválasztó megnyitása">
+            <span class="nb-mobile-icon">🛍️</span>
+            <span class="nb-sr-only">Termékválasztó</span>
+          </button>
+          <button type="button" class="nb-mobile-action" data-nb-trigger="color-modal" aria-label="Színválasztó megnyitása">
+            <span class="nb-mobile-icon">🎨</span>
+            <span class="nb-sr-only">Színválasztó</span>
+          </button>
+          <button type="button" class="nb-mobile-action" data-nb-trigger="size-modal" aria-label="Méretválasztó megnyitása">
+            <span class="nb-mobile-icon">📏</span>
+            <span class="nb-sr-only">Méretválasztó</span>
+          </button>
+          <button type="button" class="nb-mobile-action" data-nb-trigger="upload" aria-label="Kép feltöltése">
+            <span class="nb-mobile-icon">⬆</span>
+            <span class="nb-sr-only">Kép feltöltése</span>
+          </button>
+          <button type="button" class="nb-mobile-action" data-nb-trigger="text-tool" aria-label="Szöveg hozzáadása">
+            <span class="nb-mobile-icon">✎</span>
+            <span class="nb-sr-only">Szöveg hozzáadása</span>
+          </button>
         </div>
       </div>
     </main>
@@ -117,6 +139,22 @@
         <div class="nb-modal-section">
           <h3>Elérhető színek</h3>
           <div class="nb-modal-color-grid" id="nb-modal-color-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nb-modal" id="nb-size-modal" hidden>
+    <div class="nb-modal-backdrop" data-nb-close="size-modal"></div>
+    <div class="nb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-size-modal-title">
+      <div class="nb-modal-header">
+        <h2 id="nb-size-modal-title">Válassz méretet</h2>
+        <button type="button" class="nb-modal-close" data-nb-close="size-modal" aria-label="Bezárás">×</button>
+      </div>
+      <div class="nb-modal-body">
+        <div class="nb-modal-section">
+          <h3>Elérhető méretek</h3>
+          <div class="nb-pill-group nb-pill-group--compact" data-nb-size-buttons></div>
         </div>
       </div>
     </div>
