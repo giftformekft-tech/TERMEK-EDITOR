@@ -91,19 +91,13 @@
   const sizeSel = document.getElementById('nb-size');
   if (!typeSel || !productSel || !colorSel || !sizeSel) return;
   const productModal = document.getElementById('nb-product-modal');
-  const productModalTriggers = Array.from(document.querySelectorAll('[data-nb-trigger="product-modal"]'));
-  const productModalTrigger = productModalTriggers[0] || null;
+  const productModalTrigger = document.getElementById('nb-product-modal-trigger');
   const modalTypeList = document.getElementById('nb-modal-type-list');
   const colorModal = document.getElementById('nb-color-modal');
-  const colorModalTriggers = Array.from(document.querySelectorAll('[data-nb-trigger="color-modal"]'));
-  const colorModalTrigger = colorModalTriggers[0] || null;
+  const colorModalTrigger = document.getElementById('nb-color-modal-trigger');
   const modalColorList = document.getElementById('nb-modal-color-list');
   const colorModalLabel = document.getElementById('nb-color-modal-label');
-  const sizeButtonsWraps = Array.from(document.querySelectorAll('[data-nb-size-buttons]'));
-  const sizeModal = document.getElementById('nb-size-modal');
-  const sizeModalTriggers = Array.from(document.querySelectorAll('[data-nb-trigger="size-modal"]'));
-  const uploadTriggers = Array.from(document.querySelectorAll('[data-nb-trigger="upload"]'));
-  const textToolTriggers = Array.from(document.querySelectorAll('[data-nb-trigger="text-tool"]'));
+  const sizeButtonsWrap = document.getElementById('nb-size-buttons');
   const selectionSummaryEl = document.getElementById('nb-selection-summary');
   const productTitleEl = document.getElementById('nb-product-title');
   const productMetaEl = document.getElementById('nb-product-meta');
@@ -281,14 +275,13 @@
     modalColorList.innerHTML = '';
     const options = Array.from(colorSel.options);
     const hasOptions = options.length > 0;
-    colorModalTriggers.forEach(trigger=>{
-      if (!trigger) return;
+    if (colorModalTrigger){
       if (hasOptions){
-        trigger.removeAttribute('disabled');
+        colorModalTrigger.removeAttribute('disabled');
       } else {
-        trigger.setAttribute('disabled', 'disabled');
+        colorModalTrigger.setAttribute('disabled', 'disabled');
       }
-    });
+    }
     if (!hasOptions){
       const empty = document.createElement('div');
       empty.className = 'nb-modal-empty';
@@ -325,34 +318,27 @@
   }
 
   function renderSizeButtons(){
-    if (!sizeButtonsWraps.length) return;
-    sizeButtonsWraps.forEach(wrap=>{ wrap.innerHTML = ''; });
+    if (!sizeButtonsWrap) return;
+    sizeButtonsWrap.innerHTML = '';
     const options = Array.from(sizeSel.options);
     if (!options.length){
-      sizeButtonsWraps.forEach(wrap=>{
-        const empty = document.createElement('div');
-        empty.className = 'nb-empty';
-        empty.textContent = 'Nincs méret megadva.';
-        wrap.appendChild(empty);
-      });
+      const empty = document.createElement('div');
+      empty.className = 'nb-empty';
+      empty.textContent = 'Nincs méret megadva.';
+      sizeButtonsWrap.appendChild(empty);
       return;
     }
     options.forEach(opt=>{
-      sizeButtonsWraps.forEach(wrap=>{
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'nb-pill' + (opt.value === sizeSel.value ? ' is-active' : '');
-        btn.textContent = opt.textContent;
-        btn.onclick = ()=>{
-          sizeSel.value = opt.value;
-          renderSizeButtons();
-          updateSelectionSummary();
-          if (wrap && wrap.closest('#nb-size-modal')){
-            closeSizeModal();
-          }
-        };
-        wrap.appendChild(btn);
-      });
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'nb-pill' + (opt.value === sizeSel.value ? ' is-active' : '');
+      btn.textContent = opt.textContent;
+      btn.onclick = ()=>{
+        sizeSel.value = opt.value;
+        renderSizeButtons();
+        updateSelectionSummary();
+      };
+      sizeButtonsWrap.appendChild(btn);
     });
   }
 
@@ -416,7 +402,7 @@
   }
 
   function updateModalBodyState(){
-    const anyOpen = (productModal && !productModal.hidden) || (colorModal && !colorModal.hidden) || (sizeModal && !sizeModal.hidden);
+    const anyOpen = (productModal && !productModal.hidden) || (colorModal && !colorModal.hidden);
     if (anyOpen){
       document.body.classList.add('nb-modal-open');
     } else {
@@ -448,19 +434,6 @@
   function closeColorModal(){
     if (!colorModal) return;
     colorModal.hidden = true;
-    updateModalBodyState();
-  }
-
-  function openSizeModal(){
-    if (!sizeModal) return;
-    renderSizeButtons();
-    sizeModal.hidden = false;
-    updateModalBodyState();
-  }
-
-  function closeSizeModal(){
-    if (!sizeModal) return;
-    sizeModal.hidden = true;
     updateModalBodyState();
   }
 
@@ -995,7 +968,6 @@
     });
     ensureSelectValue(sizeSel);
     renderSizeButtons();
-    closeSizeModal();
   }
 
   // initial populate
@@ -1080,12 +1052,8 @@
     };
   });
 
-  if (productModalTriggers.length){
-    productModalTriggers.forEach(btn=>{
-      if (btn){
-        btn.addEventListener('click', openProductModal);
-      }
-    });
+  if (productModalTrigger){
+    productModalTrigger.addEventListener('click', openProductModal);
   }
 
   if (productModal){
@@ -1098,20 +1066,8 @@
     });
   }
 
-  if (colorModalTriggers.length){
-    colorModalTriggers.forEach(btn=>{
-      if (btn){
-        btn.addEventListener('click', openColorModal);
-      }
-    });
-  }
-
-  if (sizeModalTriggers.length){
-    sizeModalTriggers.forEach(btn=>{
-      if (btn){
-        btn.addEventListener('click', openSizeModal);
-      }
-    });
+  if (colorModalTrigger){
+    colorModalTrigger.addEventListener('click', openColorModal);
   }
 
   if (colorModal){
@@ -1124,40 +1080,6 @@
     });
   }
 
-  if (sizeModal){
-    const closeButtons = Array.from(sizeModal.querySelectorAll('[data-nb-close="size-modal"]'));
-    closeButtons.forEach(btn=>btn.addEventListener('click', closeSizeModal));
-    sizeModal.addEventListener('click', evt=>{
-      if (evt.target && evt.target.dataset && evt.target.dataset.nbClose === 'size-modal'){
-        closeSizeModal();
-      }
-    });
-  }
-
-  if (uploadTriggers.length){
-    uploadTriggers.forEach(btn=>{
-      if (btn){
-        btn.addEventListener('click', ()=>{
-          if (uploadInput){
-            uploadInput.click();
-          }
-        });
-      }
-    });
-  }
-
-  if (textToolTriggers.length){
-    textToolTriggers.forEach(btn=>{
-      if (btn){
-        btn.addEventListener('click', ()=>{
-          if (addTextBtn){
-            addTextBtn.click();
-          }
-        });
-      }
-    });
-  }
-
   document.addEventListener('keydown', evt=>{
     if (evt.key === 'Escape'){
       if (colorModal && !colorModal.hidden){
@@ -1166,10 +1088,6 @@
       }
       if (productModal && !productModal.hidden){
         closeProductModal();
-        return;
-      }
-      if (sizeModal && !sizeModal.hidden){
-        closeSizeModal();
       }
     }
   });
