@@ -224,6 +224,21 @@
     return value.toString().trim().toLowerCase();
   }
 
+  function normalizedColorValue(value){
+    if (value === undefined || value === null) return '';
+    return value.toString().trim().toLowerCase();
+  }
+
+  function colorEntryFromString(colorName){
+    const original = (colorName || '').toString().trim();
+    if (!original) return null;
+    const normalized = normalizedColorValue(original);
+    if (!normalized) return null;
+    const label = formatColorLabel(original);
+    if (!label) return null;
+    return {original, normalized, label};
+  }
+
   function productSupportsType(cfg, typeValue){
     const normalized = normalizedTypeValue(typeValue);
     if (!normalized) return true;
@@ -239,6 +254,52 @@
     const canCheck = typeof CSS !== 'undefined' && typeof CSS.supports === 'function';
     if (cleaned && canCheck && CSS.supports('color', cleaned)) return cleaned;
     return '';
+  }
+
+  function variantHasActiveMockup(cfg, typeValue, colorValue, list){
+    if (!cfg || typeof cfg !== 'object') return false;
+    const map = cfg.map;
+    if (!map || typeof map !== 'object') return false;
+    const mkList = Array.isArray(list) ? list : mockups();
+    const normalizedType = normalizedTypeValue(typeValue);
+    const normalizedColor = normalizedColorValue(colorValue);
+    if (!normalizedType || !normalizedColor) return false;
+    const entry = map[normalizedType + '|' + normalizedColor];
+    if (!entry) return false;
+    return resolveMockupIndex(entry, mkList) >= 0;
+  }
+
+  function availableColorsForType(cfg, typeValue){
+    const colors = Array.isArray(cfg?.colors) ? cfg.colors : [];
+    if (!colors.length) return {entries: [], restricted: false};
+    const map = cfg?.map && typeof cfg.map === 'object' ? cfg.map : {};
+    const mkList = mockups();
+    const hasAnyActiveMapping = Object.keys(map).some(key=>resolveMockupIndex(map[key], mkList) >= 0);
+    const normalizedType = normalizedTypeValue(typeValue);
+    const entries = [];
+
+    colors.forEach(colorName=>{
+      const entry = colorEntryFromString(colorName);
+      if (!entry) return;
+      let include = true;
+      if (hasAnyActiveMapping){
+        if (normalizedType){
+          include = variantHasActiveMockup(cfg, normalizedType, entry.normalized, mkList);
+        } else {
+          include = Object.keys(map).some(key=>{
+            const parts = key.split('|');
+            if (parts.length !== 2) return false;
+            if (parts[1] !== entry.normalized) return false;
+            return resolveMockupIndex(map[key], mkList) >= 0;
+          });
+        }
+      }
+      if (include){
+        entries.push(entry);
+      }
+    });
+
+    return {entries, restricted: hasAnyActiveMapping};
   }
 
   function ensureSelectValue(selectEl){
@@ -997,16 +1058,17 @@
   function populateColorsSizes(){
     const pid = parseInt(productSel.value || 0, 10);
     const cfg = getCatalog()[pid] || {};
+    const {entries: filteredColors, restricted} = availableColorsForType(cfg, typeSel ? typeSel.value : '');
+    const fallbackColors = (cfg.colors || []).map(colorEntryFromString).filter(Boolean);
+    const colorsToRender = (filteredColors.length || restricted) ? filteredColors : fallbackColors;
     colorSel.innerHTML = '';
-    (cfg.colors || []).forEach(colorName=>{
-      const original = (colorName || '').toString().trim();
-      if (!original) return;
+    colorsToRender.forEach(entry=>{
       const opt = document.createElement('option');
-      opt.value = original.toLowerCase();
-      opt.textContent = formatColorLabel(original);
-      opt.dataset.original = original;
-      opt.dataset.display = formatColorLabel(original);
-      opt.dataset.rawColor = original;
+      opt.value = entry.normalized;
+      opt.textContent = entry.label;
+      opt.dataset.original = entry.original;
+      opt.dataset.display = entry.label;
+      opt.dataset.rawColor = entry.original;
       colorSel.appendChild(opt);
     });
     ensureSelectValue(colorSel);
@@ -1037,7 +1099,11 @@
   syncTextControls();
 
   if (typeSel) typeSel.onchange = ()=>{
+    const previousProduct = productSel ? productSel.value : '';
     ensureProductMatchesType();
+    if (!productSel || productSel.value === previousProduct){
+      populateColorsSizes();
+    }
     renderModalTypes();
     setMockupBgAndArea();
     updateSelectionSummary();
