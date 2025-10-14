@@ -591,7 +591,7 @@
       const rect = stageColumn.getBoundingClientRect();
       if (rect){
         if (rect.width){
-          widthConstraints.push(Math.floor(rect.width - 24));
+          widthConstraints.push(Math.floor(rect.width));
         }
         if (rect.height){
           heightConstraints.push(Math.floor(rect.height - 32));
@@ -603,7 +603,7 @@
       const rect = stageFrame.getBoundingClientRect();
       if (rect){
         if (rect.width){
-          widthConstraints.push(Math.floor(rect.width - 16));
+          widthConstraints.push(Math.floor(rect.width));
         }
         if (rect.height){
           heightConstraints.push(Math.floor(rect.height - 24));
@@ -612,7 +612,7 @@
     }
 
     if (window.innerWidth){
-      widthConstraints.push(Math.floor(window.innerWidth - 32));
+      widthConstraints.push(Math.floor(window.innerWidth - 24));
     }
     if (window.innerHeight){
       heightConstraints.push(Math.floor(window.innerHeight - 140));
@@ -639,10 +639,29 @@
     const sizeH = positiveNumberOr(size?.h, defaultCanvasSize.h);
     const targetW = sizeW > 0 ? sizeW : defaultCanvasSize.w;
     const targetH = sizeH > 0 ? sizeH : defaultCanvasSize.h;
+
+    const canvasContainer = canvasElement?.parentElement || null;
+    const containerRect = canvasContainer && typeof canvasContainer.getBoundingClientRect === 'function'
+      ? canvasContainer.getBoundingClientRect()
+      : null;
+    const containerWidth = containerRect && containerRect.width ? Math.floor(containerRect.width) : 0;
+
     const bounds = preferredCanvasBounds();
-    const scaleX = bounds.w / targetW;
-    const scaleY = bounds.h / targetH;
-    let scale = Math.min(scaleX, scaleY);
+    let scaleX = bounds.w / targetW;
+    let scaleY = bounds.h / targetH;
+    if (!Number.isFinite(scaleX) || scaleX <= 0){
+      scaleX = 1;
+    }
+    if (!Number.isFinite(scaleY) || scaleY <= 0){
+      scaleY = 1;
+    }
+
+    const narrowLayout = (containerWidth && containerWidth <= 640)
+      || (!containerWidth && window.innerWidth && window.innerWidth <= 768);
+    let scale = narrowLayout ? scaleX : Math.min(scaleX, scaleY);
+    if (!Number.isFinite(scale) || scale <= 0){
+      scale = narrowLayout ? scaleX : 1;
+    }
     if (!Number.isFinite(scale) || scale <= 0){
       scale = 1;
     }
@@ -650,11 +669,6 @@
     let appliedW = Math.max(1, Math.round(targetW * scale));
     let appliedH = Math.max(1, Math.round(targetH * scale));
 
-    const canvasContainer = canvasElement?.parentElement || null;
-    const containerRect = canvasContainer && typeof canvasContainer.getBoundingClientRect === 'function'
-      ? canvasContainer.getBoundingClientRect()
-      : null;
-    const containerWidth = containerRect && containerRect.width ? Math.floor(containerRect.width) : 0;
     if (containerWidth && appliedW > containerWidth){
       const containerScale = containerWidth / appliedW;
       appliedW = Math.max(1, Math.round(appliedW * containerScale));
