@@ -584,34 +584,53 @@
   function preferredCanvasBounds(){
     const stageColumn = canvasEl.closest('.nb-column--stage');
     const stageFrame = canvasEl.closest('.nb-product-frame');
-    let widthAvailable = defaultCanvasSize.w;
-    let heightAvailable = defaultCanvasSize.h;
+    const widthConstraints = [];
+    const heightConstraints = [];
+
     if (stageColumn){
       const rect = stageColumn.getBoundingClientRect();
-      if (rect && rect.width){
-        widthAvailable = Math.max(220, Math.floor(rect.width - 32));
-      }
-      if (rect && rect.height){
-        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 48));
+      if (rect){
+        if (rect.width){
+          widthConstraints.push(Math.floor(rect.width - 24));
+        }
+        if (rect.height){
+          heightConstraints.push(Math.floor(rect.height - 32));
+        }
       }
     }
+
     if (stageFrame){
       const rect = stageFrame.getBoundingClientRect();
-      if (rect && rect.width){
-        widthAvailable = Math.max(widthAvailable, Math.floor(rect.width - 24));
-      }
-      if (rect && rect.height){
-        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 36));
+      if (rect){
+        if (rect.width){
+          widthConstraints.push(Math.floor(rect.width - 16));
+        }
+        if (rect.height){
+          heightConstraints.push(Math.floor(rect.height - 24));
+        }
       }
     }
+
     if (window.innerWidth){
-      const viewportWidth = Math.max(220, Math.floor(window.innerWidth - 32));
-      widthAvailable = Math.min(widthAvailable, viewportWidth);
+      widthConstraints.push(Math.floor(window.innerWidth - 32));
     }
     if (window.innerHeight){
-      heightAvailable = Math.max(heightAvailable, Math.floor(window.innerHeight - 140));
+      heightConstraints.push(Math.floor(window.innerHeight - 140));
     }
-    return {w: Math.max(widthAvailable, 220), h: Math.max(heightAvailable, 220)};
+
+    const positiveMin = (values, fallback) => {
+      const filtered = values.filter(v => Number.isFinite(v) && v > 0);
+      if (!filtered.length) return fallback;
+      return Math.max(220, Math.min(...filtered));
+    };
+
+    const widthAvailable = positiveMin(widthConstraints, defaultCanvasSize.w);
+    const heightAvailable = positiveMin(heightConstraints, defaultCanvasSize.h);
+
+    return {
+      w: Math.max(widthAvailable, 220),
+      h: Math.max(heightAvailable, 220)
+    };
   }
 
   function applyCanvasSize(size){
@@ -984,6 +1003,7 @@
   populateColorsSizes();
   initAlignDefault();
   setMockupBgAndArea();
+  requestAnimationFrame(()=>{ setMockupBgAndArea(); });
   updateSelectionSummary();
   syncTextControls();
 
@@ -1105,6 +1125,10 @@
     resizeRaf = requestAnimationFrame(()=>{
       setMockupBgAndArea();
     });
+  });
+
+  window.addEventListener('load', ()=>{
+    setMockupBgAndArea();
   });
 
   if (addTextBtn){
