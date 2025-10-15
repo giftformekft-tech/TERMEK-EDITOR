@@ -1,6 +1,97 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
+function nb_normalize_type_key($value){
+  if ($value === null) return '';
+  return strtolower(trim((string)$value));
+}
+
+function nb_normalize_color_key($value){
+  if ($value === null) return '';
+  return strtolower(trim((string)$value));
+}
+
+function nb_sync_product_color_configuration(&$cfg, $settings){
+  if (!is_array($cfg)) $cfg = [];
+  $existingColors = [];
+  if (isset($cfg['colors']) && is_array($cfg['colors'])){
+    $existingColors = $cfg['colors'];
+  }
+  $existingMap = [];
+  if (isset($cfg['map']) && is_array($cfg['map'])){
+    $existingMap = $cfg['map'];
+  }
+  $typeColors = $settings['type_colors'] ?? [];
+  if (!is_array($typeColors)) $typeColors = [];
+  $hasTypeColorConfig = false;
+  foreach ($typeColors as $list){
+    if (is_array($list)){
+      $hasTypeColorConfig = true;
+      break;
+    }
+  }
+  $types = $cfg['types'] ?? [];
+  if (!is_array($types)) $types = [];
+  $colorsByType = [];
+  foreach ($types as $type){
+    $key = nb_normalize_type_key($type);
+    if ($key === '') continue;
+    $list = $typeColors[$key] ?? [];
+    if (!is_array($list)) $list = [];
+    $normalizedList = [];
+    foreach ($list as $color){
+      $color = is_string($color) ? trim($color) : '';
+      if ($color === '') continue;
+      if (!in_array($color, $normalizedList, true)) $normalizedList[] = $color;
+    }
+    $colorsByType[$key] = $normalizedList;
+  }
+  $cfg['colors_by_type'] = $colorsByType;
+  $union = [];
+  foreach ($colorsByType as $list){
+    foreach ($list as $color){
+      if (!in_array($color, $union, true)) $union[] = $color;
+    }
+  }
+  $cfg['colors'] = $union;
+  if (!isset($cfg['map']) || !is_array($cfg['map'])){
+    $cfg['map'] = [];
+  }
+  $hasAnyColor = !empty($union);
+  if (!$hasAnyColor && !$hasTypeColorConfig){
+    $cfg['colors'] = $existingColors;
+    if (!empty($existingMap)){
+      $cfg['map'] = $existingMap;
+    }
+    return;
+  }
+  $allowed = [];
+  foreach ($colorsByType as $typeKey=>$list){
+    $allowed[$typeKey] = [];
+    foreach ($list as $color){
+      $normColor = nb_normalize_color_key($color);
+      if ($normColor === '') continue;
+      if (!in_array($normColor, $allowed[$typeKey], true)) $allowed[$typeKey][] = $normColor;
+    }
+  }
+  foreach ($cfg['map'] as $key=>$entry){
+    $parts = explode('|', $key);
+    if (count($parts) !== 2){
+      unset($cfg['map'][$key]);
+      continue;
+    }
+    $typeKey = trim($parts[0]);
+    $colorKey = trim($parts[1]);
+    if ($typeKey === '' || $colorKey === ''){
+      unset($cfg['map'][$key]);
+      continue;
+    }
+    if (!isset($allowed[$typeKey]) || !in_array($colorKey, $allowed[$typeKey], true)){
+      unset($cfg['map'][$key]);
+    }
+  }
+}
+
 add_action('admin_menu', function(){
   add_menu_page('Terméktervező','Terméktervező','manage_options','nb-designer','nb_admin_render','dashicons-art',58);
 });
@@ -20,6 +111,7 @@ function nb_admin_render(){
         if (empty($settings['catalog'][$pid])){
           $settings['catalog'][$pid] = ['title'=>get_the_title($pid),'types'=>[],'colors'=>[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
         }
+        nb_sync_product_color_configuration($settings['catalog'][$pid], $settings);
       }
     } elseif ($tab==='mockups'){
       $mockups_json = stripslashes($_POST['mockups_json'] ?? '[]');
@@ -47,13 +139,15 @@ function nb_admin_render(){
         }
       }
       $settings['color_palette'] = $palette;
-      $catalog = $settings['catalog'] ?? [];
-      $products = $settings['products'] ?? [];
-      foreach ($products as $pid){
-        if (!isset($catalog[$pid])){
-          $catalog[$pid] = ['title'=>get_the_title($pid),'types'=>[],'colors'=>[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
-        }
-        $selected = $_POST['product_colors'][$pid] ?? [];
+      $typeInputs = $_POST['type_colors'] ?? [];
+      if (!is_array($typeInputs)) $typeInputs = [];
+      $globalTypes = $settings['types'] ?? [];
+      if (!is_array($globalTypes)) $globalTypes = [];
+      $typeColors = [];
+      foreach ($globalTypes as $typeLabel){
+        $key = nb_normalize_type_key($typeLabel);
+        if ($key === '') continue;
+        $selected = $typeInputs[$key] ?? [];
         if (!is_array($selected)) $selected = [];
         $colors = [];
         foreach ($selected as $color){
@@ -69,33 +163,15 @@ function nb_admin_render(){
           $normalized = $match ?? $color;
           if (!in_array($normalized, $colors, true)) $colors[] = $normalized;
         }
-        $catalog[$pid]['colors'] = $colors;
-        if (!isset($catalog[$pid]['map']) || !is_array($catalog[$pid]['map'])){
-          $catalog[$pid]['map'] = [];
+        $typeColors[$key] = $colors;
+      }
+      $settings['type_colors'] = $typeColors;
+      $catalog = $settings['catalog'] ?? [];
+      foreach ($settings['products'] ?? [] as $pid){
+        if (!isset($catalog[$pid])){
+          $catalog[$pid] = ['title'=>get_the_title($pid),'types'=>[],'colors'=>[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
         }
-        if (!empty($catalog[$pid]['map']) && !empty($colors)){
-          $allowed = array_map(function($val){ return strtolower(trim($val)); }, $colors);
-          $allowed = array_filter($allowed, function($val){ return $val !== ''; });
-          foreach ($catalog[$pid]['map'] as $key=>$entry){
-            $parts = explode('|', $key);
-            $colorKey = $parts[1] ?? '';
-            if ($colorKey === '') continue;
-            if (!in_array($colorKey, $allowed, true)){
-              unset($catalog[$pid]['map'][$key]);
-            }
-          }
-        }
-        if (empty($colors)){
-          $catalog[$pid]['colors'] = [];
-          if (!empty($catalog[$pid]['map']) && is_array($catalog[$pid]['map'])){
-            foreach ($catalog[$pid]['map'] as $key=>$entry){
-              $parts = explode('|', $key);
-              if (($parts[1] ?? '') !== ''){
-                unset($catalog[$pid]['map'][$key]);
-              }
-            }
-          }
-        }
+        nb_sync_product_color_configuration($catalog[$pid], $settings);
       }
       $settings['catalog'] = $catalog;
     } elseif ($tab==='variants'){
@@ -119,9 +195,12 @@ function nb_admin_render(){
         $catalog[$pid]['size_surcharge'] = $ss;
         // Map for type|color
         $catalog[$pid]['map'] = $catalog[$pid]['map'] ?? [];
-        $colors = $catalog[$pid]['colors'] ?? [];
+        nb_sync_product_color_configuration($catalog[$pid], $settings);
+        $colorsByType = $catalog[$pid]['colors_by_type'] ?? [];
         foreach ($catalog[$pid]['types'] as $type){
-          foreach ($colors as $color){
+          $typeKey = nb_normalize_type_key($type);
+          $colorList = $colorsByType[$typeKey] ?? [];
+          foreach ($colorList as $color){
             $key = strtolower($type).'|'.strtolower($color);
             $hash = md5($key);
             $catalog[$pid]['map'][$key] = [

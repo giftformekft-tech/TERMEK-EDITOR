@@ -239,6 +239,37 @@
     return {original, normalized, label};
   }
 
+  function flattenTypeColorMap(cfg){
+    const map = cfg && cfg.colors_by_type && typeof cfg.colors_by_type === 'object' ? cfg.colors_by_type : null;
+    if (!map) return [];
+    const seen = new Set();
+    const result = [];
+    Object.keys(map).forEach(typeKey=>{
+      const list = Array.isArray(map[typeKey]) ? map[typeKey] : [];
+      list.forEach(colorName=>{
+        const entry = colorEntryFromString(colorName);
+        if (!entry) return;
+        if (seen.has(entry.normalized)) return;
+        seen.add(entry.normalized);
+        result.push(entry.original);
+      });
+    });
+    return result;
+  }
+
+  function colorStringsForType(cfg, typeValue){
+    const normalizedType = normalizedTypeValue(typeValue);
+    const map = cfg && cfg.colors_by_type && typeof cfg.colors_by_type === 'object' ? cfg.colors_by_type : null;
+    if (map && normalizedType && Array.isArray(map[normalizedType]) && map[normalizedType].length){
+      return map[normalizedType];
+    }
+    if (map){
+      const flattened = flattenTypeColorMap(cfg);
+      if (flattened.length) return flattened;
+    }
+    return Array.isArray(cfg?.colors) ? cfg.colors : [];
+  }
+
   function productSupportsType(cfg, typeValue){
     const normalized = normalizedTypeValue(typeValue);
     if (!normalized) return true;
@@ -270,7 +301,7 @@
   }
 
   function availableColorsForType(cfg, typeValue){
-    const colors = Array.isArray(cfg?.colors) ? cfg.colors : [];
+    const colors = colorStringsForType(cfg, typeValue);
     if (!colors.length) return {entries: [], restricted: false};
     const map = cfg?.map && typeof cfg.map === 'object' ? cfg.map : {};
     const mkList = mockups();
@@ -1059,7 +1090,7 @@
     const pid = parseInt(productSel.value || 0, 10);
     const cfg = getCatalog()[pid] || {};
     const {entries: filteredColors, restricted} = availableColorsForType(cfg, typeSel ? typeSel.value : '');
-    const fallbackColors = (cfg.colors || []).map(colorEntryFromString).filter(Boolean);
+    const fallbackColors = colorStringsForType(cfg, '').map(colorEntryFromString).filter(Boolean);
     const colorsToRender = (filteredColors.length || restricted) ? filteredColors : fallbackColors;
     colorSel.innerHTML = '';
     colorsToRender.forEach(entry=>{
