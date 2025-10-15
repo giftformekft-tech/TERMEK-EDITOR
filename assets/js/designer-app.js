@@ -224,6 +224,72 @@
     return value.toString().trim().toLowerCase();
   }
 
+  function normalizedColorValue(value){
+    if (value === undefined || value === null) return '';
+    return value.toString().trim().toLowerCase();
+  }
+
+  function colorEntryFromString(colorName){
+    const original = (colorName || '').toString().trim();
+    if (!original) return null;
+    const normalized = normalizedColorValue(original);
+    if (!normalized) return null;
+    const label = formatColorLabel(original);
+    if (!label) return null;
+    return {original, normalized, label};
+  }
+
+  function flattenTypeColorMap(cfg){
+    const map = cfg && cfg.colors_by_type && typeof cfg.colors_by_type === 'object' ? cfg.colors_by_type : null;
+    if (!map) return [];
+    const seen = new Set();
+    const result = [];
+    Object.keys(map).forEach(typeKey=>{
+      const list = Array.isArray(map[typeKey]) ? map[typeKey] : [];
+      list.forEach(colorName=>{
+        const entry = colorEntryFromString(colorName);
+        if (!entry) return;
+        if (seen.has(entry.normalized)) return;
+        seen.add(entry.normalized);
+        result.push(entry.original);
+      });
+    });
+    return result;
+  }
+
+  function hasTypeColorConfig(cfg){
+    if (!cfg || typeof cfg !== 'object') return false;
+    const map = cfg.colors_by_type;
+    if (!map || typeof map !== 'object') return false;
+    return Object.keys(map).some(key=>Array.isArray(map[key]));
+  }
+
+  function colorStringsForType(cfg, typeValue){
+    const normalizedType = normalizedTypeValue(typeValue);
+    const map = cfg && cfg.colors_by_type && typeof cfg.colors_by_type === 'object' ? cfg.colors_by_type : null;
+    const hasTypeConfig = hasTypeColorConfig(cfg);
+
+    if (map && normalizedType){
+      if (Object.prototype.hasOwnProperty.call(map, normalizedType)){
+        return Array.isArray(map[normalizedType]) ? map[normalizedType] : [];
+      }
+      if (hasTypeConfig){
+        return [];
+      }
+    }
+
+    if (map && !normalizedType){
+      const flattened = flattenTypeColorMap(cfg);
+      if (flattened.length) return flattened;
+    }
+
+    if (!hasTypeConfig && Array.isArray(cfg?.colors)){
+      return cfg.colors;
+    }
+
+    return [];
+  }
+
   function productSupportsType(cfg, typeValue){
     const normalized = normalizedTypeValue(typeValue);
     if (!normalized) return true;
@@ -239,6 +305,53 @@
     const canCheck = typeof CSS !== 'undefined' && typeof CSS.supports === 'function';
     if (cleaned && canCheck && CSS.supports('color', cleaned)) return cleaned;
     return '';
+  }
+
+  function variantHasActiveMockup(cfg, typeValue, colorValue, list){
+    if (!cfg || typeof cfg !== 'object') return false;
+    const map = cfg.map;
+    if (!map || typeof map !== 'object') return false;
+    const mkList = Array.isArray(list) ? list : mockups();
+    const normalizedType = normalizedTypeValue(typeValue);
+    const normalizedColor = normalizedColorValue(colorValue);
+    if (!normalizedType || !normalizedColor) return false;
+    const entry = map[normalizedType + '|' + normalizedColor];
+    if (!entry) return false;
+    return resolveMockupIndex(entry, mkList) >= 0;
+  }
+
+  function availableColorsForType(cfg, typeValue){
+    const typeConfigured = hasTypeColorConfig(cfg);
+    const colors = colorStringsForType(cfg, typeValue);
+    if (!colors.length) return {entries: [], restricted: false, typeConfigured};
+    const map = cfg?.map && typeof cfg.map === 'object' ? cfg.map : {};
+    const mkList = mockups();
+    const hasAnyActiveMapping = Object.keys(map).some(key=>resolveMockupIndex(map[key], mkList) >= 0);
+    const normalizedType = normalizedTypeValue(typeValue);
+    const entries = [];
+
+    colors.forEach(colorName=>{
+      const entry = colorEntryFromString(colorName);
+      if (!entry) return;
+      let include = true;
+      if (hasAnyActiveMapping){
+        if (normalizedType){
+          include = variantHasActiveMockup(cfg, normalizedType, entry.normalized, mkList);
+        } else {
+          include = Object.keys(map).some(key=>{
+            const parts = key.split('|');
+            if (parts.length !== 2) return false;
+            if (parts[1] !== entry.normalized) return false;
+            return resolveMockupIndex(map[key], mkList) >= 0;
+          });
+        }
+      }
+      if (include){
+        entries.push(entry);
+      }
+    });
+
+    return {entries, restricted: hasAnyActiveMapping, typeConfigured};
   }
 
   function ensureSelectValue(selectEl){
@@ -584,30 +697,53 @@
   function preferredCanvasBounds(){
     const stageColumn = canvasEl.closest('.nb-column--stage');
     const stageFrame = canvasEl.closest('.nb-product-frame');
-    let widthAvailable = defaultCanvasSize.w;
-    let heightAvailable = defaultCanvasSize.h;
+    const widthConstraints = [];
+    const heightConstraints = [];
+
     if (stageColumn){
       const rect = stageColumn.getBoundingClientRect();
-      if (rect && rect.width){
-        widthAvailable = Math.max(320, Math.floor(rect.width - 48));
-      }
-      if (rect && rect.height){
-        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 48));
+      if (rect){
+        if (rect.width){
+          widthConstraints.push(Math.floor(rect.width));
+        }
+        if (rect.height){
+          heightConstraints.push(Math.floor(rect.height - 32));
+        }
       }
     }
+
     if (stageFrame){
       const rect = stageFrame.getBoundingClientRect();
-      if (rect && rect.width){
-        widthAvailable = Math.max(widthAvailable, Math.floor(rect.width - 36));
+      if (rect){
+        if (rect.width){
+          widthConstraints.push(Math.floor(rect.width));
+        }
+        if (rect.height){
+          heightConstraints.push(Math.floor(rect.height - 24));
+        }
       }
-      if (rect && rect.height){
-        heightAvailable = Math.max(heightAvailable, Math.floor(rect.height - 36));
-      }
+    }
+
+    if (window.innerWidth){
+      widthConstraints.push(Math.floor(window.innerWidth - 24));
     }
     if (window.innerHeight){
-      heightAvailable = Math.max(heightAvailable, Math.floor(window.innerHeight - 140));
+      heightConstraints.push(Math.floor(window.innerHeight - 140));
     }
-    return {w: widthAvailable, h: heightAvailable};
+
+    const positiveMin = (values, fallback) => {
+      const filtered = values.filter(v => Number.isFinite(v) && v > 0);
+      if (!filtered.length) return fallback;
+      return Math.max(220, Math.min(...filtered));
+    };
+
+    const widthAvailable = positiveMin(widthConstraints, defaultCanvasSize.w);
+    const heightAvailable = positiveMin(heightConstraints, defaultCanvasSize.h);
+
+    return {
+      w: Math.max(widthAvailable, 220),
+      h: Math.max(heightAvailable, 220)
+    };
   }
 
   function applyCanvasSize(size){
@@ -616,29 +752,61 @@
     const sizeH = positiveNumberOr(size?.h, defaultCanvasSize.h);
     const targetW = sizeW > 0 ? sizeW : defaultCanvasSize.w;
     const targetH = sizeH > 0 ? sizeH : defaultCanvasSize.h;
+
+    const canvasContainer = canvasElement?.parentElement || null;
+    const containerRect = canvasContainer && typeof canvasContainer.getBoundingClientRect === 'function'
+      ? canvasContainer.getBoundingClientRect()
+      : null;
+    const containerWidth = containerRect && containerRect.width ? Math.floor(containerRect.width) : 0;
+
     const bounds = preferredCanvasBounds();
-    const scaleX = bounds.w / targetW;
-    const scaleY = bounds.h / targetH;
-    let scale = Math.min(scaleX, scaleY);
+    let scaleX = bounds.w / targetW;
+    let scaleY = bounds.h / targetH;
+    if (!Number.isFinite(scaleX) || scaleX <= 0){
+      scaleX = 1;
+    }
+    if (!Number.isFinite(scaleY) || scaleY <= 0){
+      scaleY = 1;
+    }
+
+    const narrowLayout = (containerWidth && containerWidth <= 640)
+      || (!containerWidth && window.innerWidth && window.innerWidth <= 768);
+    let scale = narrowLayout ? scaleX : Math.min(scaleX, scaleY);
+    if (!Number.isFinite(scale) || scale <= 0){
+      scale = narrowLayout ? scaleX : 1;
+    }
     if (!Number.isFinite(scale) || scale <= 0){
       scale = 1;
     }
-    const appliedW = Math.max(320, Math.round(targetW * scale));
-    const appliedH = Math.max(320, Math.round(targetH * scale));
-    let changed = false;
-    if (c.width !== appliedW){
-      c.setWidth(appliedW);
-      canvasElement.width = appliedW;
-      canvasElement.style.width = appliedW + 'px';
-      changed = true;
+
+    let appliedW = Math.max(1, Math.round(targetW * scale));
+    let appliedH = Math.max(1, Math.round(targetH * scale));
+
+    if (containerWidth && appliedW > containerWidth){
+      const containerScale = containerWidth / appliedW;
+      appliedW = Math.max(1, Math.round(appliedW * containerScale));
+      appliedH = Math.max(1, Math.round(appliedH * containerScale));
     }
-    if (c.height !== appliedH){
-      c.setHeight(appliedH);
-      canvasElement.height = appliedH;
-      canvasElement.style.height = appliedH + 'px';
-      changed = true;
+
+    const dims = {width: appliedW, height: appliedH};
+    const cssDims = {cssOnly: true};
+    c.setDimensions(dims);
+    c.setDimensions(dims, cssDims);
+    canvasElement.width = appliedW;
+    canvasElement.height = appliedH;
+
+    const canvasWrapper = canvasElement.parentElement;
+    if (canvasWrapper){
+      canvasWrapper.style.maxWidth = '100%';
+      canvasWrapper.style.width = appliedW + 'px';
+      canvasWrapper.style.height = appliedH + 'px';
     }
-    if (changed && c.calcOffset){
+
+    canvasElement.style.maxWidth = '100%';
+    canvasElement.style.width = appliedW + 'px';
+    canvasElement.style.height = appliedH + 'px';
+
+    if (c.calcOffset){
       c.calcOffset();
     }
     return {w: appliedW, h: appliedH};
@@ -942,16 +1110,17 @@
   function populateColorsSizes(){
     const pid = parseInt(productSel.value || 0, 10);
     const cfg = getCatalog()[pid] || {};
+    const {entries: filteredColors, restricted, typeConfigured} = availableColorsForType(cfg, typeSel ? typeSel.value : '');
+    const fallbackColors = typeConfigured ? [] : colorStringsForType(cfg, '').map(colorEntryFromString).filter(Boolean);
+    const colorsToRender = filteredColors.length ? filteredColors : fallbackColors;
     colorSel.innerHTML = '';
-    (cfg.colors || []).forEach(colorName=>{
-      const original = (colorName || '').toString().trim();
-      if (!original) return;
+    colorsToRender.forEach(entry=>{
       const opt = document.createElement('option');
-      opt.value = original.toLowerCase();
-      opt.textContent = formatColorLabel(original);
-      opt.dataset.original = original;
-      opt.dataset.display = formatColorLabel(original);
-      opt.dataset.rawColor = original;
+      opt.value = entry.normalized;
+      opt.textContent = entry.label;
+      opt.dataset.original = entry.original;
+      opt.dataset.display = entry.label;
+      opt.dataset.rawColor = entry.original;
       colorSel.appendChild(opt);
     });
     ensureSelectValue(colorSel);
@@ -977,11 +1146,16 @@
   populateColorsSizes();
   initAlignDefault();
   setMockupBgAndArea();
+  requestAnimationFrame(()=>{ setMockupBgAndArea(); });
   updateSelectionSummary();
   syncTextControls();
 
   if (typeSel) typeSel.onchange = ()=>{
+    const previousProduct = productSel ? productSel.value : '';
     ensureProductMatchesType();
+    if (!productSel || productSel.value === previousProduct){
+      populateColorsSizes();
+    }
     renderModalTypes();
     setMockupBgAndArea();
     updateSelectionSummary();
@@ -1100,6 +1274,10 @@
     });
   });
 
+  window.addEventListener('load', ()=>{
+    setMockupBgAndArea();
+  });
+
   if (addTextBtn){
     addTextBtn.onclick = () => {
       const a = c.__nb_area || fallbackArea;
@@ -1162,13 +1340,76 @@
     };
   }
 
+  function exportPrintImage(){
+    const area = Object.assign({
+      x: 0,
+      y: 0,
+      w: c.width,
+      h: c.height
+    }, c.__nb_area || {});
+
+    const width = Math.max(1, area.w || c.width || 1);
+    const height = Math.max(1, area.h || c.height || 1);
+    const left = Math.max(0, area.x || 0);
+    const top = Math.max(0, area.y || 0);
+    const targetWidth = 3000;
+    const multiplierRaw = targetWidth / width;
+    const multiplier = Number.isFinite(multiplierRaw) && multiplierRaw > 0 ? multiplierRaw : 1;
+
+    const hiddenObjects = [];
+    if (c.__nb_area_rect && c.__nb_area_rect.visible !== false){
+      c.__nb_area_rect.visible = false;
+      hiddenObjects.push(c.__nb_area_rect);
+    }
+
+    const bgImage = c.backgroundImage || null;
+    if (bgImage){
+      c.backgroundImage = null;
+    }
+
+    const originalBgColor = c.backgroundColor;
+    c.backgroundColor = 'rgba(0,0,0,0)';
+
+    c.renderAll();
+
+    let dataUrl = '';
+    try {
+      dataUrl = c.toDataURL({
+        format: 'png',
+        left,
+        top,
+        width,
+        height,
+        multiplier,
+        enableRetinaScaling: false
+      });
+    } finally {
+      if (bgImage){
+        c.backgroundImage = bgImage;
+      }
+      c.backgroundColor = originalBgColor;
+      hiddenObjects.forEach(obj=>{ obj.visible = true; });
+      c.renderAll();
+    }
+
+    return {
+      dataUrl,
+      width: Math.round(width * multiplier),
+      height: Math.round(height * multiplier)
+    };
+  }
+
   let saving = false;
   if (saveBtn){
     saveBtn.onclick = async ()=>{
       if (saving) return;
       saving = true;
       try{
-        const png = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
+        const previewPng = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
+        const printExport = exportPrintImage();
+        if (!printExport.dataUrl){
+          throw new Error('print-export-failed');
+        }
         const sel = currentSelection();
         const size = sizeSel.value || '';
         const price_ctx = {product_id: sel.pid, type: sel.type, color: sel.color, size};
@@ -1176,7 +1417,14 @@
         const res = await fetch(NB_DESIGNER.rest + 'save', {
           method:'POST',
           headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
-          body: JSON.stringify({png_base64: png, layers: c.toJSON(), meta})
+          body: JSON.stringify({
+            png_base64: previewPng,
+            print_png_base64: printExport.dataUrl,
+            print_width_px: printExport.width,
+            print_height_px: printExport.height,
+            layers: c.toJSON(),
+            meta
+          })
         });
         const j = await res.json();
         if (!res.ok){
@@ -1188,7 +1436,11 @@
         alert('Mentve! ID: ' + designState.savedDesignId);
         updatePriceDisplay();
       }catch(e){
-        alert('Hálózati hiba');
+        if (e && e.message === 'print-export-failed'){
+          alert('Nem sikerült előállítani a nyomdai PNG fájlt.');
+        } else {
+          alert('Hálózati hiba');
+        }
       } finally {
         saving = false;
       }
