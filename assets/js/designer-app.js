@@ -257,17 +257,37 @@
     return result;
   }
 
+  function hasTypeColorConfig(cfg){
+    if (!cfg || typeof cfg !== 'object') return false;
+    const map = cfg.colors_by_type;
+    if (!map || typeof map !== 'object') return false;
+    return Object.keys(map).some(key=>Array.isArray(map[key]));
+  }
+
   function colorStringsForType(cfg, typeValue){
     const normalizedType = normalizedTypeValue(typeValue);
     const map = cfg && cfg.colors_by_type && typeof cfg.colors_by_type === 'object' ? cfg.colors_by_type : null;
-    if (map && normalizedType && Array.isArray(map[normalizedType]) && map[normalizedType].length){
-      return map[normalizedType];
+    const hasTypeConfig = hasTypeColorConfig(cfg);
+
+    if (map && normalizedType){
+      if (Object.prototype.hasOwnProperty.call(map, normalizedType)){
+        return Array.isArray(map[normalizedType]) ? map[normalizedType] : [];
+      }
+      if (hasTypeConfig){
+        return [];
+      }
     }
-    if (map){
+
+    if (map && !normalizedType){
       const flattened = flattenTypeColorMap(cfg);
       if (flattened.length) return flattened;
     }
-    return Array.isArray(cfg?.colors) ? cfg.colors : [];
+
+    if (!hasTypeConfig && Array.isArray(cfg?.colors)){
+      return cfg.colors;
+    }
+
+    return [];
   }
 
   function productSupportsType(cfg, typeValue){
@@ -301,8 +321,9 @@
   }
 
   function availableColorsForType(cfg, typeValue){
+    const typeConfigured = hasTypeColorConfig(cfg);
     const colors = colorStringsForType(cfg, typeValue);
-    if (!colors.length) return {entries: [], restricted: false};
+    if (!colors.length) return {entries: [], restricted: false, typeConfigured};
     const map = cfg?.map && typeof cfg.map === 'object' ? cfg.map : {};
     const mkList = mockups();
     const hasAnyActiveMapping = Object.keys(map).some(key=>resolveMockupIndex(map[key], mkList) >= 0);
@@ -330,7 +351,7 @@
       }
     });
 
-    return {entries, restricted: hasAnyActiveMapping};
+    return {entries, restricted: hasAnyActiveMapping, typeConfigured};
   }
 
   function ensureSelectValue(selectEl){
@@ -1089,9 +1110,9 @@
   function populateColorsSizes(){
     const pid = parseInt(productSel.value || 0, 10);
     const cfg = getCatalog()[pid] || {};
-    const {entries: filteredColors, restricted} = availableColorsForType(cfg, typeSel ? typeSel.value : '');
-    const fallbackColors = colorStringsForType(cfg, '').map(colorEntryFromString).filter(Boolean);
-    const colorsToRender = (filteredColors.length || restricted) ? filteredColors : fallbackColors;
+    const {entries: filteredColors, restricted, typeConfigured} = availableColorsForType(cfg, typeSel ? typeSel.value : '');
+    const fallbackColors = typeConfigured ? [] : colorStringsForType(cfg, '').map(colorEntryFromString).filter(Boolean);
+    const colorsToRender = filteredColors.length ? filteredColors : fallbackColors;
     colorSel.innerHTML = '';
     colorsToRender.forEach(entry=>{
       const opt = document.createElement('option');
