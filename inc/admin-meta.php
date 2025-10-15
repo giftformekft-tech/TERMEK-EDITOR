@@ -64,6 +64,7 @@ add_action('woocommerce_admin_order_data_after_order_details', function($order){
       continue;
     }
     if ($preview){
+      $design_id = intval($design_id);
       echo '<p><img src="'.esc_url($preview).'" style="max-width:220px;border:1px solid #ddd"/></p>';
     }
     if (!empty($parts)){
