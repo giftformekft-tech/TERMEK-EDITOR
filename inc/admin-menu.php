@@ -30,16 +30,82 @@ function nb_admin_render(){
     } elseif ($tab==='pricing'){
       $settings['fee_per_cm2'] = isset($_POST['fee_per_cm2']) ? floatval($_POST['fee_per_cm2']) : 3;
       $settings['min_fee']     = isset($_POST['min_fee']) ? floatval($_POST['min_fee']) : 990;
+    } elseif ($tab==='colors'){
+      $palette_raw = $_POST['color_palette'] ?? '';
+      if (is_string($palette_raw)){
+        $palette_raw = sanitize_textarea_field(wp_unslash($palette_raw));
+      } else {
+        $palette_raw = '';
+      }
+      $parts = preg_split('/[\r\n,]+/', $palette_raw);
+      $palette = [];
+      if (is_array($parts)){
+        foreach ($parts as $entry){
+          $entry = trim($entry);
+          if ($entry === '') continue;
+          if (!in_array($entry, $palette, true)) $palette[] = $entry;
+        }
+      }
+      $settings['color_palette'] = $palette;
+      $catalog = $settings['catalog'] ?? [];
+      $products = $settings['products'] ?? [];
+      foreach ($products as $pid){
+        if (!isset($catalog[$pid])){
+          $catalog[$pid] = ['title'=>get_the_title($pid),'types'=>[],'colors'=>[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
+        }
+        $selected = $_POST['product_colors'][$pid] ?? [];
+        if (!is_array($selected)) $selected = [];
+        $colors = [];
+        foreach ($selected as $color){
+          $color = sanitize_text_field(wp_unslash($color));
+          if ($color === '') continue;
+          $match = null;
+          foreach ($palette as $candidate){
+            if (strcasecmp($candidate, $color) === 0){
+              $match = $candidate;
+              break;
+            }
+          }
+          $normalized = $match ?? $color;
+          if (!in_array($normalized, $colors, true)) $colors[] = $normalized;
+        }
+        $catalog[$pid]['colors'] = $colors;
+        if (!isset($catalog[$pid]['map']) || !is_array($catalog[$pid]['map'])){
+          $catalog[$pid]['map'] = [];
+        }
+        if (!empty($catalog[$pid]['map']) && !empty($colors)){
+          $allowed = array_map(function($val){ return strtolower(trim($val)); }, $colors);
+          $allowed = array_filter($allowed, function($val){ return $val !== ''; });
+          foreach ($catalog[$pid]['map'] as $key=>$entry){
+            $parts = explode('|', $key);
+            $colorKey = $parts[1] ?? '';
+            if ($colorKey === '') continue;
+            if (!in_array($colorKey, $allowed, true)){
+              unset($catalog[$pid]['map'][$key]);
+            }
+          }
+        }
+        if (empty($colors)){
+          $catalog[$pid]['colors'] = [];
+          if (!empty($catalog[$pid]['map']) && is_array($catalog[$pid]['map'])){
+            foreach ($catalog[$pid]['map'] as $key=>$entry){
+              $parts = explode('|', $key);
+              if (($parts[1] ?? '') !== ''){
+                unset($catalog[$pid]['map'][$key]);
+              }
+            }
+          }
+        }
+      }
+      $settings['catalog'] = $catalog;
     } elseif ($tab==='variants'){
       $catalog = $settings['catalog'] ?? [];
       $pids = array_map('intval', $_POST['var_pid'] ?? []);
       foreach($pids as $idx=>$pid){
         if (!isset($catalog[$pid])) $catalog[$pid]=['title'=>get_the_title($pid),'types'=>[],'colors'=>[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
         $types_csv  = sanitize_text_field($_POST['types_'.$pid] ?? '');
-        $colors_csv = sanitize_text_field($_POST['colors_'.$pid] ?? '');
         $sizes_csv  = sanitize_text_field($_POST['sizes_'.$pid] ?? '');
         $catalog[$pid]['types']  = array_values(array_filter(array_map('trim', explode(',', $types_csv))));
-        $catalog[$pid]['colors'] = array_values(array_filter(array_map('trim', explode(',', $colors_csv))));
         $catalog[$pid]['sizes']  = array_values(array_filter(array_map('trim', explode(',', $sizes_csv))));
         // size surcharge parse "XL:300,XXL:600"
         $ss_csv = sanitize_text_field($_POST['size_surcharge_'.$pid] ?? '');
@@ -53,8 +119,9 @@ function nb_admin_render(){
         $catalog[$pid]['size_surcharge'] = $ss;
         // Map for type|color
         $catalog[$pid]['map'] = $catalog[$pid]['map'] ?? [];
+        $colors = $catalog[$pid]['colors'] ?? [];
         foreach ($catalog[$pid]['types'] as $type){
-          foreach ($catalog[$pid]['colors'] as $color){
+          foreach ($colors as $color){
             $key = strtolower($type).'|'.strtolower($color);
             $hash = md5($key);
             $catalog[$pid]['map'][$key] = [
