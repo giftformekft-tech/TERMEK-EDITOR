@@ -45,6 +45,9 @@ add_action('rest_api_init', function(){
       if ( null === WC()->cart && function_exists('wc_load_cart') ) {
         wc_load_cart();
       }
+      if ( null === WC()->session && method_exists(WC(), 'initialize_session') ) {
+        WC()->initialize_session();
+      }
       if ( null === WC()->cart ) {
         return new WP_Error('wc_cart','WooCommerce kosár nem elérhető', ['status'=>500]);
       }
@@ -139,9 +142,18 @@ add_action('rest_api_init', function(){
           $match = $data_store->find_matching_product_variation($product, $variation_attrs);
           if ($match){
             $variation_id = $match;
+            if (function_exists('wc_get_product_variation_attributes')) {
+              $resolved_attrs = wc_get_product_variation_attributes($variation_id);
+              if (is_array($resolved_attrs) && !empty($resolved_attrs)){
+                $variation_attrs = $resolved_attrs;
+              }
+            }
           } else {
             return new WP_Error('variant','A kiválasztott kombináció nem elérhető', ['status'=>400]);
           }
+        }
+        if (! $variation_id) {
+          return new WP_Error('variant','A kiválasztott kombináció nem elérhető', ['status'=>400]);
         }
       }
 
@@ -150,8 +162,33 @@ add_action('rest_api_init', function(){
         'preview_url'  => get_post_meta($design_id,'preview_url',true),
       ];
 
+      if (function_exists('wc_clear_notices')) {
+        wc_clear_notices();
+      }
+
       $added = WC()->cart->add_to_cart($cart_product_id, 1, $variation_id, $variation_attrs, $cart_item_data);
-      if (! $added) return new WP_Error('cart','Nem sikerült kosárba tenni', ['status'=>500]);
+      if (! $added) {
+        $message = '';
+        if (function_exists('wc_get_notices')){
+          $errors = wc_get_notices('error');
+          if (!empty($errors)){
+            $pieces = [];
+            foreach ($errors as $notice){
+              if (is_array($notice) && isset($notice['notice'])){
+                $pieces[] = wp_strip_all_tags($notice['notice']);
+              } elseif (is_string($notice)){
+                $pieces[] = wp_strip_all_tags($notice);
+              }
+            }
+            $message = trim(implode(' ', array_filter($pieces))); 
+          }
+          wc_clear_notices();
+        }
+        if ($message === ''){
+          $message = 'Nem sikerült kosárba tenni';
+        }
+        return new WP_Error('cart', $message, ['status'=>500]);
+      }
       return ['ok'=>true,'redirect'=>wc_get_cart_url()];
     }
   ]);
