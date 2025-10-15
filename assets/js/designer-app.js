@@ -158,81 +158,76 @@
     return [];
   }
 
-  function googleStylesheetUrl(query){
-    if (typeof query !== 'string') return '';
-    let value = query.trim();
-    if (!value) return '';
-    if (value.toLowerCase().indexOf('google:') === 0){
-      value = value.slice(7).trim();
+  function normalizeFontUrl(value){
+    if (typeof value !== 'string') return '';
+    let candidate = value.trim();
+    if (!candidate) return '';
+    if (candidate.toLowerCase().indexOf('google:') === 0){
+      candidate = candidate.slice(7).trim();
+      if (!candidate) return '';
+      const collapsed = candidate.replace(/\s+/g, '+');
+      return 'https://fonts.googleapis.com/css2?family=' + collapsed.replace(/\|/g, '%7C') + '&display=swap';
     }
-    if (!value) return '';
-    const collapsed = value.replace(/\s+/g, '+');
-    return 'https://fonts.googleapis.com/css2?family=' + collapsed.replace(/\|/g, '%7C') + '&display=swap';
+    return candidate;
   }
 
   function parseFontEntry(entry){
     if (!entry) return null;
+    let label = '';
+    let family = '';
+    let url = '';
+    let fallbackUrl = '';
+
     if (typeof entry === 'string'){
       const parts = entry.split('|').map(p=>p.trim()).filter(Boolean);
       if (!parts.length) return null;
-      let label = parts[0];
-      let family = parts[1] || label;
-      let url = '';
-      let google = '';
-      if (parts.length === 2){
+      label = parts[0];
+      if (parts.length === 1){
+        family = label;
+      } else if (parts.length === 2){
         const candidate = parts[1];
-        if (candidate && candidate.toLowerCase().indexOf('google:') === 0){
-          google = candidate.slice(7);
-        } else if (candidate && /^https?:/i.test(candidate)){
+        if (candidate && (/^https?:/i.test(candidate) || candidate.toLowerCase().indexOf('google:') === 0)){
           url = candidate;
+          family = label;
         } else {
-          family = candidate;
+          family = candidate || label;
         }
-      } else if (parts.length >= 3){
+      } else {
         family = parts[1] || label;
-        const candidate = parts[2];
-        if (candidate && candidate.toLowerCase().indexOf('google:') === 0){
-          google = candidate.slice(7);
-        } else {
-          url = candidate;
-        }
+        fallbackUrl = parts[2];
       }
-      const parsed = {
-        label: label || family,
-        family: family || label,
-        google,
-        url
-      };
-      if (!parsed.url && parsed.google){
-        parsed.url = googleStylesheetUrl(parsed.google);
-      }
-      if (!parsed.family) return null;
-      return parsed;
-    }
-    if (typeof entry === 'object'){
+    } else if (typeof entry === 'object') {
       const labelRaw = entry.label || entry.name || entry.title || '';
       const familyRaw = entry.family || entry.font || '';
-      const googleRaw = entry.google || entry.google_family || entry.googleFont || '';
       const urlRaw = entry.url || entry.stylesheet || entry.href || '';
-      const parsed = {
-        label: (labelRaw || familyRaw || googleRaw || '').toString().trim(),
-        family: (familyRaw || labelRaw || '').toString().trim(),
-        google: (googleRaw || '').toString().trim(),
-        url: (urlRaw || '').toString().trim()
-      };
-      if (!parsed.family && parsed.google){
-        parsed.family = parsed.google.split(':')[0] || parsed.google;
-      }
-      if (!parsed.label && parsed.family){
-        parsed.label = parsed.family;
-      }
-      if (!parsed.url && parsed.google){
-        parsed.url = googleStylesheetUrl(parsed.google);
-      }
-      if (!parsed.family) return null;
-      return parsed;
+      const googleRaw = entry.google || entry.google_family || entry.googleFont || '';
+      label = (labelRaw || familyRaw || googleRaw || '').toString();
+      family = (familyRaw || labelRaw || '').toString();
+      url = (urlRaw || '').toString();
+      fallbackUrl = (googleRaw || '').toString();
+    } else {
+      return null;
     }
-    return null;
+
+    label = label.trim();
+    family = family.trim();
+    url = normalizeFontUrl(url);
+    fallbackUrl = normalizeFontUrl(fallbackUrl);
+
+    if (!url && fallbackUrl){
+      url = fallbackUrl;
+    }
+    if (!family && label){
+      family = label;
+    }
+    if (!label && family){
+      label = family;
+    }
+    if (!label && !family){
+      return null;
+    }
+
+    return {label, family, url};
   }
 
   function fontEntries(){

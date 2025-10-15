@@ -193,7 +193,6 @@
           function nb_admin_render_font_row($index, $font = []){
             $label = esc_attr($font['label'] ?? '');
             $family = esc_attr($font['family'] ?? '');
-            $google = esc_attr($font['google'] ?? '');
             $url = esc_attr($font['url'] ?? '');
             ob_start();
       ?>
@@ -212,10 +211,6 @@
                   <input type="text" name="fonts[<?php echo esc_attr($index); ?>][family]" value="<?php echo $family; ?>" placeholder="Roboto">
                 </label>
                 <label>
-                  <span><?php esc_html_e('Google Fonts család / variáns', 'nb'); ?></span>
-                  <input type="text" name="fonts[<?php echo esc_attr($index); ?>][google]" value="<?php echo $google; ?>" placeholder="Roboto:wght@400;700">
-                </label>
-                <label>
                   <span><?php esc_html_e('Egyedi stylesheet URL', 'nb'); ?></span>
                   <input type="text" name="fonts[<?php echo esc_attr($index); ?>][url]" value="<?php echo $url; ?>" placeholder="https://...">
                 </label>
@@ -232,7 +227,7 @@
         $fontCount = count($fontEntries);
       ?>
       <h2>Betűtípusok</h2>
-      <p class="description nb-fonts-help"><?php esc_html_e('Add meg, hogy az „Írj saját feliratot” eszköz milyen betűtípusokat kínáljon. Google Fonts esetén elég a család és variáns, pl. Roboto:wght@400;700.', 'nb'); ?></p>
+      <p class="description nb-fonts-help"><?php esc_html_e('Add meg, hogy az „Írj saját feliratot” eszköz milyen betűtípusokat kínáljon. Adj meg megjelenő nevet, CSS font-family értéket és opcionálisan egy stylesheet URL-t.', 'nb'); ?></p>
       <div id="nb-fonts" class="nb-font-list" data-next="<?php echo esc_attr($fontCount); ?>">
         <?php foreach ($fontEntries as $i=>$font){ echo nb_admin_render_font_row($i, $font); } ?>
       </div>

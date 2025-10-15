@@ -8,7 +8,7 @@ add_action('wp_enqueue_scripts', function(){
     $content = (string) get_post_field('post_content', $post_id);
   }
   if ( $post_id && is_page($post_id) && has_shortcode($content, 'nb_designer') ) {
-    $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.4.24';
+    $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.4.25';
     wp_enqueue_style('nb-designer', NB_DESIGNER_URL.'assets/css/designer.css', [], $version);
     wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
     wp_enqueue_script('nb-designer', NB_DESIGNER_URL.'assets/js/designer-app.js', ['fabric','jquery'], $version, true);
@@ -31,7 +31,7 @@ add_action('wp_enqueue_scripts', function(){
 add_action('admin_enqueue_scripts', function($hook){
   if ( isset($_GET['page']) && $_GET['page']==='nb-designer' ) {
     wp_enqueue_media();
-    $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.4.24';
+    $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.4.25';
     wp_enqueue_style('nb-admin', NB_DESIGNER_URL.'admin/css/admin.css', [], $version);
     wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
     wp_enqueue_script('nb-admin', NB_DESIGNER_URL.'admin/js/admin.js', ['jquery','fabric'], $version, true);

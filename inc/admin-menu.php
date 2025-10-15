@@ -130,18 +130,13 @@ function nb_admin_render(){
           if (!is_array($font_entry)) continue;
           $label  = sanitize_text_field(wp_unslash($font_entry['label'] ?? ''));
           $family = sanitize_text_field(wp_unslash($font_entry['family'] ?? ''));
-          $google = sanitize_text_field(wp_unslash($font_entry['google'] ?? ''));
           $url    = esc_url_raw(wp_unslash($font_entry['url'] ?? ''));
-          if ($google !== ''){
-            $google = preg_replace('/\s+/', ' ', $google);
-          }
           if ($label === '' && $family !== '') $label = $family;
           if ($family === '' && $label !== '') $family = $label;
-          if ($label === '' && $family === '' && $google === '' && $url === '') continue;
+          if ($label === '' && $family === '' && $url === '') continue;
           $fonts[] = [
             'label'  => $label,
             'family' => $family,
-            'google' => $google,
             'url'    => $url,
           ];
         }

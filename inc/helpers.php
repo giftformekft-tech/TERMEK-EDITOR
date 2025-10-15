@@ -21,67 +21,106 @@ if ( ! function_exists('nb_normalize_font_settings') ) {
     if (!is_array($fonts)) {
       return $normalized;
     }
+
+    $google_to_stylesheet = static function($value){
+      $value = is_string($value) ? trim($value) : '';
+      if ($value === '') {
+        return '';
+      }
+      if (stripos($value, 'google:') === 0){
+        $value = substr($value, 7);
+      }
+      $value = trim($value);
+      if ($value === '') {
+        return '';
+      }
+      $value = preg_replace('/\s+/', '+', $value);
+      return 'https://fonts.googleapis.com/css2?family=' . str_replace('|', '%7C', $value) . '&display=swap';
+    };
+
     foreach ($fonts as $entry){
       $label = '';
       $family = '';
       $url = '';
-      $google = '';
+      $fallbackGoogle = '';
+
       if (is_string($entry)){
         $parts = array_map('trim', explode('|', $entry));
-        if (count($parts) === 1){
+        $parts = array_values(array_filter($parts, static function($part){ return $part !== ''; }));
+        $count = count($parts);
+        if ($count === 0){
+          continue;
+        }
+        if ($count === 1){
           $label = $parts[0];
           $family = $parts[0];
-        } elseif (count($parts) === 2){
+        } elseif ($count === 2){
           $label = $parts[0];
-          $family = $parts[0];
           $candidate = $parts[1];
-          if (stripos($candidate, 'google:') === 0){
-            $google = substr($candidate, 7);
-          } else {
+          if (preg_match('/^https?:/i', $candidate)){
             $url = $candidate;
+            $family = $label;
+          } elseif (stripos($candidate, 'google:') === 0) {
+            $fallbackGoogle = substr($candidate, 7);
+            $family = $label;
+          } else {
+            $family = $candidate !== '' ? $candidate : $label;
           }
-        } elseif (count($parts) >= 3){
+        } else {
           $label = $parts[0];
           $family = $parts[1] !== '' ? $parts[1] : $parts[0];
           $candidate = $parts[2];
           if (stripos($candidate, 'google:') === 0){
-            $google = substr($candidate, 7);
+            $fallbackGoogle = substr($candidate, 7);
           } else {
             $url = $candidate;
           }
         }
       } elseif (is_array($entry)) {
-        $label = isset($entry['label']) ? (string)$entry['label'] : '';
-        $family = isset($entry['family']) ? (string)$entry['family'] : '';
-        $url = isset($entry['url']) ? (string)$entry['url'] : '';
-        $google = isset($entry['google']) ? (string)$entry['google'] : '';
-        if (!$google && isset($entry['google_family'])){
-          $google = (string)$entry['google_family'];
-        }
+        $label = isset($entry['label']) ? (string) $entry['label'] : '';
+        $family = isset($entry['family']) ? (string) $entry['family'] : '';
+        $url = isset($entry['url']) ? (string) $entry['url'] : '';
         if (!$url && isset($entry['stylesheet'])){
-          $url = (string)$entry['stylesheet'];
+          $url = (string) $entry['stylesheet'];
+        }
+        if (!$url && isset($entry['href'])){
+          $url = (string) $entry['href'];
+        }
+        if (isset($entry['google'])){
+          $fallbackGoogle = (string) $entry['google'];
+        } elseif (isset($entry['google_family'])){
+          $fallbackGoogle = (string) $entry['google_family'];
         }
       }
+
       $label = trim($label);
       $family = trim($family);
       $url = trim($url);
-      $google = trim($google);
+      $fallbackGoogle = trim($fallbackGoogle);
+
+      if ($url !== '' && stripos($url, 'google:') === 0){
+        $url = $google_to_stylesheet($url);
+      }
+      if ($url === '' && $fallbackGoogle !== ''){
+        $url = $google_to_stylesheet($fallbackGoogle);
+      }
       if ($label === '' && $family !== ''){
         $label = $family;
       }
       if ($family === '' && $label !== ''){
         $family = $label;
       }
-      if ($label === '' && $family === '' && $url === '' && $google === ''){
+      if ($label === '' && $family === '' && $url === ''){
         continue;
       }
+
       $normalized[] = [
         'label' => $label,
         'family'=> $family,
         'url'   => $url,
-        'google'=> $google,
       ];
     }
+
     return array_values($normalized);
   }
 }
