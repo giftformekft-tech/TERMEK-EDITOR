@@ -7,21 +7,40 @@ add_action('rest_api_init', function(){
     'permission_callback' => '__return_true',
     'callback' => function($req){
       $png = $req->get_param('png_base64');
+      $print_png = $req->get_param('print_png_base64');
       $meta = $req->get_param('meta');
       $layers = $req->get_param('layers');
       if (! $png || strpos($png,'data:image/png;base64,') !== 0) {
         return new WP_Error('bad_png','Hibás PNG adat', ['status'=>400]);
       }
       $data = base64_decode(substr($png,22));
+      $print_data = null;
+      if ($print_png){
+        if (strpos($print_png,'data:image/png;base64,') !== 0){
+          return new WP_Error('bad_print_png','Hibás nyomdai PNG adat', ['status'=>400]);
+        }
+        $print_data = base64_decode(substr($print_png,22));
+      }
+      if (! $print_data){
+        $print_data = $data;
+      }
       if ( ! function_exists('wp_upload_bits') ) require_once ABSPATH.'wp-admin/includes/file.php';
-      $upload = wp_upload_bits('nb_'.time().'.png', null, $data);
+      $timestamp = time();
+      $preview_filename = 'nb_preview_'.$timestamp.'.png';
+      $print_filename = 'nb_print_'.$timestamp.'.png';
+      $upload = wp_upload_bits($preview_filename, null, $data);
       if (!empty($upload['error'])) return new WP_Error('upload','Mentési hiba: '.$upload['error'], ['status'=>500]);
+      $print_upload = wp_upload_bits($print_filename, null, $print_data);
+      if (!empty($print_upload['error'])) return new WP_Error('print_upload','Mentési hiba: '.$print_upload['error'], ['status'=>500]);
+      $print_width_px = max(0, intval($req->get_param('print_width_px')));
+      $print_height_px = max(0, intval($req->get_param('print_height_px')));
 
       $post_id = wp_insert_post([
         'post_type'=>'nb_design','post_status'=>'publish',
         'post_title'=>'Design #'.time(),
         'meta_input'=>[
           'preview_url'     => esc_url_raw($upload['url']),
+          'print_url'       => esc_url_raw($print_upload['url']),
           'layers_json'     => wp_json_encode($layers),
           'width_mm'        => floatval($meta['width_mm']??0),
           'height_mm'       => floatval($meta['height_mm']??0),
@@ -29,10 +48,16 @@ add_action('rest_api_init', function(){
           'product_id'      => intval($meta['product_id']??0),
           'attributes_json' => wp_json_encode($meta['attributes_json']??[]),
           'price_ctx'       => wp_json_encode($meta['price_ctx']??[]),
+          'print_width_px'  => $print_width_px,
+          'print_height_px' => $print_height_px,
         ]
       ]);
       if (is_wp_error($post_id)) return new WP_Error('db','Nem sikerült menteni', ['status'=>500]);
-      return ['design_id'=>$post_id,'preview_url'=>$upload['url']];
+      return [
+        'design_id'   => $post_id,
+        'preview_url' => $upload['url'],
+        'print_url'   => $print_upload['url'],
+      ];
     }
   ]);
 
@@ -178,9 +203,17 @@ add_action('rest_api_init', function(){
         }
       }
 
+      $preview_url = get_post_meta($design_id,'preview_url',true);
+      $print_url = get_post_meta($design_id,'print_url',true);
+      $print_width_px = intval(get_post_meta($design_id,'print_width_px',true));
+      $print_height_px = intval(get_post_meta($design_id,'print_height_px',true));
+
       $cart_item_data = [
-        'nb_design_id' => $design_id,
-        'preview_url'  => get_post_meta($design_id,'preview_url',true),
+        'nb_design_id'     => $design_id,
+        'preview_url'      => $preview_url,
+        'print_url'        => $print_url ?: $preview_url,
+        'print_width_px'   => $print_width_px,
+        'print_height_px'  => $print_height_px,
       ];
 
       if (function_exists('wc_clear_notices')) {

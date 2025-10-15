@@ -51,4 +51,7 @@ add_action('woocommerce_cart_calculate_fees', function($cart){
 add_action('woocommerce_checkout_create_order_line_item', function($item, $cart_item_key, $values, $order){
   if (!empty($values['nb_design_id'])) $item->add_meta_data('nb_design_id',$values['nb_design_id']);
   if (!empty($values['preview_url']))  $item->add_meta_data('preview_url',$values['preview_url']);
+  if (!empty($values['print_url']))    $item->add_meta_data('print_url',$values['print_url']);
+  if (!empty($values['print_width_px']))  $item->add_meta_data('print_width_px', intval($values['print_width_px']));
+  if (!empty($values['print_height_px'])) $item->add_meta_data('print_height_px', intval($values['print_height_px']));
 },10,4);

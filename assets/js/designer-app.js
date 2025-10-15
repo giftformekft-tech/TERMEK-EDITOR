@@ -1340,13 +1340,76 @@
     };
   }
 
+  function exportPrintImage(){
+    const area = Object.assign({
+      x: 0,
+      y: 0,
+      w: c.width,
+      h: c.height
+    }, c.__nb_area || {});
+
+    const width = Math.max(1, area.w || c.width || 1);
+    const height = Math.max(1, area.h || c.height || 1);
+    const left = Math.max(0, area.x || 0);
+    const top = Math.max(0, area.y || 0);
+    const targetWidth = 3000;
+    const multiplierRaw = targetWidth / width;
+    const multiplier = Number.isFinite(multiplierRaw) && multiplierRaw > 0 ? multiplierRaw : 1;
+
+    const hiddenObjects = [];
+    if (c.__nb_area_rect && c.__nb_area_rect.visible !== false){
+      c.__nb_area_rect.visible = false;
+      hiddenObjects.push(c.__nb_area_rect);
+    }
+
+    const bgImage = c.backgroundImage || null;
+    if (bgImage){
+      c.backgroundImage = null;
+    }
+
+    const originalBgColor = c.backgroundColor;
+    c.backgroundColor = 'rgba(0,0,0,0)';
+
+    c.renderAll();
+
+    let dataUrl = '';
+    try {
+      dataUrl = c.toDataURL({
+        format: 'png',
+        left,
+        top,
+        width,
+        height,
+        multiplier,
+        enableRetinaScaling: false
+      });
+    } finally {
+      if (bgImage){
+        c.backgroundImage = bgImage;
+      }
+      c.backgroundColor = originalBgColor;
+      hiddenObjects.forEach(obj=>{ obj.visible = true; });
+      c.renderAll();
+    }
+
+    return {
+      dataUrl,
+      width: Math.round(width * multiplier),
+      height: Math.round(height * multiplier)
+    };
+  }
+
   let saving = false;
   if (saveBtn){
     saveBtn.onclick = async ()=>{
       if (saving) return;
       saving = true;
       try{
-        const png = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
+        const previewPng = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
+        const printExport = exportPrintImage();
+        if (!printExport.dataUrl){
+          throw new Error('print-export-failed');
+        }
         const sel = currentSelection();
         const size = sizeSel.value || '';
         const price_ctx = {product_id: sel.pid, type: sel.type, color: sel.color, size};
@@ -1354,7 +1417,14 @@
         const res = await fetch(NB_DESIGNER.rest + 'save', {
           method:'POST',
           headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
-          body: JSON.stringify({png_base64: png, layers: c.toJSON(), meta})
+          body: JSON.stringify({
+            png_base64: previewPng,
+            print_png_base64: printExport.dataUrl,
+            print_width_px: printExport.width,
+            print_height_px: printExport.height,
+            layers: c.toJSON(),
+            meta
+          })
         });
         const j = await res.json();
         if (!res.ok){
@@ -1366,7 +1436,11 @@
         alert('Mentve! ID: ' + designState.savedDesignId);
         updatePriceDisplay();
       }catch(e){
-        alert('Hálózati hiba');
+        if (e && e.message === 'print-export-failed'){
+          alert('Nem sikerült előállítani a nyomdai PNG fájlt.');
+        } else {
+          alert('Hálózati hiba');
+        }
       } finally {
         saving = false;
       }
