@@ -3,6 +3,7 @@
   <h2 class="nav-tab-wrapper">
     <a href="?page=nb-designer&tab=products" class="nav-tab <?php echo ($tab==='products'?'nav-tab-active':''); ?>">Termékek & Típusok</a>
     <a href="?page=nb-designer&tab=variants" class="nav-tab <?php echo ($tab==='variants'?'nav-tab-active':''); ?>">Típus–Szín mapping & Ár</a>
+    <a href="?page=nb-designer&tab=colors" class="nav-tab <?php echo ($tab==='colors'?'nav-tab-active':''); ?>">Színek</a>
     <a href="?page=nb-designer&tab=mockups" class="nav-tab <?php echo ($tab==='mockups'?'nav-tab-active':''); ?>">Mockupok & Print-area</a>
     <a href="?page=nb-designer&tab=fonts" class="nav-tab <?php echo ($tab==='fonts'?'nav-tab-active':''); ?>">Fontok</a>
     <a href="?page=nb-designer&tab=pricing" class="nav-tab <?php echo ($tab==='pricing'?'nav-tab-active':''); ?>">Globális árak</a>
@@ -45,8 +46,14 @@
             <td><input type="text" name="types_<?php echo $pid; ?>" value="<?php echo esc_attr(implode(',', $cfg['types'] ?? $global_types)); ?>" size="60"></td>
           </tr>
           <tr>
-            <th>Színek (vesszővel)</th>
-            <td><input type="text" name="colors_<?php echo $pid; ?>" value="<?php echo esc_attr(implode(',', $cfg['colors'] ?? [])); ?>" size="60"></td>
+            <th>Színek</th>
+            <td>
+              <?php if (!empty($cfg['colors'])): ?>
+                <span><?php echo esc_html(implode(', ', $cfg['colors'])); ?></span>
+              <?php else: ?>
+                <em>Nincs kiválasztott szín. Állítsd be a <a href="?page=nb-designer&amp;tab=colors">Színek</a> fülön.</em>
+              <?php endif; ?>
+            </td>
           </tr>
           <tr>
             <th>Méretek (vesszővel)</th>
@@ -88,6 +95,60 @@
         </table>
       </div>
       <?php endforeach; ?>
+
+    <?php elseif ($tab==='colors'): ?>
+      <?php
+        $catalog = $settings['catalog'] ?? [];
+        $products = $settings['products'] ?? [];
+        $savedPalette = $settings['color_palette'] ?? [];
+        if (!is_array($savedPalette)) $savedPalette = [];
+        if (empty($savedPalette)){
+          foreach ($catalog as $cfg){
+            if (empty($cfg['colors']) || !is_array($cfg['colors'])) continue;
+            foreach ($cfg['colors'] as $color){
+              $color = trim($color);
+              if ($color === '') continue;
+              if (!in_array($color, $savedPalette, true)) $savedPalette[] = $color;
+            }
+          }
+        }
+        $paletteText = implode("\n", $savedPalette);
+      ?>
+      <h2>Szín elérhetőség</h2>
+      <p>Add meg a teljes palettát (soronként egy szín vagy vesszővel elválasztva). Ez alapján választhatod ki, mely színek érhetők el az egyes termékekhez.</p>
+      <textarea name="color_palette" rows="6" cols="80"><?php echo esc_textarea($paletteText); ?></textarea>
+      <?php if (!empty($products)): ?>
+        <h3>Színek termékenként</h3>
+        <?php foreach ($products as $pid):
+          $productColors = $catalog[$pid]['colors'] ?? [];
+          if (!is_array($productColors)) $productColors = [];
+          $title = get_the_title($pid);
+          $palette = $savedPalette;
+        ?>
+          <div class="nb-color-card">
+            <h4><?php echo esc_html($title ?: ('Termék #'.$pid)); ?> (#<?php echo $pid; ?>)</h4>
+            <?php if (!empty($palette)): ?>
+              <div class="nb-color-grid">
+                <?php foreach ($palette as $color):
+                  $value = trim($color);
+                  if ($value === '') continue;
+                  $id = 'color_'.$pid.'_'.md5($value);
+                  $checked = in_array($value, $productColors, true) ? 'checked' : '';
+                ?>
+                  <label for="<?php echo esc_attr($id); ?>" class="nb-color-option">
+                    <input type="checkbox" id="<?php echo esc_attr($id); ?>" name="product_colors[<?php echo $pid; ?>][]" value="<?php echo esc_attr($value); ?>" <?php echo $checked; ?>>
+                    <span><?php echo esc_html($value); ?></span>
+                  </label>
+                <?php endforeach; ?>
+              </div>
+            <?php else: ?>
+              <p class="nb-color-empty">Adj meg legalább egy színt a palettán, hogy kiválaszthasd az elérhető színeket.</p>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
+      <?php else: ?>
+        <p>Először válaszd ki a <a href="?page=nb-designer&amp;tab=products">Termékek &amp; Típusok</a> fülön, hogy mely termékek tervezhetők.</p>
+      <?php endif; ?>
 
     <?php elseif ($tab==='mockups'): ?>
       <h2>Mockupok & print-area</h2>
