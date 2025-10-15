@@ -39,7 +39,12 @@ add_action('rest_api_init', function(){
   register_rest_route('nb/v1','/add-to-cart', [
     'methods'=>'POST','permission_callback'=>'__return_true',
     'callback'=>function($req){
-      if ( ! class_exists('WC') ) return new WP_Error('wc','WooCommerce szükséges', ['status'=>500]);
+      if ( ! function_exists('WC') || ! WC() ) {
+        return new WP_Error('wc','WooCommerce szükséges', ['status'=>500]);
+      }
+      if ( null === WC()->cart && function_exists('wc_load_cart') ) {
+        wc_load_cart();
+      }
       $design_id = intval($req->get_param('design_id'));
       if (! $design_id) return new WP_Error('bad','Hiányzó design_id', ['status'=>400]);
       $product_id = intval(get_post_meta($design_id,'product_id',true));
