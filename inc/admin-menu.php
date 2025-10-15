@@ -1,6 +1,97 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
+function nb_normalize_type_key($value){
+  if ($value === null) return '';
+  return strtolower(trim((string)$value));
+}
+
+function nb_normalize_color_key($value){
+  if ($value === null) return '';
+  return strtolower(trim((string)$value));
+}
+
+function nb_sync_product_color_configuration(&$cfg, $settings){
+  if (!is_array($cfg)) $cfg = [];
+  $existingColors = [];
+  if (isset($cfg['colors']) && is_array($cfg['colors'])){
+    $existingColors = $cfg['colors'];
+  }
+  $existingMap = [];
+  if (isset($cfg['map']) && is_array($cfg['map'])){
+    $existingMap = $cfg['map'];
+  }
+  $typeColors = $settings['type_colors'] ?? [];
+  if (!is_array($typeColors)) $typeColors = [];
+  $hasTypeColorConfig = false;
+  foreach ($typeColors as $list){
+    if (is_array($list)){
+      $hasTypeColorConfig = true;
+      break;
+    }
+  }
+  $types = $cfg['types'] ?? [];
+  if (!is_array($types)) $types = [];
+  $colorsByType = [];
+  foreach ($types as $type){
+    $key = nb_normalize_type_key($type);
+    if ($key === '') continue;
+    $list = $typeColors[$key] ?? [];
+    if (!is_array($list)) $list = [];
+    $normalizedList = [];
+    foreach ($list as $color){
+      $color = is_string($color) ? trim($color) : '';
+      if ($color === '') continue;
+      if (!in_array($color, $normalizedList, true)) $normalizedList[] = $color;
+    }
+    $colorsByType[$key] = $normalizedList;
+  }
+  $cfg['colors_by_type'] = $colorsByType;
+  $union = [];
+  foreach ($colorsByType as $list){
+    foreach ($list as $color){
+      if (!in_array($color, $union, true)) $union[] = $color;
+    }
+  }
+  $cfg['colors'] = $union;
+  if (!isset($cfg['map']) || !is_array($cfg['map'])){
+    $cfg['map'] = [];
+  }
+  $hasAnyColor = !empty($union);
+  if (!$hasAnyColor && !$hasTypeColorConfig){
+    $cfg['colors'] = $existingColors;
+    if (!empty($existingMap)){
+      $cfg['map'] = $existingMap;
+    }
+    return;
+  }
+  $allowed = [];
+  foreach ($colorsByType as $typeKey=>$list){
+    $allowed[$typeKey] = [];
+    foreach ($list as $color){
+      $normColor = nb_normalize_color_key($color);
+      if ($normColor === '') continue;
+      if (!in_array($normColor, $allowed[$typeKey], true)) $allowed[$typeKey][] = $normColor;
+    }
+  }
+  foreach ($cfg['map'] as $key=>$entry){
+    $parts = explode('|', $key);
+    if (count($parts) !== 2){
+      unset($cfg['map'][$key]);
+      continue;
+    }
+    $typeKey = trim($parts[0]);
+    $colorKey = trim($parts[1]);
+    if ($typeKey === '' || $colorKey === ''){
+      unset($cfg['map'][$key]);
+      continue;
+    }
+    if (!isset($allowed[$typeKey]) || !in_array($colorKey, $allowed[$typeKey], true)){
+      unset($cfg['map'][$key]);
+    }
+  }
+}
+
 add_action('admin_menu', function(){
   add_menu_page('Terméktervező','Terméktervező','manage_options','nb-designer','nb_admin_render','dashicons-art',58);
 });
