@@ -1,11 +1,33 @@
 (function($){
   // Fonts repeater
+  function nbNextFontIndex(){
+    const container = $('#nb-fonts');
+    if (!container.length) return 0;
+    let next = parseInt(container.attr('data-next'), 10);
+    if (!isFinite(next)){
+      next = container.children('.nb-font').length;
+    }
+    container.attr('data-next', next + 1);
+    return next;
+  }
+
+  function nbAddFontRow(){
+    const container = $('#nb-fonts');
+    const template = $('#nb-font-template').html();
+    if (!container.length || !template) return;
+    const index = nbNextFontIndex();
+    const html = template.replace(/__index__/g, index);
+    container.append(html);
+  }
+
   $(document).on('click','#nb-add-font', function(e){
     e.preventDefault();
-    $('#nb-fonts').append('<div class="nb-font"><input type="text" name="fonts[]" value="" size="80"> <button class="button nb-remove-font">Eltávolítás</button></div>');
+    nbAddFontRow();
   });
+
   $(document).on('click','.nb-remove-font', function(e){
-    e.preventDefault(); $(this).closest('.nb-font').remove();
+    e.preventDefault();
+    $(this).closest('.nb-font').remove();
   });
 
   // Mockup editor
