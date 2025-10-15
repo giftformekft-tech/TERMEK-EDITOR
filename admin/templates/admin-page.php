@@ -188,13 +188,58 @@
       <p><button type="button" class="button" id="nb-add-mockup">+ Mockup hozzáadása</button></p>
 
     <?php elseif ($tab==='fonts'): ?>
+      <?php
+        if (!function_exists('nb_admin_render_font_row')){
+          function nb_admin_render_font_row($index, $font = []){
+            $label = esc_attr($font['label'] ?? '');
+            $family = esc_attr($font['family'] ?? '');
+            $google = esc_attr($font['google'] ?? '');
+            $url = esc_attr($font['url'] ?? '');
+            ob_start();
+      ?>
+            <div class="nb-font" data-index="<?php echo esc_attr($index); ?>">
+              <div class="nb-font-header">
+                <strong><?php esc_html_e('Betűtípus', 'nb'); ?></strong>
+                <button type="button" class="button-link nb-remove-font"><?php esc_html_e('Eltávolítás', 'nb'); ?></button>
+              </div>
+              <div class="nb-font-grid">
+                <label>
+                  <span><?php esc_html_e('Megjelenő név', 'nb'); ?></span>
+                  <input type="text" name="fonts[<?php echo esc_attr($index); ?>][label]" value="<?php echo $label; ?>">
+                </label>
+                <label>
+                  <span><?php esc_html_e('CSS font-family', 'nb'); ?></span>
+                  <input type="text" name="fonts[<?php echo esc_attr($index); ?>][family]" value="<?php echo $family; ?>" placeholder="Roboto">
+                </label>
+                <label>
+                  <span><?php esc_html_e('Google Fonts család / variáns', 'nb'); ?></span>
+                  <input type="text" name="fonts[<?php echo esc_attr($index); ?>][google]" value="<?php echo $google; ?>" placeholder="Roboto:wght@400;700">
+                </label>
+                <label>
+                  <span><?php esc_html_e('Egyedi stylesheet URL', 'nb'); ?></span>
+                  <input type="text" name="fonts[<?php echo esc_attr($index); ?>][url]" value="<?php echo $url; ?>" placeholder="https://...">
+                </label>
+              </div>
+            </div>
+      <?php
+            return ob_get_clean();
+          }
+        }
+        $fontEntries = nb_normalize_font_settings($settings['fonts'] ?? []);
+        if (empty($fontEntries)){
+          $fontEntries = [[]];
+        }
+        $fontCount = count($fontEntries);
+      ?>
       <h2>Betűtípusok</h2>
-      <div id="nb-fonts">
-        <?php foreach(($settings['fonts'] ?? []) as $url): ?>
-          <div class="nb-font"><input type="text" name="fonts[]" value="<?php echo esc_attr($url); ?>" size="80"> <button class="button nb-remove-font">Eltávolítás</button></div>
-        <?php endforeach; ?>
+      <p class="description nb-fonts-help"><?php esc_html_e('Add meg, hogy az „Írj saját feliratot” eszköz milyen betűtípusokat kínáljon. Google Fonts esetén elég a család és variáns, pl. Roboto:wght@400;700.', 'nb'); ?></p>
+      <div id="nb-fonts" class="nb-font-list" data-next="<?php echo esc_attr($fontCount); ?>">
+        <?php foreach ($fontEntries as $i=>$font){ echo nb_admin_render_font_row($i, $font); } ?>
       </div>
-      <p><button type="button" class="button" id="nb-add-font">+ Font mező</button></p>
+      <script type="text/template" id="nb-font-template">
+        <?php echo nb_admin_render_font_row('__index__', []); ?>
+      </script>
+      <p><button type="button" class="button" id="nb-add-font">+ <?php esc_html_e('Új font', 'nb'); ?></button></p>
 
     <?php elseif ($tab==='pricing'): ?>
       <h2>Globális ár</h2>

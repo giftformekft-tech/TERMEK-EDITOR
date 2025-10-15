@@ -148,19 +148,95 @@
     return -1;
   }
   function types(){ return settings.types || ['Póló','Pulóver']; }
-  function fontEntries(){ return settings.fonts || []; }
+
+  function rawFontEntries(){
+    const fonts = settings.fonts;
+    if (Array.isArray(fonts)) return fonts;
+    if (fonts && typeof fonts === 'object'){
+      return Object.keys(fonts).map(key=>fonts[key]).filter(Boolean);
+    }
+    return [];
+  }
+
+  function googleStylesheetUrl(query){
+    if (typeof query !== 'string') return '';
+    let value = query.trim();
+    if (!value) return '';
+    if (value.toLowerCase().indexOf('google:') === 0){
+      value = value.slice(7).trim();
+    }
+    if (!value) return '';
+    const collapsed = value.replace(/\s+/g, '+');
+    return 'https://fonts.googleapis.com/css2?family=' + collapsed.replace(/\|/g, '%7C') + '&display=swap';
+  }
 
   function parseFontEntry(entry){
-    if (typeof entry !== 'string') return null;
-    const parts = entry.split('|').map(p=>p.trim()).filter(Boolean);
-    if (!parts.length) return null;
-    if (parts.length === 1){
-      return {label: parts[0], family: parts[0], url: ''};
+    if (!entry) return null;
+    if (typeof entry === 'string'){
+      const parts = entry.split('|').map(p=>p.trim()).filter(Boolean);
+      if (!parts.length) return null;
+      let label = parts[0];
+      let family = parts[1] || label;
+      let url = '';
+      let google = '';
+      if (parts.length === 2){
+        const candidate = parts[1];
+        if (candidate && candidate.toLowerCase().indexOf('google:') === 0){
+          google = candidate.slice(7);
+        } else if (candidate && /^https?:/i.test(candidate)){
+          url = candidate;
+        } else {
+          family = candidate;
+        }
+      } else if (parts.length >= 3){
+        family = parts[1] || label;
+        const candidate = parts[2];
+        if (candidate && candidate.toLowerCase().indexOf('google:') === 0){
+          google = candidate.slice(7);
+        } else {
+          url = candidate;
+        }
+      }
+      const parsed = {
+        label: label || family,
+        family: family || label,
+        google,
+        url
+      };
+      if (!parsed.url && parsed.google){
+        parsed.url = googleStylesheetUrl(parsed.google);
+      }
+      if (!parsed.family) return null;
+      return parsed;
     }
-    if (parts.length === 2){
-      return {label: parts[0], family: parts[0], url: parts[1]};
+    if (typeof entry === 'object'){
+      const labelRaw = entry.label || entry.name || entry.title || '';
+      const familyRaw = entry.family || entry.font || '';
+      const googleRaw = entry.google || entry.google_family || entry.googleFont || '';
+      const urlRaw = entry.url || entry.stylesheet || entry.href || '';
+      const parsed = {
+        label: (labelRaw || familyRaw || googleRaw || '').toString().trim(),
+        family: (familyRaw || labelRaw || '').toString().trim(),
+        google: (googleRaw || '').toString().trim(),
+        url: (urlRaw || '').toString().trim()
+      };
+      if (!parsed.family && parsed.google){
+        parsed.family = parsed.google.split(':')[0] || parsed.google;
+      }
+      if (!parsed.label && parsed.family){
+        parsed.label = parsed.family;
+      }
+      if (!parsed.url && parsed.google){
+        parsed.url = googleStylesheetUrl(parsed.google);
+      }
+      if (!parsed.family) return null;
+      return parsed;
     }
-    return {label: parts[0], family: parts[1], url: parts[2]};
+    return null;
+  }
+
+  function fontEntries(){
+    return rawFontEntries().map(parseFontEntry).filter(Boolean);
   }
 
   function ensureFontLoaded(font){
@@ -205,7 +281,7 @@
       {label:'Lato', family:'Lato', url:'https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap'}
     ];
     defaults.forEach(addFontOption);
-    fontEntries().map(parseFontEntry).forEach(addFontOption);
+    fontEntries().forEach(addFontOption);
     if (!fontFamilySel.value && fontFamilySel.options.length){
       fontFamilySel.value = fontFamilySel.options[0].value;
     }
@@ -1412,7 +1488,24 @@
         }
         const sel = currentSelection();
         const size = sizeSel.value || '';
-        const price_ctx = {product_id: sel.pid, type: sel.type, color: sel.color, size};
+        const typeOption = (typeSel && typeSel.selectedOptions && typeSel.selectedOptions[0]) ? typeSel.selectedOptions[0] : null;
+        const typeLabel = typeOption ? (typeOption.dataset?.label || typeOption.textContent || typeOption.value || '') : '';
+        let colorLabel = '';
+        if (colorSel){
+          const colorOption = Array.from(colorSel.options).find(opt=>opt.value === sel.color);
+          if (colorOption){
+            colorLabel = colorOption.dataset?.display || colorOption.dataset?.original || colorOption.textContent || '';
+          }
+        }
+        const price_ctx = {
+          product_id: sel.pid,
+          type: sel.type,
+          color: sel.color,
+          size,
+          type_label: typeLabel,
+          color_label: colorLabel,
+          size_label: size
+        };
         const meta = {width_mm:300, height_mm:400, dpi:300, product_id: sel.pid, attributes_json:{pa_type: sel.type, pa_color: sel.color, pa_size: size}, price_ctx};
         const res = await fetch(NB_DESIGNER.rest + 'save', {
           method:'POST',

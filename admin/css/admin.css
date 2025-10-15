@@ -11,3 +11,10 @@
 .nb-color-option{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #dcdcde;background:#fafafa;border-radius:4px;cursor:pointer}
 .nb-color-option input{margin:0}
 .nb-color-empty{margin:0;color:#666}
+.nb-fonts-help{max-width:780px}
+.nb-font-list{display:flex;flex-direction:column;gap:12px;max-width:960px}
+.nb-font{border:1px solid #e5e5e5;background:#fff;padding:12px}
+.nb-font-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.nb-font-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(220px,1fr));gap:12px}
+.nb-font-grid label{display:flex;flex-direction:column;font-weight:600;gap:6px}
+.nb-font-grid input{width:100%}

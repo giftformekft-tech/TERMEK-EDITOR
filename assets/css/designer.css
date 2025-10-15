@@ -56,6 +56,8 @@
 .nb-product-meta{font-size:13px;color:#cbd5f5;display:flex;flex-direction:column;gap:4px}
 .nb-selection-summary{display:flex;flex-wrap:wrap;gap:8px}
 .nb-selection-summary span{display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(15,23,42,.35);border-radius:999px;font-size:12px;color:#e2e8f0;border:1px solid rgba(148,163,184,.4)}
+.nb-order-design-meta{margin:.5em 0 0;font-size:.95em;color:#374151}
+.nb-order-design-link{margin:.35em 0}
 .nb-summary-actions{display:flex;flex-direction:column;gap:12px}
 .nb-cart-button{background:#22c55e;color:#06281a;border:none;border-radius:18px;padding:16px;font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;transition:background .2s ease,transform .2s ease}
 .nb-cart-button:hover{background:#16a34a;transform:translateY(-2px)}

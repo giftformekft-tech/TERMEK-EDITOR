@@ -100,6 +100,11 @@ function nb_admin_render(){
   if ( ! current_user_can('manage_options') ) return;
   $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'products';
   $settings = get_option('nb_settings',[]);
+  if (!isset($settings['fonts']) || !is_array($settings['fonts'])){
+    $settings['fonts'] = [];
+  } else {
+    $settings['fonts'] = nb_normalize_font_settings($settings['fonts']);
+  }
   if ($_SERVER['REQUEST_METHOD']==='POST' && check_admin_referer('nb_save','nb_nonce')){
     if ($tab==='products'){
       $settings['products'] = array_map('intval', $_POST['products'] ?? []);
@@ -118,7 +123,30 @@ function nb_admin_render(){
       $decoded = json_decode($mockups_json, true);
       if (is_array($decoded)) $settings['mockups'] = $decoded;
     } elseif ($tab==='fonts'){
-      $settings['fonts'] = array_values(array_filter(array_map('esc_url_raw', $_POST['fonts'] ?? [])));
+      $fonts_input = $_POST['fonts'] ?? [];
+      $fonts = [];
+      if (is_array($fonts_input)){
+        foreach ($fonts_input as $font_entry){
+          if (!is_array($font_entry)) continue;
+          $label  = sanitize_text_field(wp_unslash($font_entry['label'] ?? ''));
+          $family = sanitize_text_field(wp_unslash($font_entry['family'] ?? ''));
+          $google = sanitize_text_field(wp_unslash($font_entry['google'] ?? ''));
+          $url    = esc_url_raw(wp_unslash($font_entry['url'] ?? ''));
+          if ($google !== ''){
+            $google = preg_replace('/\s+/', ' ', $google);
+          }
+          if ($label === '' && $family !== '') $label = $family;
+          if ($family === '' && $label !== '') $family = $label;
+          if ($label === '' && $family === '' && $google === '' && $url === '') continue;
+          $fonts[] = [
+            'label'  => $label,
+            'family' => $family,
+            'google' => $google,
+            'url'    => $url,
+          ];
+        }
+      }
+      $settings['fonts'] = nb_normalize_font_settings($fonts);
     } elseif ($tab==='pricing'){
       $settings['fee_per_cm2'] = isset($_POST['fee_per_cm2']) ? floatval($_POST['fee_per_cm2']) : 3;
       $settings['min_fee']     = isset($_POST['min_fee']) ? floatval($_POST['min_fee']) : 990;
@@ -214,6 +242,7 @@ function nb_admin_render(){
       }
       $settings['catalog'] = $catalog;
     }
+    $settings['fonts'] = nb_normalize_font_settings($settings['fonts'] ?? []);
     update_option('nb_settings',$settings);
     echo '<div class="updated"><p>Mentve.</p></div>';
   }

@@ -35,6 +35,30 @@ add_action('rest_api_init', function(){
       $print_width_px = max(0, intval($req->get_param('print_width_px')));
       $print_height_px = max(0, intval($req->get_param('print_height_px')));
 
+      $product_id_meta = intval($meta['product_id'] ?? 0);
+      $price_ctx_raw = $meta['price_ctx'] ?? [];
+      if (!is_array($price_ctx_raw)){
+        $decoded_ctx = json_decode($price_ctx_raw, true);
+        $price_ctx_raw = is_array($decoded_ctx) ? $decoded_ctx : [];
+      }
+      $price_ctx_raw['product_id'] = $product_id_meta;
+      $type_label = sanitize_text_field($price_ctx_raw['type_label'] ?? '');
+      $color_label = sanitize_text_field($price_ctx_raw['color_label'] ?? '');
+      $size_label = sanitize_text_field($price_ctx_raw['size_label'] ?? '');
+      if ($size_label === '' && isset($price_ctx_raw['size']) && is_string($price_ctx_raw['size'])){
+        $size_label = sanitize_text_field($price_ctx_raw['size']);
+      }
+      foreach (['type','color','size'] as $key){
+        if (isset($price_ctx_raw[$key]) && is_string($price_ctx_raw[$key])){
+          $price_ctx_raw[$key] = sanitize_text_field($price_ctx_raw[$key]);
+        }
+      }
+      $price_ctx_raw['type_label'] = $type_label;
+      $price_ctx_raw['color_label'] = $color_label;
+      $price_ctx_raw['size_label'] = $size_label;
+      $price_ctx_raw['product_id'] = intval($price_ctx_raw['product_id'] ?? 0);
+      $price_ctx = $price_ctx_raw;
+
       $post_id = wp_insert_post([
         'post_type'=>'nb_design','post_status'=>'publish',
         'post_title'=>'Design #'.time(),
@@ -45,11 +69,14 @@ add_action('rest_api_init', function(){
           'width_mm'        => floatval($meta['width_mm']??0),
           'height_mm'       => floatval($meta['height_mm']??0),
           'dpi'             => intval($meta['dpi']??300),
-          'product_id'      => intval($meta['product_id']??0),
+          'product_id'      => $product_id_meta,
           'attributes_json' => wp_json_encode($meta['attributes_json']??[]),
-          'price_ctx'       => wp_json_encode($meta['price_ctx']??[]),
+          'price_ctx'       => wp_json_encode($price_ctx),
           'print_width_px'  => $print_width_px,
           'print_height_px' => $print_height_px,
+          'type_label'      => $type_label,
+          'color_label'     => $color_label,
+          'size_label'      => $size_label,
         ]
       ]);
       if (is_wp_error($post_id)) return new WP_Error('db','Nem sikerült menteni', ['status'=>500]);
@@ -207,6 +234,44 @@ add_action('rest_api_init', function(){
       $print_url = get_post_meta($design_id,'print_url',true);
       $print_width_px = intval(get_post_meta($design_id,'print_width_px',true));
       $print_height_px = intval(get_post_meta($design_id,'print_height_px',true));
+      $price_ctx = json_decode(get_post_meta($design_id,'price_ctx',true), true);
+      if (!is_array($price_ctx)) $price_ctx = [];
+      $type_value = isset($price_ctx['type']) ? (string)$price_ctx['type'] : '';
+      $color_value = isset($price_ctx['color']) ? (string)$price_ctx['color'] : '';
+      $size_value = isset($price_ctx['size']) ? (string)$price_ctx['size'] : '';
+      $type_label = isset($price_ctx['type_label']) ? (string)$price_ctx['type_label'] : '';
+      $color_label = isset($price_ctx['color_label']) ? (string)$price_ctx['color_label'] : '';
+      $size_label = isset($price_ctx['size_label']) ? (string)$price_ctx['size_label'] : '';
+      if ($type_label === ''){
+        $meta_type_label = get_post_meta($design_id,'type_label',true);
+        if (is_string($meta_type_label)) $type_label = $meta_type_label;
+      }
+      if ($color_label === ''){
+        $meta_color_label = get_post_meta($design_id,'color_label',true);
+        if (is_string($meta_color_label)) $color_label = $meta_color_label;
+      }
+      if ($size_label === ''){
+        $meta_size_label = get_post_meta($design_id,'size_label',true);
+        if (is_string($meta_size_label)) $size_label = $meta_size_label;
+      }
+      $settings = get_option('nb_settings', []);
+      if ($type_label === '' && $type_value !== ''){
+        $type_label = nb_resolve_type_label($settings, $type_value);
+      }
+      if ($color_label === ''){
+        $color_label = nb_resolve_color_label($settings, $type_value, $color_value);
+      }
+      if ($size_label === '' && $size_value !== ''){
+        $size_label = $size_value;
+      }
+      $clean_text = function($value){
+        if (!is_string($value)) return '';
+        if (function_exists('wc_clean')) return wc_clean($value);
+        return sanitize_text_field($value);
+      };
+      $type_label = $clean_text($type_label);
+      $color_label = $clean_text($color_label);
+      $size_label = $clean_text($size_label);
 
       $cart_item_data = [
         'nb_design_id'     => $design_id,
@@ -215,6 +280,9 @@ add_action('rest_api_init', function(){
         'print_width_px'   => $print_width_px,
         'print_height_px'  => $print_height_px,
       ];
+      if ($type_label !== '') $cart_item_data['nb_product_type'] = $type_label;
+      if ($color_label !== '') $cart_item_data['nb_product_color'] = $color_label;
+      if ($size_label !== '') $cart_item_data['nb_product_size'] = $size_label;
 
       if (function_exists('wc_clear_notices')) {
         wc_clear_notices();
