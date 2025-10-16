@@ -34,15 +34,20 @@ if ( ! function_exists('nb_normalize_color_key') ) {
 if ( ! function_exists('nb_decode_unicode_sequences') ) {
   function nb_decode_unicode_sequences($value){
     if (!is_string($value)) return $value;
-    if (strpos($value, 'u') === false && strpos($value, '\\') === false) {
-      return $value;
-    }
-    if (!preg_match('/(\\\\u[0-9a-fA-F]{4}|u[0-9a-fA-F]{4})/', $value)) {
+    if ($value === '') return '';
+    if (!preg_match('/\\\\?u[0-9a-fA-F]{4}/', $value)) {
       return $value;
     }
     $prepared = preg_replace('/(?<!\\\\)u([0-9a-fA-F]{4})/i', '\\u$1', $value);
-    $json = '"'.preg_replace('/([\\\\"])/', '\\$1', $prepared).'"';
-    $decoded = json_decode($json);
+    if (!is_string($prepared)) {
+      $prepared = $value;
+    }
+    $escaped = preg_replace('/\\\\(?!u[0-9a-fA-F]{4})/i', '\\$0', $prepared);
+    if (!is_string($escaped)) {
+      $escaped = $prepared;
+    }
+    $escaped = str_replace('"', '\\"', $escaped);
+    $decoded = json_decode('"'.$escaped.'"');
     if (JSON_ERROR_NONE === json_last_error() && is_string($decoded)) {
       return $decoded;
     }
