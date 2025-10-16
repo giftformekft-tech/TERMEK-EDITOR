@@ -129,19 +129,29 @@ add_action('woocommerce_admin_order_data_after_order_details', function($order){
     $download_link = nb_render_design_download_link($preview, $design_id, $print);
 
     echo '<div class="nb-order-design">';
+
     if ($preview){
-      echo '<p><img src="'.esc_url($preview).'" alt="" style="max-width:220px;border:1px solid #ddd" /></p>';
+      echo '<div class="nb-order-design__preview"><img src="'.esc_url($preview).'" alt="" /></div>';
     }
-    if (! empty($summary)){
-      echo '<div class="nb-order-design__attributes">';
-      foreach ($summary as $row){
-        echo '<p><strong>'.esc_html($row['label']).':</strong> '.esc_html($row['value']).'</p>';
+
+    if (! empty($summary) || $download_link){
+      echo '<div class="nb-order-design__details">';
+
+      if (! empty($summary)){
+        echo '<ul class="nb-order-design__attributes">';
+        foreach ($summary as $row){
+          echo '<li><strong>'.esc_html($row['label']).':</strong> <span>'.esc_html($row['value']).'</span></li>';
+        }
+        echo '</ul>';
       }
+
+      if ($download_link){
+        echo '<p class="nb-order-design__download">'.$download_link.'</p>';
+      }
+
       echo '</div>';
     }
-    if ($download_link){
-      echo '<p class="nb-order-design__download">'.$download_link.'</p>';
-    }
+
     echo '</div>';
   }
 
@@ -187,3 +197,35 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
   }
   echo '</div>';
 }, 10, 4);
+
+add_action('admin_head', function(){
+  if (! function_exists('get_current_screen')){
+    return;
+  }
+
+  $screen = get_current_screen();
+  if (! $screen){
+    return;
+  }
+
+  $screen_id = $screen->id ?? '';
+  if ($screen_id === ''){
+    return;
+  }
+
+  if ($screen_id !== 'shop_order' && strpos($screen_id, 'shop_order') === false && strpos($screen_id, 'wc-orders') === false){
+    return;
+  }
+
+  echo '<style id="nb-order-design-admin-css">
+.nb-order-designs .nb-order-design{display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;}
+.nb-order-designs .nb-order-design__preview img{max-width:220px;height:auto;display:block;border:1px solid #ddd;border-radius:4px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.08);}
+.nb-order-designs .nb-order-design__details{flex:1;min-width:0;}
+.nb-order-designs .nb-order-design__attributes{margin:0 0 8px;padding:0;list-style:none;}
+.nb-order-designs .nb-order-design__attributes li{margin:0 0 6px;padding:0;font-size:13px;}
+.nb-order-designs .nb-order-design__attributes strong{display:inline-block;min-width:120px;font-weight:600;}
+.nb-order-designs .nb-order-design__attributes span{font-weight:400;}
+.nb-order-designs .nb-order-design__download{margin:8px 0 0;}
+.nb-order-designs .nb-order-design__download .nb-design-download{display:inline-block;margin-top:2px;}
+</style>';
+});
