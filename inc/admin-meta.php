@@ -230,9 +230,21 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
         $candidates[] = $settings['types'];
       }
       $normalizedSelected = nb_designer_normalize_type_key($selected);
+      if (function_exists('nb_resolve_type_order_label')){
+        $mapped = nb_resolve_type_order_label($selected !== '' ? $selected : $value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
+        }
+      }
       if (! empty($price_ctx['type_label'])){
-        $label = trim((string)$price_ctx['type_label']);
+        $label = nb_clean_label_string($price_ctx['type_label']);
         if ($label !== ''){
+          if (function_exists('nb_resolve_type_order_label')){
+            $mapped = nb_resolve_type_order_label($label, $settings);
+            if ($mapped !== ''){
+              return $mapped;
+            }
+          }
           return $label;
         }
       }
@@ -243,11 +255,29 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
             continue;
           }
           if (strcasecmp($value, $label) === 0){
+            if (function_exists('nb_resolve_type_order_label')){
+              $mapped = nb_resolve_type_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
           if ($normalizedSelected !== '' && nb_designer_normalize_type_key($label) === $normalizedSelected){
+            if (function_exists('nb_resolve_type_order_label')){
+              $mapped = nb_resolve_type_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
+        }
+      }
+      if (function_exists('nb_resolve_type_order_label')){
+        $mapped = nb_resolve_type_order_label($value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
         }
       }
       return $value;
@@ -255,9 +285,21 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
 
     if ($group === 'color'){
       $normalizedSelected = nb_designer_normalize_color_key($selected);
+      if (function_exists('nb_resolve_color_order_label')){
+        $mapped = nb_resolve_color_order_label($selected !== '' ? $selected : $value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
+        }
+      }
       if (! empty($price_ctx['color_label'])){
-        $label = trim((string)$price_ctx['color_label']);
+        $label = nb_clean_label_string($price_ctx['color_label']);
         if ($label !== ''){
+          if (function_exists('nb_resolve_color_order_label')){
+            $mapped = nb_resolve_color_order_label($label, $settings);
+            if ($mapped !== ''){
+              return $mapped;
+            }
+          }
           return $label;
         }
       }
@@ -290,14 +332,32 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
             continue;
           }
           if (strcasecmp($value, $label) === 0){
+            if (function_exists('nb_resolve_color_order_label')){
+              $mapped = nb_resolve_color_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
           if ($normalizedSelected !== '' && nb_designer_normalize_color_key($label) === $normalizedSelected){
+            if (function_exists('nb_resolve_color_order_label')){
+              $mapped = nb_resolve_color_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
         }
       }
 
+      if (function_exists('nb_resolve_color_order_label')){
+        $mapped = nb_resolve_color_order_label($value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
+        }
+      }
       return $value;
     }
 

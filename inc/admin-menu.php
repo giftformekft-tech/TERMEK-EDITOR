@@ -101,10 +101,53 @@ function nb_admin_render(){
   if ($_SERVER['REQUEST_METHOD']==='POST' && check_admin_referer('nb_save','nb_nonce')){
     if ($tab==='products'){
       $settings['products'] = array_map('intval', $_POST['products'] ?? []);
-      $types_input = isset($_POST['types']) ? wp_unslash($_POST['types']) : '';
-      $types_csv = sanitize_text_field($types_input);
-      $types = nb_clean_label_list(array_map('trim', explode(',', $types_csv)));
-      if (!empty($types)) $settings['types'] = $types;
+      $designerInputs = isset($_POST['types_designer']) ? (array)$_POST['types_designer'] : [];
+      $orderInputs    = isset($_POST['types_order']) ? (array)$_POST['types_order'] : [];
+      $typeLabels = [];
+      $typeOrderMap = [];
+      $max = max(count($designerInputs), count($orderInputs));
+      for ($i = 0; $i < $max; $i++){
+        $rawDesigner = $designerInputs[$i] ?? '';
+        if (!is_scalar($rawDesigner)){
+          continue;
+        }
+        $rawDesigner = (string)$rawDesigner;
+        if (function_exists('wp_unslash')){
+          $rawDesigner = wp_unslash($rawDesigner);
+        }
+        if (function_exists('sanitize_text_field')){
+          $rawDesigner = sanitize_text_field($rawDesigner);
+        }
+        $designer = nb_clean_label_string($rawDesigner);
+        if ($designer === ''){
+          continue;
+        }
+        if (in_array($designer, $typeLabels, true)){
+          continue;
+        }
+        $typeLabels[] = $designer;
+        $rawOrder = $orderInputs[$i] ?? '';
+        if (!is_scalar($rawOrder)){
+          continue;
+        }
+        $rawOrder = (string)$rawOrder;
+        if (function_exists('wp_unslash')){
+          $rawOrder = wp_unslash($rawOrder);
+        }
+        if (function_exists('sanitize_text_field')){
+          $rawOrder = sanitize_text_field($rawOrder);
+        }
+        $orderLabel = nb_clean_label_string($rawOrder);
+        if ($orderLabel === ''){
+          continue;
+        }
+        $normKey = nb_normalize_type_key($designer);
+        if ($normKey !== ''){
+          $typeOrderMap[$normKey] = $orderLabel;
+        }
+      }
+      $settings['types'] = $typeLabels;
+      $settings['type_order_labels'] = $typeOrderMap;
       if (!isset($settings['catalog'])) $settings['catalog'] = [];
       foreach($settings['products'] as $pid){
         if (empty($settings['catalog'][$pid])){
@@ -123,22 +166,53 @@ function nb_admin_render(){
       $settings['fee_per_cm2'] = isset($_POST['fee_per_cm2']) ? floatval($_POST['fee_per_cm2']) : 3;
       $settings['min_fee']     = isset($_POST['min_fee']) ? floatval($_POST['min_fee']) : 990;
     } elseif ($tab==='colors'){
-      $palette_raw = $_POST['color_palette'] ?? '';
-      if (is_string($palette_raw)){
-        $palette_raw = sanitize_textarea_field(wp_unslash($palette_raw));
-      } else {
-        $palette_raw = '';
-      }
-      $parts = preg_split('/[\r\n,]+/', $palette_raw);
+      $designerInputs = isset($_POST['color_designer']) ? (array)$_POST['color_designer'] : [];
+      $orderInputs    = isset($_POST['color_order']) ? (array)$_POST['color_order'] : [];
       $palette = [];
-      if (is_array($parts)){
-        foreach ($parts as $entry){
-          $entry = trim($entry);
-          if ($entry === '') continue;
-          if (!in_array($entry, $palette, true)) $palette[] = $entry;
+      $colorOrderMap = [];
+      $max = max(count($designerInputs), count($orderInputs));
+      for ($i = 0; $i < $max; $i++){
+        $rawDesigner = $designerInputs[$i] ?? '';
+        if (!is_scalar($rawDesigner)){
+          continue;
+        }
+        $rawDesigner = (string)$rawDesigner;
+        if (function_exists('wp_unslash')){
+          $rawDesigner = wp_unslash($rawDesigner);
+        }
+        if (function_exists('sanitize_text_field')){
+          $rawDesigner = sanitize_text_field($rawDesigner);
+        }
+        $designer = nb_clean_label_string($rawDesigner);
+        if ($designer === ''){
+          continue;
+        }
+        if (in_array($designer, $palette, true)){
+          continue;
+        }
+        $palette[] = $designer;
+        $rawOrder = $orderInputs[$i] ?? '';
+        if (!is_scalar($rawOrder)){
+          continue;
+        }
+        $rawOrder = (string)$rawOrder;
+        if (function_exists('wp_unslash')){
+          $rawOrder = wp_unslash($rawOrder);
+        }
+        if (function_exists('sanitize_text_field')){
+          $rawOrder = sanitize_text_field($rawOrder);
+        }
+        $orderLabel = nb_clean_label_string($rawOrder);
+        if ($orderLabel === ''){
+          continue;
+        }
+        $normKey = nb_normalize_color_key($designer);
+        if ($normKey !== ''){
+          $colorOrderMap[$normKey] = $orderLabel;
         }
       }
       $settings['color_palette'] = $palette;
+      $settings['color_order_labels'] = $colorOrderMap;
       $typeInputs = $_POST['type_colors'] ?? [];
       if (!is_array($typeInputs)) $typeInputs = [];
       $globalTypes = $settings['types'] ?? [];

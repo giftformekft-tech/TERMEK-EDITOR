@@ -31,6 +31,52 @@ if ( ! function_exists('nb_normalize_color_key') ) {
   }
 }
 
+if ( ! function_exists('nb_resolve_type_order_label') ) {
+  function nb_resolve_type_order_label($value, $settings, $fallback = ''){
+    $map = [];
+    if (isset($settings['type_order_labels']) && is_array($settings['type_order_labels'])){
+      $map = $settings['type_order_labels'];
+    }
+    $key = nb_normalize_type_key($value);
+    if ($key !== '' && isset($map[$key])){
+      $label = nb_clean_label_string($map[$key]);
+      if ($label !== ''){
+        return $label;
+      }
+    }
+    if ($fallback !== ''){
+      $cleanFallback = nb_clean_label_string($fallback);
+      if ($cleanFallback !== ''){
+        return $cleanFallback;
+      }
+    }
+    return '';
+  }
+}
+
+if ( ! function_exists('nb_resolve_color_order_label') ) {
+  function nb_resolve_color_order_label($value, $settings, $fallback = ''){
+    $map = [];
+    if (isset($settings['color_order_labels']) && is_array($settings['color_order_labels'])){
+      $map = $settings['color_order_labels'];
+    }
+    $key = nb_normalize_color_key($value);
+    if ($key !== '' && isset($map[$key])){
+      $label = nb_clean_label_string($map[$key]);
+      if ($label !== ''){
+        return $label;
+      }
+    }
+    if ($fallback !== ''){
+      $cleanFallback = nb_clean_label_string($fallback);
+      if ($cleanFallback !== ''){
+        return $cleanFallback;
+      }
+    }
+    return '';
+  }
+}
+
 if ( ! function_exists('nb_decode_unicode_sequences') ) {
   function nb_decode_unicode_sequences($value){
     if (!is_string($value)) return $value;
@@ -101,8 +147,52 @@ if ( ! function_exists('nb_clean_settings_unicode') ) {
       $settings['types'] = nb_clean_label_list($settings['types']);
     }
 
+    if (isset($settings['type_order_labels']) && is_array($settings['type_order_labels'])) {
+      $cleanTypeOrders = [];
+      foreach ($settings['type_order_labels'] as $key => $label){
+        if (is_array($label) || is_object($label)) {
+          continue;
+        }
+        $cleanKey = nb_normalize_type_key(nb_decode_unicode_sequences((string)$key));
+        if ($cleanKey === '') {
+          continue;
+        }
+        $cleanLabel = nb_clean_label_string($label);
+        if ($cleanLabel === '') {
+          continue;
+        }
+        if (function_exists('sanitize_text_field')) {
+          $cleanLabel = sanitize_text_field($cleanLabel);
+        }
+        $cleanTypeOrders[$cleanKey] = $cleanLabel;
+      }
+      $settings['type_order_labels'] = $cleanTypeOrders;
+    }
+
     if (isset($settings['color_palette'])) {
       $settings['color_palette'] = nb_clean_label_list($settings['color_palette']);
+    }
+
+    if (isset($settings['color_order_labels']) && is_array($settings['color_order_labels'])) {
+      $cleanColorOrders = [];
+      foreach ($settings['color_order_labels'] as $key => $label){
+        if (is_array($label) || is_object($label)) {
+          continue;
+        }
+        $cleanKey = nb_normalize_color_key(nb_decode_unicode_sequences((string)$key));
+        if ($cleanKey === '') {
+          continue;
+        }
+        $cleanLabel = nb_clean_label_string($label);
+        if ($cleanLabel === '') {
+          continue;
+        }
+        if (function_exists('sanitize_text_field')) {
+          $cleanLabel = sanitize_text_field($cleanLabel);
+        }
+        $cleanColorOrders[$cleanKey] = $cleanLabel;
+      }
+      $settings['color_order_labels'] = $cleanColorOrders;
     }
 
     if (isset($settings['type_colors']) && is_array($settings['type_colors'])) {
