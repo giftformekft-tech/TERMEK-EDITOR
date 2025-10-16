@@ -56,7 +56,7 @@ if ( ! function_exists('nb_detect_attribute_group_from_key') ) {
       if (function_exists('remove_accents')){
         $normalized = remove_accents($normalized);
       }
-      $key = strtolower($normalized);
+      $key = nb_utf8_strtolower($normalized);
     } else {
       $key = '';
     }
@@ -145,7 +145,7 @@ if ( ! function_exists('nb_designer_normalize_type_key') ) {
     if (function_exists('remove_accents')){
       $string = remove_accents($string);
     }
-    return strtolower($string);
+    return nb_utf8_strtolower($string);
   }
 }
 
@@ -164,7 +164,7 @@ if ( ! function_exists('nb_designer_normalize_color_key') ) {
     if (function_exists('remove_accents')){
       $string = remove_accents($string);
     }
-    return strtolower($string);
+    return nb_utf8_strtolower($string);
   }
 }
 
@@ -286,7 +286,7 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
         }
       }
 
-      $normalizedSelected = strtolower($selected);
+      $normalizedSelected = nb_utf8_strtolower($selected);
       $candidateLists = [];
       if ($cfg && ! empty($cfg['sizes']) && is_array($cfg['sizes'])){
         $candidateLists[] = $cfg['sizes'];
@@ -309,7 +309,7 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
           if (strcasecmp($value, $label) === 0){
             return $label;
           }
-          if ($normalizedSelected !== '' && strtolower($label) === $normalizedSelected){
+          if ($normalizedSelected !== '' && nb_utf8_strtolower($label) === $normalizedSelected){
             return $label;
           }
         }
@@ -329,13 +329,30 @@ if ( ! function_exists('nb_normalize_attribute_candidates') ) {
       $values = [$values];
     }
     foreach ($values as $value){
-      if (is_scalar($value)){
-        $clean = trim((string)$value);
-        if ($clean !== '' && ! in_array($clean, $list, true)){
-          $list[] = $clean;
-        }
+      if (! is_scalar($value)){
+        continue;
+      }
+
+      $string = (string)$value;
+      if (function_exists('wp_unslash')){
+        $string = wp_unslash($string);
+      }
+
+      if (function_exists('nb_clean_label_string')){
+        $clean = nb_clean_label_string($string);
+      } else {
+        $clean = trim($string);
+      }
+
+      if ($clean === ''){
+        continue;
+      }
+
+      if (! in_array($clean, $list, true)){
+        $list[] = $clean;
       }
     }
+
     return $list;
   }
 }

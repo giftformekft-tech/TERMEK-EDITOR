@@ -95,7 +95,9 @@
                   continue;
                 }
                 foreach ($colorList as $color):
-                  $key = strtolower($type).'|'.strtolower($color);
+                  $colorKey = nb_normalize_color_key($color);
+                  if ($colorKey === '') continue;
+                  $key = $typeKey.'|'.$colorKey;
                   $hash = md5($key);
                   $map = $cfg['map'][$key] ?? ['mockup_index'=>-1,'fee_per_cm2'=>'','min_fee'=>'','base_fee'=>''];
                   $renderedRows++;
