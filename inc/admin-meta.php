@@ -107,6 +107,197 @@ if ( ! function_exists('nb_normalize_attribute_display') ) {
   }
 }
 
+if ( ! function_exists('nb_designer_settings_cache') ) {
+  function nb_designer_settings_cache(){
+    static $cache = null;
+    if ($cache === null){
+      $settings = get_option('nb_settings', []);
+      $cache = is_array($settings) ? $settings : [];
+    }
+    return $cache;
+  }
+}
+
+if ( ! function_exists('nb_designer_normalize_type_key') ) {
+  function nb_designer_normalize_type_key($value){
+    if (function_exists('nb_normalize_type_key')){
+      return nb_normalize_type_key($value);
+    }
+    if ($value === null){
+      return '';
+    }
+    $string = trim((string)$value);
+    return $string === '' ? '' : strtolower($string);
+  }
+}
+
+if ( ! function_exists('nb_designer_normalize_color_key') ) {
+  function nb_designer_normalize_color_key($value){
+    if (function_exists('nb_normalize_color_key')){
+      return nb_normalize_color_key($value);
+    }
+    if ($value === null){
+      return '';
+    }
+    $string = trim((string)$value);
+    return $string === '' ? '' : strtolower($string);
+  }
+}
+
+if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
+  function nb_translate_attribute_value_from_catalog($group, $value, $product_id = 0, $context = []){
+    $value = is_string($value) ? trim($value) : '';
+    if ($value === ''){
+      return '';
+    }
+
+    $selected = $context['selected'] ?? $value;
+    $selected = is_string($selected) ? trim($selected) : '';
+    if ($selected === ''){
+      $selected = $value;
+    }
+
+    $resolved_raw = [];
+    if (! empty($context['resolved_raw']) && is_array($context['resolved_raw'])){
+      $resolved_raw = $context['resolved_raw'];
+    }
+
+    $price_ctx = [];
+    if (! empty($context['price_ctx']) && is_array($context['price_ctx'])){
+      $price_ctx = $context['price_ctx'];
+    }
+
+    $settings = nb_designer_settings_cache();
+    $catalog = isset($settings['catalog']) && is_array($settings['catalog']) ? $settings['catalog'] : [];
+    $cfg = null;
+    if ($product_id && isset($catalog[$product_id]) && is_array($catalog[$product_id])){
+      $cfg = $catalog[$product_id];
+    }
+
+    if ($group === 'type'){
+      $candidates = [];
+      if ($cfg && ! empty($cfg['types']) && is_array($cfg['types'])){
+        $candidates[] = $cfg['types'];
+      }
+      if (! empty($settings['types']) && is_array($settings['types'])){
+        $candidates[] = $settings['types'];
+      }
+      $normalizedSelected = nb_designer_normalize_type_key($selected);
+      if (! empty($price_ctx['type_label'])){
+        $label = trim((string)$price_ctx['type_label']);
+        if ($label !== ''){
+          return $label;
+        }
+      }
+      foreach ($candidates as $list){
+        foreach ($list as $label){
+          $label = is_string($label) ? trim($label) : '';
+          if ($label === ''){
+            continue;
+          }
+          if (strcasecmp($value, $label) === 0){
+            return $label;
+          }
+          if ($normalizedSelected !== '' && nb_designer_normalize_type_key($label) === $normalizedSelected){
+            return $label;
+          }
+        }
+      }
+      return $value;
+    }
+
+    if ($group === 'color'){
+      $normalizedSelected = nb_designer_normalize_color_key($selected);
+      if (! empty($price_ctx['color_label'])){
+        $label = trim((string)$price_ctx['color_label']);
+        if ($label !== ''){
+          return $label;
+        }
+      }
+
+      $typeKey = '';
+      if (! empty($resolved_raw['type'])){
+        $typeKey = nb_designer_normalize_type_key($resolved_raw['type']);
+      }
+      if ($typeKey === '' && ! empty($price_ctx['type'])){
+        $typeKey = nb_designer_normalize_type_key($price_ctx['type']);
+      }
+
+      $candidateLists = [];
+      if ($cfg){
+        if ($typeKey && ! empty($cfg['colors_by_type'][$typeKey]) && is_array($cfg['colors_by_type'][$typeKey])){
+          $candidateLists[] = $cfg['colors_by_type'][$typeKey];
+        }
+        if (! empty($cfg['colors']) && is_array($cfg['colors'])){
+          $candidateLists[] = $cfg['colors'];
+        }
+      }
+      if (! empty($settings['color_palette']) && is_array($settings['color_palette'])){
+        $candidateLists[] = $settings['color_palette'];
+      }
+
+      foreach ($candidateLists as $list){
+        foreach ($list as $label){
+          $label = is_string($label) ? trim($label) : '';
+          if ($label === ''){
+            continue;
+          }
+          if (strcasecmp($value, $label) === 0){
+            return $label;
+          }
+          if ($normalizedSelected !== '' && nb_designer_normalize_color_key($label) === $normalizedSelected){
+            return $label;
+          }
+        }
+      }
+
+      return $value;
+    }
+
+    if ($group === 'size'){
+      if (! empty($price_ctx['size_label'])){
+        $label = trim((string)$price_ctx['size_label']);
+        if ($label !== ''){
+          return $label;
+        }
+      }
+
+      $normalizedSelected = strtolower($selected);
+      $candidateLists = [];
+      if ($cfg && ! empty($cfg['sizes']) && is_array($cfg['sizes'])){
+        $candidateLists[] = $cfg['sizes'];
+      }
+      if (! empty($settings['catalog']) && is_array($settings['catalog'])){
+        foreach ($settings['catalog'] as $entry){
+          if (! is_array($entry) || empty($entry['sizes']) || ! is_array($entry['sizes'])){
+            continue;
+          }
+          $candidateLists[] = $entry['sizes'];
+        }
+      }
+
+      foreach ($candidateLists as $list){
+        foreach ($list as $label){
+          $label = is_string($label) ? trim($label) : '';
+          if ($label === ''){
+            continue;
+          }
+          if (strcasecmp($value, $label) === 0){
+            return $label;
+          }
+          if ($normalizedSelected !== '' && strtolower($label) === $normalizedSelected){
+            return $label;
+          }
+        }
+      }
+
+      return $value;
+    }
+
+    return $value;
+  }
+}
+
 if ( ! function_exists('nb_normalize_attribute_candidates') ) {
   function nb_normalize_attribute_candidates($values){
     $list = [];
@@ -294,6 +485,7 @@ if ( ! function_exists('nb_get_design_attribute_summary') ) {
     ];
 
     $summary = [];
+    $resolved_raw = [];
     foreach ($map as $key => $config){
       $merged_candidates = array_merge(
         $ctx_candidates[$key]    ?? [],
@@ -318,7 +510,14 @@ if ( ! function_exists('nb_get_design_attribute_summary') ) {
       }
 
       $value = '';
+      $selected_candidate = '';
       foreach ($candidates as $candidate){
+        if ($candidate === ''){
+          continue;
+        }
+        if ($selected_candidate === ''){
+          $selected_candidate = $candidate;
+        }
         $normalized = nb_normalize_attribute_display($candidate, $config['taxonomy'], $product_id);
         if ($normalized !== ''){
           $value = $normalized;
@@ -326,12 +525,27 @@ if ( ! function_exists('nb_get_design_attribute_summary') ) {
         }
       }
 
+      if ($value === '' && $selected_candidate !== ''){
+        $value = $selected_candidate;
+      }
+
       if ($value !== ''){
+        $display_value = nb_translate_attribute_value_from_catalog($key, $value, $product_id, [
+          'selected'    => $selected_candidate,
+          'resolved_raw'=> $resolved_raw,
+          'price_ctx'   => $ctx,
+        ]);
+
+        if ($display_value === ''){
+          $display_value = $value;
+        }
+
         $summary[] = [
           'key'   => $key,
           'label' => $config['label'],
-          'value' => $value,
+          'value' => $display_value,
         ];
+        $resolved_raw[$key] = $selected_candidate !== '' ? $selected_candidate : $value;
       }
     }
 
