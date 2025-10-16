@@ -1412,8 +1412,19 @@
         }
         const sel = currentSelection();
         const size = sizeSel.value || '';
+        const typeLabel = (typeSel.selectedOptions[0]?.dataset?.label || typeSel.selectedOptions[0]?.textContent || '').toString().trim();
+        const colorLabel = (getColorLabel() || '').toString().trim();
+        const rawSizeLabel = sizeSel.selectedOptions[0]?.dataset?.label || sizeSel.selectedOptions[0]?.textContent || '';
+        const sizeLabel = (rawSizeLabel || size || '').toString().trim();
         const price_ctx = {product_id: sel.pid, type: sel.type, color: sel.color, size};
-        const meta = {width_mm:300, height_mm:400, dpi:300, product_id: sel.pid, attributes_json:{pa_type: sel.type, pa_color: sel.color, pa_size: size}, price_ctx};
+        if (typeLabel) price_ctx.type_label = typeLabel;
+        if (colorLabel) price_ctx.color_label = colorLabel;
+        if (sizeLabel) price_ctx.size_label = sizeLabel;
+        const attributes_json = {pa_type: sel.type, pa_color: sel.color, pa_size: size};
+        if (typeLabel) attributes_json.type_label = typeLabel;
+        if (colorLabel) attributes_json.color_label = colorLabel;
+        if (sizeLabel) attributes_json.size_label = sizeLabel;
+        const meta = {width_mm:300, height_mm:400, dpi:300, product_id: sel.pid, attributes_json, price_ctx};
         const res = await fetch(NB_DESIGNER.rest + 'save', {
           method:'POST',
           headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
