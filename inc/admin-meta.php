@@ -92,6 +92,26 @@ add_action('woocommerce_admin_order_data_after_order_details', function($order){
     if ($block !== ''){
       $blocks[] = $block;
     }
+
+    if (! empty($summary) || $download_link){
+      echo '<div class="nb-order-design__details">';
+
+      if (! empty($summary)){
+        echo '<ul class="nb-order-design__attributes">';
+        foreach ($summary as $row){
+          echo '<li><strong>'.esc_html($row['label']).':</strong> <span>'.esc_html($row['value']).'</span></li>';
+        }
+        echo '</ul>';
+      }
+
+      if ($download_link){
+        echo '<p class="nb-order-design__download">'.$download_link.'</p>';
+      }
+
+      echo '</div>';
+    }
+
+    echo '</div>';
   }
 
   if (empty($blocks)){
