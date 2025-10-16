@@ -48,15 +48,27 @@ if ( ! function_exists('nb_get_design_price_context') ) {
 
 if ( ! function_exists('nb_detect_attribute_group_from_key') ) {
   function nb_detect_attribute_group_from_key($key){
-    $key = is_string($key) ? strtolower(trim($key)) : '';
+    if (is_string($key)){
+      $normalized = trim($key);
+      if ($normalized === ''){
+        return '';
+      }
+      if (function_exists('remove_accents')){
+        $normalized = remove_accents($normalized);
+      }
+      $key = strtolower($normalized);
+    } else {
+      $key = '';
+    }
+
     if ($key === ''){
       return '';
     }
 
     $groups = [
-      'type'  => ['type', 'nb_type', 'termektipus', 'product_type'],
-      'color' => ['color', 'colour', 'szin', 'nb_color'],
-      'size'  => ['size', 'meret', 'nb_size'],
+      'type'  => ['type', 'nb_type', 'termektipus', 'termek_tipus', 'product_type', 'tipus'],
+      'color' => ['color', 'colour', 'szin', 'nb_color', 'colorway'],
+      'size'  => ['size', 'meret', 'nb_size', 'ruhameret'],
     ];
 
     foreach ($groups as $group => $fragments){
@@ -127,7 +139,13 @@ if ( ! function_exists('nb_designer_normalize_type_key') ) {
       return '';
     }
     $string = trim((string)$value);
-    return $string === '' ? '' : strtolower($string);
+    if ($string === ''){
+      return '';
+    }
+    if (function_exists('remove_accents')){
+      $string = remove_accents($string);
+    }
+    return strtolower($string);
   }
 }
 
@@ -140,7 +158,13 @@ if ( ! function_exists('nb_designer_normalize_color_key') ) {
       return '';
     }
     $string = trim((string)$value);
-    return $string === '' ? '' : strtolower($string);
+    if ($string === ''){
+      return '';
+    }
+    if (function_exists('remove_accents')){
+      $string = remove_accents($string);
+    }
+    return strtolower($string);
   }
 }
 
@@ -323,9 +347,9 @@ if ( ! function_exists('nb_collect_item_attribute_candidates') ) {
     }
 
     $keys = [
-      'type'  => ['attribute_pa_type', 'attribute_type', 'pa_type', 'type', 'type_label', '_nb_attr_type_label', 'nb_attr_type_label'],
-      'color' => ['attribute_pa_color', 'attribute_color', 'pa_color', 'color', 'color_label', '_nb_attr_color_label', 'nb_attr_color_label'],
-      'size'  => ['attribute_pa_size', 'attribute_size', 'pa_size', 'size', 'size_label', '_nb_attr_size_label', 'nb_attr_size_label'],
+      'type'  => ['_nb_attr_type_label', 'nb_attr_type_label', 'type_label', 'type_display', 'attribute_type', 'attribute_pa_type', 'attribute_pa_termektipus', 'attribute_termektipus', 'attribute_tipus', 'pa_type', 'pa_termektipus', 'type', 'termektipus', 'termek_tipus', 'tipus'],
+      'color' => ['_nb_attr_color_label', 'nb_attr_color_label', 'color_label', 'color_display', 'color_name', 'attribute_color', 'attribute_pa_color', 'attribute_pa_szin', 'attribute_szin', 'pa_color', 'pa_szin', 'color', 'colour', 'szin', 'szin_kod'],
+      'size'  => ['_nb_attr_size_label', 'nb_attr_size_label', 'size_label', 'size_display', 'size_name', 'attribute_size', 'attribute_pa_size', 'attribute_pa_meret', 'attribute_meret', 'pa_size', 'pa_meret', 'size', 'meret', 'ruhameret'],
     ];
 
     $found = [];
@@ -394,9 +418,9 @@ if ( ! function_exists('nb_collect_price_ctx_attribute_candidates') ) {
     }
 
     $map = [
-      'type'  => ['type', 'type_label', 'typelabel', 'type_name', 'typename', 'typekey', 'pa_type'],
-      'color' => ['color', 'colour', 'color_label', 'colour_label', 'colorname', 'colourname', 'pa_color'],
-      'size'  => ['size', 'size_label', 'sizelabel', 'size_name', 'sizename', 'pa_size'],
+      'type'  => ['type', 'type_label', 'typelabel', 'type_name', 'typename', 'typekey', 'pa_type', 'termektipus', 'pa_termektipus', 'tipus'],
+      'color' => ['color', 'colour', 'color_label', 'colour_label', 'colorname', 'colourname', 'color_display', 'color_name', 'pa_color', 'szin', 'szin_label', 'pa_szin'],
+      'size'  => ['size', 'size_label', 'sizelabel', 'size_name', 'sizename', 'size_display', 'pa_size', 'meret', 'pa_meret'],
     ];
 
     $found = [];
@@ -442,9 +466,9 @@ if ( ! function_exists('nb_collect_design_attribute_candidates') ) {
     }
 
     $map = [
-      'type'  => ['pa_type', 'type'],
-      'color' => ['pa_color', 'color'],
-      'size'  => ['pa_size', 'size'],
+      'type'  => ['pa_type', 'type', 'type_label', 'type_display', 'termektipus', 'pa_termektipus', 'tipus'],
+      'color' => ['pa_color', 'color', 'color_label', 'color_display', 'pa_szin', 'szin'],
+      'size'  => ['pa_size', 'size', 'size_label', 'size_display', 'pa_meret', 'meret'],
     ];
 
     $found = [];
@@ -488,14 +512,14 @@ if ( ! function_exists('nb_get_design_attribute_summary') ) {
     $resolved_raw = [];
     foreach ($map as $key => $config){
       $merged_candidates = array_merge(
+        $item_candidates[$key]   ?? [],
         $ctx_candidates[$key]    ?? [],
-        $design_candidates[$key] ?? [],
-        $item_candidates[$key]   ?? []
+        $design_candidates[$key] ?? []
       );
 
       if (isset($extra_candidates[$key])){
         $extra_list = nb_normalize_attribute_candidates($extra_candidates[$key]);
-        $merged_candidates = array_merge($merged_candidates, $extra_list);
+        $merged_candidates = array_merge($extra_list, $merged_candidates);
       }
 
       if (empty($merged_candidates)){
