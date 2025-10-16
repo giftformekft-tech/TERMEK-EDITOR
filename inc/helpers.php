@@ -1,17 +1,33 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
+if ( ! function_exists('nb_utf8_strtolower') ) {
+  function nb_utf8_strtolower($value){
+    if ($value === null) return '';
+    $string = (string)$value;
+    if ($string === '') return '';
+    if (function_exists('mb_strtolower')) {
+      return mb_strtolower($string, 'UTF-8');
+    }
+    return strtolower($string);
+  }
+}
+
 if ( ! function_exists('nb_normalize_type_key') ) {
   function nb_normalize_type_key($value){
     if ($value === null) return '';
-    return strtolower(trim((string)$value));
+    $string = trim((string)$value);
+    if ($string === '') return '';
+    return nb_utf8_strtolower($string);
   }
 }
 
 if ( ! function_exists('nb_normalize_color_key') ) {
   function nb_normalize_color_key($value){
     if ($value === null) return '';
-    return strtolower(trim((string)$value));
+    $string = trim((string)$value);
+    if ($string === '') return '';
+    return nb_utf8_strtolower($string);
   }
 }
 

@@ -202,9 +202,12 @@ function nb_admin_render(){
         $colorsByType = $catalog[$pid]['colors_by_type'] ?? [];
         foreach ($catalog[$pid]['types'] as $type){
           $typeKey = nb_normalize_type_key($type);
+          if ($typeKey === '') continue;
           $colorList = $colorsByType[$typeKey] ?? [];
           foreach ($colorList as $color){
-            $key = strtolower($type).'|'.strtolower($color);
+            $colorKey = nb_normalize_color_key($color);
+            if ($colorKey === '') continue;
+            $key = $typeKey.'|'.$colorKey;
             $hash = md5($key);
             $catalog[$pid]['map'][$key] = [
               'mockup_index' => intval($_POST['mockup_'.$pid.'_'.$hash] ?? -1),
