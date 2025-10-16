@@ -329,13 +329,30 @@ if ( ! function_exists('nb_normalize_attribute_candidates') ) {
       $values = [$values];
     }
     foreach ($values as $value){
-      if (is_scalar($value)){
-        $clean = trim((string)$value);
-        if ($clean !== '' && ! in_array($clean, $list, true)){
-          $list[] = $clean;
-        }
+      if (! is_scalar($value)){
+        continue;
+      }
+
+      $string = (string)$value;
+      if (function_exists('wp_unslash')){
+        $string = wp_unslash($string);
+      }
+
+      if (function_exists('nb_clean_label_string')){
+        $clean = nb_clean_label_string($string);
+      } else {
+        $clean = trim($string);
+      }
+
+      if ($clean === ''){
+        continue;
+      }
+
+      if (! in_array($clean, $list, true)){
+        $list[] = $clean;
       }
     }
+
     return $list;
   }
 }
