@@ -1,16 +1,6 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
-function nb_normalize_type_key($value){
-  if ($value === null) return '';
-  return strtolower(trim((string)$value));
-}
-
-function nb_normalize_color_key($value){
-  if ($value === null) return '';
-  return strtolower(trim((string)$value));
-}
-
 function nb_sync_product_color_configuration(&$cfg, $settings){
   if (!is_array($cfg)) $cfg = [];
   $existingColors = [];
@@ -99,12 +89,21 @@ add_action('admin_menu', function(){
 function nb_admin_render(){
   if ( ! current_user_can('manage_options') ) return;
   $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'products';
-  $settings = get_option('nb_settings',[]);
+  $stored = get_option('nb_settings',[]);
+  $settings = is_array($stored) ? $stored : [];
+  $cleaned = nb_clean_settings_unicode($settings);
+  if (wp_json_encode($cleaned) !== wp_json_encode($settings)){
+    $settings = $cleaned;
+    update_option('nb_settings', $settings);
+  } else {
+    $settings = $cleaned;
+  }
   if ($_SERVER['REQUEST_METHOD']==='POST' && check_admin_referer('nb_save','nb_nonce')){
     if ($tab==='products'){
       $settings['products'] = array_map('intval', $_POST['products'] ?? []);
-      $types_csv = sanitize_text_field($_POST['types'] ?? '');
-      $types = array_values(array_filter(array_map('trim', explode(',', $types_csv))));
+      $types_input = isset($_POST['types']) ? wp_unslash($_POST['types']) : '';
+      $types_csv = sanitize_text_field($types_input);
+      $types = nb_clean_label_list(array_map('trim', explode(',', $types_csv)));
       if (!empty($types)) $settings['types'] = $types;
       if (!isset($settings['catalog'])) $settings['catalog'] = [];
       foreach($settings['products'] as $pid){
@@ -118,7 +117,8 @@ function nb_admin_render(){
       $decoded = json_decode($mockups_json, true);
       if (is_array($decoded)) $settings['mockups'] = $decoded;
     } elseif ($tab==='fonts'){
-      $settings['fonts'] = array_values(array_filter(array_map('esc_url_raw', $_POST['fonts'] ?? [])));
+      $fontInputs = isset($_POST['fonts']) ? array_map('wp_unslash', (array)$_POST['fonts']) : [];
+      $settings['fonts'] = array_values(array_filter(array_map('esc_url_raw', $fontInputs)));
     } elseif ($tab==='pricing'){
       $settings['fee_per_cm2'] = isset($_POST['fee_per_cm2']) ? floatval($_POST['fee_per_cm2']) : 3;
       $settings['min_fee']     = isset($_POST['min_fee']) ? floatval($_POST['min_fee']) : 990;
@@ -179,12 +179,15 @@ function nb_admin_render(){
       $pids = array_map('intval', $_POST['var_pid'] ?? []);
       foreach($pids as $idx=>$pid){
         if (!isset($catalog[$pid])) $catalog[$pid]=['title'=>get_the_title($pid),'types'=>[],'colors'=>[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
-        $types_csv  = sanitize_text_field($_POST['types_'.$pid] ?? '');
-        $sizes_csv  = sanitize_text_field($_POST['sizes_'.$pid] ?? '');
-        $catalog[$pid]['types']  = array_values(array_filter(array_map('trim', explode(',', $types_csv))));
-        $catalog[$pid]['sizes']  = array_values(array_filter(array_map('trim', explode(',', $sizes_csv))));
+        $types_input = isset($_POST['types_'.$pid]) ? wp_unslash($_POST['types_'.$pid]) : '';
+        $sizes_input = isset($_POST['sizes_'.$pid]) ? wp_unslash($_POST['sizes_'.$pid]) : '';
+        $types_csv  = sanitize_text_field($types_input);
+        $sizes_csv  = sanitize_text_field($sizes_input);
+        $catalog[$pid]['types']  = nb_clean_label_list(array_map('trim', explode(',', $types_csv)));
+        $catalog[$pid]['sizes']  = nb_clean_label_list(array_map('trim', explode(',', $sizes_csv)));
         // size surcharge parse "XL:300,XXL:600"
-        $ss_csv = sanitize_text_field($_POST['size_surcharge_'.$pid] ?? '');
+        $ss_input = isset($_POST['size_surcharge_'.$pid]) ? wp_unslash($_POST['size_surcharge_'.$pid]) : '';
+        $ss_csv = sanitize_text_field($ss_input);
         $ss = [];
         foreach (explode(',', $ss_csv) as $pair){
           $pair = trim($pair);
@@ -199,9 +202,12 @@ function nb_admin_render(){
         $colorsByType = $catalog[$pid]['colors_by_type'] ?? [];
         foreach ($catalog[$pid]['types'] as $type){
           $typeKey = nb_normalize_type_key($type);
+          if ($typeKey === '') continue;
           $colorList = $colorsByType[$typeKey] ?? [];
           foreach ($colorList as $color){
-            $key = strtolower($type).'|'.strtolower($color);
+            $colorKey = nb_normalize_color_key($color);
+            if ($colorKey === '') continue;
+            $key = $typeKey.'|'.$colorKey;
             $hash = md5($key);
             $catalog[$pid]['map'][$key] = [
               'mockup_index' => intval($_POST['mockup_'.$pid.'_'.$hash] ?? -1),
@@ -213,6 +219,13 @@ function nb_admin_render(){
         }
       }
       $settings['catalog'] = $catalog;
+    }
+    $settings = nb_clean_settings_unicode($settings);
+    if (isset($settings['catalog']) && is_array($settings['catalog'])){
+      foreach ($settings['catalog'] as &$catalogCfg){
+        nb_sync_product_color_configuration($catalogCfg, $settings);
+      }
+      unset($catalogCfg);
     }
     update_option('nb_settings',$settings);
     echo '<div class="updated"><p>Mentve.</p></div>';
