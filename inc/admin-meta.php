@@ -29,15 +29,50 @@ if ( ! function_exists('nb_render_design_download_link') ) {
   }
 }
 
-if ( ! function_exists('nb_get_design_price_context') ) {
-  function nb_get_design_price_context($design_id){
+if ( ! function_exists('nb_admin_trim_string') ) {
+  function nb_admin_trim_string($value){
+    if (is_string($value)){
+      return trim($value);
+    }
+    if (is_numeric($value)){
+      return trim((string)$value);
+    }
+    if (is_object($value) && method_exists($value, '__toString')){
+      return trim((string)$value);
+    }
+    return '';
+  }
+}
+
+if ( ! function_exists('nb_admin_unique_strings') ) {
+  function nb_admin_unique_strings($values){
+    $list = [];
+    foreach ((array)$values as $value){
+      $clean = nb_admin_trim_string($value);
+      if ($clean === ''){
+        continue;
+      }
+      if (! in_array($clean, $list, true)){
+        $list[] = $clean;
+      }
+    }
+    return $list;
+  }
+}
+
+if ( ! function_exists('nb_admin_decode_design_json') ) {
+  function nb_admin_decode_design_json($design_id, $meta_key){
     $design_id = intval($design_id);
     if (! $design_id){
       return [];
     }
 
-    $raw = get_post_meta($design_id, 'price_ctx', true);
-    if (! $raw){
+    $raw = get_post_meta($design_id, $meta_key, true);
+    if (is_array($raw)){
+      return $raw;
+    }
+
+    if (! is_string($raw) || $raw === ''){
       return [];
     }
 
@@ -46,76 +81,9 @@ if ( ! function_exists('nb_get_design_price_context') ) {
   }
 }
 
-if ( ! function_exists('nb_detect_attribute_group_from_key') ) {
-  function nb_detect_attribute_group_from_key($key){
-    if (is_string($key)){
-      $normalized = trim($key);
-      if ($normalized === ''){
-        return '';
-      }
-      if (function_exists('remove_accents')){
-        $normalized = remove_accents($normalized);
-      }
-      $key = strtolower($normalized);
-    } else {
-      $key = '';
-    }
-
-    if ($key === ''){
-      return '';
-    }
-
-    $groups = [
-      'type'  => ['type', 'nb_type', 'termektipus', 'termek_tipus', 'product_type', 'tipus'],
-      'color' => ['color', 'colour', 'szin', 'nb_color', 'colorway'],
-      'size'  => ['size', 'meret', 'nb_size', 'ruhameret'],
-    ];
-
-    foreach ($groups as $group => $fragments){
-      foreach ($fragments as $fragment){
-        if ($fragment === ''){
-          continue;
-        }
-        if (strpos($key, $fragment) !== false){
-          return $group;
-        }
-      }
-    }
-
-    return '';
-  }
-}
-
-if ( ! function_exists('nb_normalize_attribute_display') ) {
-  function nb_normalize_attribute_display($raw, $taxonomy, $product_id = 0){
-    $raw = is_string($raw) ? trim($raw) : '';
-    if ($raw === ''){
-      return '';
-    }
-
-    $candidates = array_unique(array_filter([$raw, sanitize_title($raw)]));
-
-    if ($taxonomy && taxonomy_exists($taxonomy)){
-      foreach ($candidates as $slug){
-        $term = get_term_by('slug', $slug, $taxonomy);
-        if ($term && ! is_wp_error($term)){
-          return $term->name;
-        }
-      }
-
-      if ($product_id && function_exists('wc_get_product_terms')){
-        $terms = wc_get_product_terms($product_id, $taxonomy, ['fields' => 'all']);
-        if (! is_wp_error($terms)){
-          foreach ($terms as $term){
-            if (in_array($term->slug, $candidates, true)){
-              return $term->name;
-            }
-          }
-        }
-      }
-    }
-
-    return $raw;
+if ( ! function_exists('nb_get_design_price_context') ) {
+  function nb_get_design_price_context($design_id){
+    return nb_admin_decode_design_json($design_id, 'price_ctx');
   }
 }
 
@@ -130,243 +98,159 @@ if ( ! function_exists('nb_designer_settings_cache') ) {
   }
 }
 
-if ( ! function_exists('nb_designer_normalize_type_key') ) {
-  function nb_designer_normalize_type_key($value){
-    if (function_exists('nb_normalize_type_key')){
-      return nb_normalize_type_key($value);
-    }
-    if ($value === null){
+if ( ! function_exists('nb_detect_attribute_group_from_key') ) {
+  function nb_detect_attribute_group_from_key($key){
+    $key = nb_admin_trim_string($key);
+    if ($key === ''){
       return '';
     }
-    $string = trim((string)$value);
-    if ($string === ''){
-      return '';
-    }
+
     if (function_exists('remove_accents')){
-      $string = remove_accents($string);
+      $key = remove_accents($key);
     }
-    return strtolower($string);
+
+    $key = strtolower($key);
+
+    if (strpos($key, 'termektipus') !== false || strpos($key, 'termek_tipus') !== false || strpos($key, 'tipus') !== false || strpos($key, 'type') !== false){
+      return 'type';
+    }
+    if (strpos($key, 'szin') !== false || strpos($key, 'colour') !== false || strpos($key, 'color') !== false || strpos($key, 'colorway') !== false){
+      return 'color';
+    }
+    if (strpos($key, 'meret') !== false || strpos($key, 'ruhameret') !== false || strpos($key, 'size') !== false){
+      return 'size';
+    }
+
+    return '';
   }
 }
 
-if ( ! function_exists('nb_designer_normalize_color_key') ) {
-  function nb_designer_normalize_color_key($value){
-    if (function_exists('nb_normalize_color_key')){
-      return nb_normalize_color_key($value);
+if ( ! function_exists('nb_admin_values_match') ) {
+  function nb_admin_values_match($a, $b){
+    $a = nb_admin_trim_string($a);
+    $b = nb_admin_trim_string($b);
+    if ($a === '' || $b === ''){
+      return false;
     }
-    if ($value === null){
-      return '';
+    if (strcasecmp($a, $b) === 0){
+      return true;
     }
-    $string = trim((string)$value);
-    if ($string === ''){
-      return '';
+
+    if (function_exists('sanitize_title')){
+      $slugA = sanitize_title($a);
+      $slugB = sanitize_title($b);
+      if ($slugA !== '' && $slugA === $slugB){
+        return true;
+      }
     }
+
     if (function_exists('remove_accents')){
-      $string = remove_accents($string);
+      $plainA = strtolower(remove_accents($a));
+      $plainB = strtolower(remove_accents($b));
+      if ($plainA !== '' && $plainA === $plainB){
+        return true;
+      }
     }
-    return strtolower($string);
+
+    return false;
   }
 }
 
-if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
-  function nb_translate_attribute_value_from_catalog($group, $value, $product_id = 0, $context = []){
-    $value = is_string($value) ? trim($value) : '';
+if ( ! function_exists('nb_admin_label_from_catalog') ) {
+  function nb_admin_label_from_catalog($group, $value, $product_id){
+    $value = nb_admin_trim_string($value);
     if ($value === ''){
       return '';
     }
 
-    $selected = $context['selected'] ?? $value;
-    $selected = is_string($selected) ? trim($selected) : '';
-    if ($selected === ''){
-      $selected = $value;
-    }
-
-    $resolved_raw = [];
-    if (! empty($context['resolved_raw']) && is_array($context['resolved_raw'])){
-      $resolved_raw = $context['resolved_raw'];
-    }
-
-    $price_ctx = [];
-    if (! empty($context['price_ctx']) && is_array($context['price_ctx'])){
-      $price_ctx = $context['price_ctx'];
-    }
-
     $settings = nb_designer_settings_cache();
     $catalog = isset($settings['catalog']) && is_array($settings['catalog']) ? $settings['catalog'] : [];
-    $cfg = null;
+
+    $lists = [];
     if ($product_id && isset($catalog[$product_id]) && is_array($catalog[$product_id])){
       $cfg = $catalog[$product_id];
+      switch ($group){
+        case 'type':
+          if (!empty($cfg['types']) && is_array($cfg['types'])){
+            $lists[] = $cfg['types'];
+          }
+          break;
+        case 'color':
+          if (!empty($cfg['colors']) && is_array($cfg['colors'])){
+            $lists[] = $cfg['colors'];
+          }
+          if (!empty($cfg['colors_by_type']) && is_array($cfg['colors_by_type'])){
+            foreach ($cfg['colors_by_type'] as $colorList){
+              if (is_array($colorList) && !empty($colorList)){
+                $lists[] = $colorList;
+              }
+            }
+          }
+          break;
+        case 'size':
+          if (!empty($cfg['sizes']) && is_array($cfg['sizes'])){
+            $lists[] = $cfg['sizes'];
+          }
+          break;
+      }
     }
 
-    if ($group === 'type'){
-      $candidates = [];
-      if ($cfg && ! empty($cfg['types']) && is_array($cfg['types'])){
-        $candidates[] = $cfg['types'];
-      }
-      if (! empty($settings['types']) && is_array($settings['types'])){
-        $candidates[] = $settings['types'];
-      }
-      $normalizedSelected = nb_designer_normalize_type_key($selected);
-      if (! empty($price_ctx['type_label'])){
-        $label = trim((string)$price_ctx['type_label']);
-        if ($label !== ''){
+    if ($group === 'type' && !empty($settings['types']) && is_array($settings['types'])){
+      $lists[] = $settings['types'];
+    }
+    if ($group === 'color' && !empty($settings['color_palette']) && is_array($settings['color_palette'])){
+      $lists[] = $settings['color_palette'];
+    }
+
+    foreach ($lists as $list){
+      foreach ($list as $option){
+        $label = '';
+        if (is_array($option)){
+          $label = nb_admin_trim_string($option['label'] ?? $option['name'] ?? '');
+        } else {
+          $label = nb_admin_trim_string($option);
+        }
+        if ($label === ''){
+          continue;
+        }
+        if (nb_admin_values_match($label, $value)){
           return $label;
         }
       }
-      foreach ($candidates as $list){
-        foreach ($list as $label){
-          $label = is_string($label) ? trim($label) : '';
-          if ($label === ''){
-            continue;
-          }
-          if (strcasecmp($value, $label) === 0){
-            return $label;
-          }
-          if ($normalizedSelected !== '' && nb_designer_normalize_type_key($label) === $normalizedSelected){
-            return $label;
-          }
-        }
-      }
-      return $value;
     }
 
-    if ($group === 'color'){
-      $normalizedSelected = nb_designer_normalize_color_key($selected);
-      if (! empty($price_ctx['color_label'])){
-        $label = trim((string)$price_ctx['color_label']);
-        if ($label !== ''){
-          return $label;
-        }
-      }
-
-      $typeKey = '';
-      if (! empty($resolved_raw['type'])){
-        $typeKey = nb_designer_normalize_type_key($resolved_raw['type']);
-      }
-      if ($typeKey === '' && ! empty($price_ctx['type'])){
-        $typeKey = nb_designer_normalize_type_key($price_ctx['type']);
-      }
-
-      $candidateLists = [];
-      if ($cfg){
-        if ($typeKey && ! empty($cfg['colors_by_type'][$typeKey]) && is_array($cfg['colors_by_type'][$typeKey])){
-          $candidateLists[] = $cfg['colors_by_type'][$typeKey];
-        }
-        if (! empty($cfg['colors']) && is_array($cfg['colors'])){
-          $candidateLists[] = $cfg['colors'];
-        }
-      }
-      if (! empty($settings['color_palette']) && is_array($settings['color_palette'])){
-        $candidateLists[] = $settings['color_palette'];
-      }
-
-      foreach ($candidateLists as $list){
-        foreach ($list as $label){
-          $label = is_string($label) ? trim($label) : '';
-          if ($label === ''){
-            continue;
-          }
-          if (strcasecmp($value, $label) === 0){
-            return $label;
-          }
-          if ($normalizedSelected !== '' && nb_designer_normalize_color_key($label) === $normalizedSelected){
-            return $label;
-          }
-        }
-      }
-
-      return $value;
-    }
-
-    if ($group === 'size'){
-      if (! empty($price_ctx['size_label'])){
-        $label = trim((string)$price_ctx['size_label']);
-        if ($label !== ''){
-          return $label;
-        }
-      }
-
-      $normalizedSelected = strtolower($selected);
-      $candidateLists = [];
-      if ($cfg && ! empty($cfg['sizes']) && is_array($cfg['sizes'])){
-        $candidateLists[] = $cfg['sizes'];
-      }
-      if (! empty($settings['catalog']) && is_array($settings['catalog'])){
-        foreach ($settings['catalog'] as $entry){
-          if (! is_array($entry) || empty($entry['sizes']) || ! is_array($entry['sizes'])){
-            continue;
-          }
-          $candidateLists[] = $entry['sizes'];
-        }
-      }
-
-      foreach ($candidateLists as $list){
-        foreach ($list as $label){
-          $label = is_string($label) ? trim($label) : '';
-          if ($label === ''){
-            continue;
-          }
-          if (strcasecmp($value, $label) === 0){
-            return $label;
-          }
-          if ($normalizedSelected !== '' && strtolower($label) === $normalizedSelected){
-            return $label;
-          }
-        }
-      }
-
-      return $value;
-    }
-
-    return $value;
+    return '';
   }
 }
 
-if ( ! function_exists('nb_normalize_attribute_candidates') ) {
-  function nb_normalize_attribute_candidates($values){
-    $list = [];
-    if (! is_array($values)){
-      $values = [$values];
+if ( ! function_exists('nb_admin_collect_item_values') ) {
+  function nb_admin_collect_item_values($item, $groups){
+    $results = [];
+    foreach ($groups as $group => $config){
+      $results[$group] = [
+        'labels' => [],
+        'values' => [],
+      ];
     }
-    foreach ($values as $value){
-      if (is_scalar($value)){
-        $clean = trim((string)$value);
-        if ($clean !== '' && ! in_array($clean, $list, true)){
-          $list[] = $clean;
-        }
-      }
-    }
-    return $list;
-  }
-}
 
-if ( ! function_exists('nb_collect_item_attribute_candidates') ) {
-  function nb_collect_item_attribute_candidates($item){
     if (! $item || ! is_object($item) || ! method_exists($item, 'get_meta')){
-      return [];
+      return $results;
     }
 
-    $keys = [
-      'type'  => ['_nb_attr_type_label', 'nb_attr_type_label', 'type_label', 'type_display', 'attribute_type', 'attribute_pa_type', 'attribute_pa_termektipus', 'attribute_termektipus', 'attribute_tipus', 'pa_type', 'pa_termektipus', 'type', 'termektipus', 'termek_tipus', 'tipus'],
-      'color' => ['_nb_attr_color_label', 'nb_attr_color_label', 'color_label', 'color_display', 'color_name', 'attribute_color', 'attribute_pa_color', 'attribute_pa_szin', 'attribute_szin', 'pa_color', 'pa_szin', 'color', 'colour', 'szin', 'szin_kod'],
-      'size'  => ['_nb_attr_size_label', 'nb_attr_size_label', 'size_label', 'size_display', 'size_name', 'attribute_size', 'attribute_pa_size', 'attribute_pa_meret', 'attribute_meret', 'pa_size', 'pa_meret', 'size', 'meret', 'ruhameret'],
-    ];
-
-    $found = [];
-    foreach ($keys as $group => $candidates){
-      foreach ($candidates as $meta_key){
+    foreach ($groups as $group => $config){
+      $meta_keys = isset($config['meta_keys']) && is_array($config['meta_keys']) ? $config['meta_keys'] : [];
+      $label_meta = isset($config['label_meta']) && is_array($config['label_meta']) ? $config['label_meta'] : [];
+      foreach ($meta_keys as $meta_key){
         $value = $item->get_meta($meta_key, true);
-        if (is_scalar($value)){
-          $value = trim((string)$value);
-          if ($value !== ''){
-            $found[$group][] = $value;
-          }
+        $clean = nb_admin_trim_string($value);
+        if ($clean === ''){
+          continue;
+        }
+        $results[$group]['values'][] = $clean;
+        if (in_array($meta_key, $label_meta, true) || strpos($meta_key, '_label') !== false || strpos($meta_key, '_nb_attr_') === 0){
+          $results[$group]['labels'][] = $clean;
         }
       }
-    }
-
-    foreach ($found as $group => $values){
-      $found[$group] = nb_normalize_attribute_candidates($values);
     }
 
     if (method_exists($item, 'get_meta_data')){
@@ -377,200 +261,223 @@ if ( ! function_exists('nb_collect_item_attribute_candidates') ) {
             continue;
           }
           $data = $meta_obj->get_data();
-          $meta_key = $data['key'] ?? '';
-          $meta_value = $data['value'] ?? '';
+          $meta_key = isset($data['key']) ? $data['key'] : '';
+          $meta_value = isset($data['value']) ? $data['value'] : '';
+          $clean = nb_admin_trim_string($meta_value);
+          if ($meta_key === '' || $clean === ''){
+            continue;
+          }
           $group = nb_detect_attribute_group_from_key($meta_key);
-          if (! $group){
+          if ($group === '' || ! isset($results[$group])){
             continue;
           }
-          if (! is_scalar($meta_value)){
-            continue;
-          }
-          $clean = trim((string)$meta_value);
-          if ($clean === ''){
-            continue;
-          }
-          if (! isset($found[$group])){
-            $found[$group] = [];
-          }
-          if (! in_array($clean, $found[$group], true)){
-            $found[$group][] = $clean;
+          $results[$group]['values'][] = $clean;
+          if (strpos($meta_key, 'label') !== false || strpos($meta_key, '_nb_attr_') === 0){
+            $results[$group]['labels'][] = $clean;
           }
         }
       }
     }
 
-    return $found;
+    foreach ($results as $group => $data){
+      $results[$group]['labels'] = nb_admin_unique_strings($data['labels']);
+      $results[$group]['values'] = nb_admin_unique_strings(array_merge($data['labels'], $data['values']));
+    }
+
+    return $results;
   }
 }
 
-if ( ! function_exists('nb_collect_price_ctx_attribute_candidates') ) {
-  function nb_collect_price_ctx_attribute_candidates($ctx){
-    if (! is_array($ctx)){
-      return [];
+if ( ! function_exists('nb_admin_collect_from_array') ) {
+  function nb_admin_collect_from_array($source, $group){
+    $result = ['labels' => [], 'values' => []];
+    if (! is_array($source)){
+      return $result;
     }
 
-    $sources = [$ctx];
-    foreach (['selection', 'attributes', 'options'] as $nested_key){
-      if (isset($ctx[$nested_key]) && is_array($ctx[$nested_key])){
-        $sources[] = $ctx[$nested_key];
+    foreach ($source as $key => $value){
+      $normalized_key = nb_admin_trim_string($key);
+      if ($normalized_key === ''){
+        continue;
       }
-    }
-
-    $map = [
-      'type'  => ['type', 'type_label', 'typelabel', 'type_name', 'typename', 'typekey', 'pa_type', 'termektipus', 'pa_termektipus', 'tipus'],
-      'color' => ['color', 'colour', 'color_label', 'colour_label', 'colorname', 'colourname', 'color_display', 'color_name', 'pa_color', 'szin', 'szin_label', 'pa_szin'],
-      'size'  => ['size', 'size_label', 'sizelabel', 'size_name', 'sizename', 'size_display', 'pa_size', 'meret', 'pa_meret'],
-    ];
-
-    $found = [];
-    foreach ($sources as $source){
-      foreach ($map as $group => $keys){
-        foreach ($keys as $candidate){
-          if (! is_string($candidate) || $candidate === ''){
-            continue;
-          }
-          if (array_key_exists($candidate, $source)){
-            $found[$group][] = $source[$candidate];
-          }
-        }
+      $normalized_key_lower = strtolower($normalized_key);
+      $detected_group = nb_detect_attribute_group_from_key($normalized_key_lower);
+      if ($detected_group !== $group){
+        continue;
       }
-      foreach ($source as $k => $value){
-        $group = nb_detect_attribute_group_from_key($k);
-        if (! $group){
+
+      $values = is_array($value) ? $value : [$value];
+      foreach ($values as $entry){
+        $clean = nb_admin_trim_string($entry);
+        if ($clean === ''){
           continue;
         }
-        $found[$group][] = $value;
-      }
-    }
-
-    foreach ($found as $group => $values){
-      $found[$group] = nb_normalize_attribute_candidates($values);
-    }
-
-    return $found;
-  }
-}
-
-if ( ! function_exists('nb_collect_design_attribute_candidates') ) {
-  function nb_collect_design_attribute_candidates($design_id){
-    $design_id = intval($design_id);
-    if (! $design_id){
-      return [];
-    }
-
-    $raw = get_post_meta($design_id, 'attributes_json', true);
-    $decoded = json_decode($raw, true);
-    if (! is_array($decoded)){
-      $decoded = [];
-    }
-
-    $map = [
-      'type'  => ['pa_type', 'type', 'type_label', 'type_display', 'termektipus', 'pa_termektipus', 'tipus'],
-      'color' => ['pa_color', 'color', 'color_label', 'color_display', 'pa_szin', 'szin'],
-      'size'  => ['pa_size', 'size', 'size_label', 'size_display', 'pa_meret', 'meret'],
-    ];
-
-    $found = [];
-    foreach ($map as $key => $candidates){
-      foreach ($candidates as $candidate){
-        if (array_key_exists($candidate, $decoded)){
-          $found[$key][] = $decoded[$candidate];
+        $result['values'][] = $clean;
+        if (strpos($normalized_key_lower, 'label') !== false || strpos($normalized_key_lower, '_display') !== false){
+          $result['labels'][] = $clean;
         }
       }
     }
 
-    foreach ($found as $group => $values){
-      $found[$group] = nb_normalize_attribute_candidates($values);
+    $result['labels'] = nb_admin_unique_strings($result['labels']);
+    $result['values'] = nb_admin_unique_strings(array_merge($result['labels'], $result['values']));
+    return $result;
+  }
+}
+
+if ( ! function_exists('nb_admin_resolve_attribute_label') ) {
+  function nb_admin_resolve_attribute_label($group, $labels, $values, $product_id, $taxonomy = ''){
+    $labels = nb_admin_unique_strings($labels);
+    $values = nb_admin_unique_strings($values);
+
+    if (! empty($labels)){
+      return $labels[0];
     }
 
-    return $found;
+    $taxonomy = nb_admin_trim_string($taxonomy);
+
+    foreach ($values as $candidate){
+      if ($candidate === ''){
+        continue;
+      }
+
+      if ($taxonomy && taxonomy_exists($taxonomy)){
+        $slug = function_exists('sanitize_title') ? sanitize_title($candidate) : $candidate;
+        if ($slug !== ''){
+          $term = get_term_by('slug', $slug, $taxonomy);
+          if ($term && ! is_wp_error($term)){
+            return $term->name;
+          }
+        }
+        $term = get_term_by('name', $candidate, $taxonomy);
+        if ($term && ! is_wp_error($term)){
+          return $term->name;
+        }
+        if ($product_id && function_exists('wc_get_product_terms')){
+          $terms = wc_get_product_terms($product_id, $taxonomy, ['fields' => 'all']);
+          if (! is_wp_error($terms)){
+            foreach ($terms as $term){
+              if (nb_admin_values_match($term->slug, $candidate) || nb_admin_values_match($term->name, $candidate)){
+                return $term->name;
+              }
+            }
+          }
+        }
+      }
+
+      $catalog_label = nb_admin_label_from_catalog($group, $candidate, $product_id);
+      if ($catalog_label !== ''){
+        return $catalog_label;
+      }
+
+      if (preg_match('/[\p{Lu}\s]/u', $candidate)){
+        return $candidate;
+      }
+    }
+
+    if (empty($values)){
+      return '';
+    }
+
+    $fallback = $values[0];
+    if ($group === 'size'){
+      return strtoupper($fallback);
+    }
+
+    if (function_exists('mb_convert_case')){
+      return mb_convert_case($fallback, MB_CASE_TITLE, 'UTF-8');
+    }
+
+    return ucfirst($fallback);
   }
 }
 
 if ( ! function_exists('nb_get_design_attribute_summary') ) {
   function nb_get_design_attribute_summary($design_id, $product_id = 0, $item = null, $extra_candidates = []){
     $ctx = nb_get_design_price_context($design_id);
-    $product_id = $product_id ? intval($product_id) : intval($ctx['product_id'] ?? 0);
+    $attributes = nb_admin_decode_design_json($design_id, 'attributes_json');
 
-    $ctx_candidates = nb_collect_price_ctx_attribute_candidates($ctx);
-
-    $design_candidates = nb_collect_design_attribute_candidates($design_id);
-    $item_candidates = nb_collect_item_attribute_candidates($item);
-
-    if (! is_array($extra_candidates)){
-      $extra_candidates = [];
+    if (! $product_id){
+      $product_id = intval($ctx['product_id'] ?? 0);
+    } else {
+      $product_id = intval($product_id);
     }
 
-    $map = [
-      'type'  => ['label' => __('Terméktípus','nb'), 'taxonomy' => 'pa_type'],
-      'color' => ['label' => __('Szín','nb'),         'taxonomy' => 'pa_color'],
-      'size'  => ['label' => __('Méret','nb'),        'taxonomy' => 'pa_size'],
+    $groups = [
+      'type'  => [
+        'label'      => __('Terméktípus','nb'),
+        'taxonomy'   => 'pa_type',
+        'meta_keys'  => ['_nb_attr_type_label', 'nb_attr_type_label', 'type_label', 'type_display', 'attribute_pa_type', 'attribute_type', 'attribute_pa_termektipus', 'attribute_termektipus', 'attribute_tipus', 'pa_type', 'pa_termektipus', 'type', 'termektipus', 'termek_tipus', 'tipus'],
+        'label_meta' => ['_nb_attr_type_label', 'nb_attr_type_label', 'type_label', 'type_display'],
+      ],
+      'color' => [
+        'label'      => __('Szín','nb'),
+        'taxonomy'   => 'pa_color',
+        'meta_keys'  => ['_nb_attr_color_label', 'nb_attr_color_label', 'color_label', 'color_display', 'color_name', 'attribute_color', 'attribute_pa_color', 'attribute_pa_szin', 'attribute_szin', 'pa_color', 'pa_szin', 'color', 'colour', 'szin', 'szin_kod'],
+        'label_meta' => ['_nb_attr_color_label', 'nb_attr_color_label', 'color_label', 'color_display', 'color_name'],
+      ],
+      'size'  => [
+        'label'      => __('Méret','nb'),
+        'taxonomy'   => 'pa_size',
+        'meta_keys'  => ['_nb_attr_size_label', 'nb_attr_size_label', 'size_label', 'size_display', 'size_name', 'attribute_size', 'attribute_pa_size', 'attribute_pa_meret', 'attribute_meret', 'pa_size', 'pa_meret', 'size', 'meret', 'ruhameret'],
+        'label_meta' => ['_nb_attr_size_label', 'nb_attr_size_label', 'size_label', 'size_display', 'size_name'],
+      ],
     ];
 
-    $summary = [];
-    $resolved_raw = [];
-    foreach ($map as $key => $config){
-      $merged_candidates = array_merge(
-        $item_candidates[$key]   ?? [],
-        $ctx_candidates[$key]    ?? [],
-        $design_candidates[$key] ?? []
-      );
+    $item_values = nb_admin_collect_item_values($item, $groups);
 
-      if (isset($extra_candidates[$key])){
-        $extra_list = nb_normalize_attribute_candidates($extra_candidates[$key]);
-        $merged_candidates = array_merge($extra_list, $merged_candidates);
+    $summary = [];
+    foreach ($groups as $group => $config){
+      $labels = [];
+      $values = [];
+
+      if (isset($item_values[$group])){
+        $labels = array_merge($labels, $item_values[$group]['labels']);
+        $values = array_merge($values, $item_values[$group]['values']);
       }
 
-      if (empty($merged_candidates)){
+      $ctx_sources = [$ctx];
+      if (isset($ctx['selection']) && is_array($ctx['selection'])){
+        $ctx_sources[] = $ctx['selection'];
+      }
+      if (isset($ctx['attributes']) && is_array($ctx['attributes'])){
+        $ctx_sources[] = $ctx['attributes'];
+      }
+      if (isset($ctx['options']) && is_array($ctx['options'])){
+        $ctx_sources[] = $ctx['options'];
+      }
+
+      foreach ($ctx_sources as $source){
+        $collected = nb_admin_collect_from_array($source, $group);
+        $labels = array_merge($labels, $collected['labels']);
+        $values = array_merge($values, $collected['values']);
+      }
+
+      $attribute_collected = nb_admin_collect_from_array($attributes, $group);
+      $labels = array_merge($labels, $attribute_collected['labels']);
+      $values = array_merge($values, $attribute_collected['values']);
+
+      if (isset($extra_candidates[$group])){
+        $values = array_merge($values, nb_admin_unique_strings($extra_candidates[$group]));
+      }
+
+      $values = nb_admin_unique_strings($values);
+      $labels = nb_admin_unique_strings($labels);
+
+      if (empty($values) && empty($labels)){
         continue;
       }
 
-      $candidates = [];
-      foreach ($merged_candidates as $candidate){
-        if (! in_array($candidate, $candidates, true)){
-          $candidates[] = $candidate;
-        }
+      $display_value = nb_admin_resolve_attribute_label($group, $labels, $values, $product_id, $config['taxonomy'] ?? '');
+      if ($display_value === ''){
+        continue;
       }
 
-      $value = '';
-      $selected_candidate = '';
-      foreach ($candidates as $candidate){
-        if ($candidate === ''){
-          continue;
-        }
-        if ($selected_candidate === ''){
-          $selected_candidate = $candidate;
-        }
-        $normalized = nb_normalize_attribute_display($candidate, $config['taxonomy'], $product_id);
-        if ($normalized !== ''){
-          $value = $normalized;
-          break;
-        }
-      }
-
-      if ($value === '' && $selected_candidate !== ''){
-        $value = $selected_candidate;
-      }
-
-      if ($value !== ''){
-        $display_value = nb_translate_attribute_value_from_catalog($key, $value, $product_id, [
-          'selected'    => $selected_candidate,
-          'resolved_raw'=> $resolved_raw,
-          'price_ctx'   => $ctx,
-        ]);
-
-        if ($display_value === ''){
-          $display_value = $value;
-        }
-
-        $summary[] = [
-          'key'   => $key,
-          'label' => $config['label'],
-          'value' => $display_value,
-        ];
-        $resolved_raw[$key] = $selected_candidate !== '' ? $selected_candidate : $value;
-      }
+      $summary[] = [
+        'key'   => $group,
+        'label' => $config['label'],
+        'value' => $display_value,
+      ];
     }
 
     return $summary;
@@ -687,7 +594,7 @@ add_action('admin_head', function(){
 
   echo '<style id="nb-order-design-admin-css">
 .nb-order-designs .nb-order-design{display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;}
-.nb-order-designs .nb-order-design__preview img{max-width:220px;height:auto;display:block;border:1px solid #ddd;border-radius:4px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.08);}
+.nb-order-designs .nb-order-design__preview img{max-width:220px;height:auto;display:block;border:1px solid #ddd;border-radius:4px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.08);} 
 .nb-order-designs .nb-order-design__details{flex:1;min-width:0;}
 .nb-order-designs .nb-order-design__attributes{margin:0 0 8px;padding:0;list-style:none;}
 .nb-order-designs .nb-order-design__attributes li{margin:0 0 6px;padding:0;font-size:13px;}
