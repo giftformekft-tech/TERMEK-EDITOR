@@ -54,4 +54,56 @@ add_action('woocommerce_checkout_create_order_line_item', function($item, $cart_
   if (!empty($values['print_url']))    $item->add_meta_data('print_url',$values['print_url']);
   if (!empty($values['print_width_px']))  $item->add_meta_data('print_width_px', intval($values['print_width_px']));
   if (!empty($values['print_height_px'])) $item->add_meta_data('print_height_px', intval($values['print_height_px']));
+
+  $design_id = intval($values['nb_design_id'] ?? 0);
+  if ($design_id && function_exists('nb_get_design_attribute_summary')){
+    $product_id = $item->get_product_id();
+    if (! $product_id && method_exists($item, 'get_product')){
+      $product = $item->get_product();
+      if ($product && is_a($product, 'WC_Product')){
+        $product_id = $product->get_id();
+      }
+    }
+
+    $extra_candidates = [];
+    if (! empty($values['variation']) && is_array($values['variation'])){
+      foreach ($values['variation'] as $meta_key => $meta_value){
+        if (! is_scalar($meta_value)){
+          continue;
+        }
+        if (! function_exists('nb_detect_attribute_group_from_key')){
+          continue;
+        }
+        $group = nb_detect_attribute_group_from_key($meta_key);
+        if (! $group){
+          continue;
+        }
+        $clean = trim((string)$meta_value);
+        if ($clean === ''){
+          continue;
+        }
+        if (! isset($extra_candidates[$group])){
+          $extra_candidates[$group] = [];
+        }
+        if (! in_array($clean, $extra_candidates[$group], true)){
+          $extra_candidates[$group][] = $clean;
+        }
+      }
+    }
+
+    $summary = nb_get_design_attribute_summary($design_id, $product_id, $item, $extra_candidates);
+    if (! empty($summary)){
+      foreach ($summary as $row){
+        if (empty($row['key']) || empty($row['value'])){
+          continue;
+        }
+        $meta_key = '_nb_attr_'.$row['key'].'_label';
+        if (method_exists($item, 'update_meta_data')){
+          $item->update_meta_data($meta_key, $row['value']);
+        } else {
+          $item->add_meta_data($meta_key, $row['value']);
+        }
+      }
+    }
+  }
 },10,4);
