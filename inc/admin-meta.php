@@ -79,14 +79,107 @@ if ( ! function_exists('nb_normalize_attribute_display') ) {
   }
 }
 
-if ( ! function_exists('nb_get_design_attribute_summary') ) {
-  function nb_get_design_attribute_summary($design_id, $product_id = 0){
-    $ctx = nb_get_design_price_context($design_id);
-    if (empty($ctx)){
+if ( ! function_exists('nb_normalize_attribute_candidates') ) {
+  function nb_normalize_attribute_candidates($values){
+    $list = [];
+    if (! is_array($values)){
+      $values = [$values];
+    }
+    foreach ($values as $value){
+      if (is_scalar($value)){
+        $clean = trim((string)$value);
+        if ($clean !== '' && ! in_array($clean, $list, true)){
+          $list[] = $clean;
+        }
+      }
+    }
+    return $list;
+  }
+}
+
+if ( ! function_exists('nb_collect_item_attribute_candidates') ) {
+  function nb_collect_item_attribute_candidates($item){
+    if (! $item || ! is_object($item) || ! method_exists($item, 'get_meta')){
       return [];
     }
 
+    $keys = [
+      'type'  => ['attribute_pa_type', 'attribute_type', 'pa_type', 'type'],
+      'color' => ['attribute_pa_color', 'attribute_color', 'pa_color', 'color'],
+      'size'  => ['attribute_pa_size', 'attribute_size', 'pa_size', 'size'],
+    ];
+
+    $found = [];
+    foreach ($keys as $group => $candidates){
+      foreach ($candidates as $meta_key){
+        $value = $item->get_meta($meta_key, true);
+        if (is_scalar($value)){
+          $value = trim((string)$value);
+          if ($value !== ''){
+            $found[$group][] = $value;
+          }
+        }
+      }
+    }
+
+    foreach ($found as $group => $values){
+      $found[$group] = nb_normalize_attribute_candidates($values);
+    }
+
+    return $found;
+  }
+}
+
+if ( ! function_exists('nb_collect_design_attribute_candidates') ) {
+  function nb_collect_design_attribute_candidates($design_id){
+    $design_id = intval($design_id);
+    if (! $design_id){
+      return [];
+    }
+
+    $raw = get_post_meta($design_id, 'attributes_json', true);
+    $decoded = json_decode($raw, true);
+    if (! is_array($decoded)){
+      $decoded = [];
+    }
+
+    $map = [
+      'type'  => ['pa_type', 'type'],
+      'color' => ['pa_color', 'color'],
+      'size'  => ['pa_size', 'size'],
+    ];
+
+    $found = [];
+    foreach ($map as $key => $candidates){
+      foreach ($candidates as $candidate){
+        if (array_key_exists($candidate, $decoded)){
+          $found[$key][] = $decoded[$candidate];
+        }
+      }
+    }
+
+    foreach ($found as $group => $values){
+      $found[$group] = nb_normalize_attribute_candidates($values);
+    }
+
+    return $found;
+  }
+}
+
+if ( ! function_exists('nb_get_design_attribute_summary') ) {
+  function nb_get_design_attribute_summary($design_id, $product_id = 0, $item = null){
+    $ctx = nb_get_design_price_context($design_id);
     $product_id = $product_id ? intval($product_id) : intval($ctx['product_id'] ?? 0);
+
+    $ctx_candidates = [];
+    foreach (['type','color','size'] as $key){
+      if (isset($ctx[$key])){
+        $ctx_candidates[$key] = nb_normalize_attribute_candidates($ctx[$key]);
+      }
+    }
+
+    $design_candidates = nb_collect_design_attribute_candidates($design_id);
+    $item_candidates = nb_collect_item_attribute_candidates($item);
 
     $map = [
       'type'  => ['label' => __('Terméktípus','nb'), 'taxonomy' => 'pa_type'],
@@ -96,7 +189,21 @@ if ( ! function_exists('nb_get_design_attribute_summary') ) {
 
     $summary = [];
     foreach ($map as $key => $config){
-      $value = nb_normalize_attribute_display($ctx[$key] ?? '', $config['taxonomy'], $product_id);
+      $candidates = array_merge(
+        $ctx_candidates[$key]   ?? [],
+        $design_candidates[$key]?? [],
+        $item_candidates[$key]  ?? []
+      );
+
+      $value = '';
+      foreach ($candidates as $candidate){
+        $normalized = nb_normalize_attribute_display($candidate, $config['taxonomy'], $product_id);
+        if ($normalized !== ''){
+          $value = $normalized;
+          break;
+        }
+      }
+
       if ($value !== ''){
         $summary[] = [
           'label' => $config['label'],
@@ -125,7 +232,7 @@ add_action('woocommerce_admin_order_data_after_order_details', function($order){
       continue;
     }
 
-    $summary = nb_get_design_attribute_summary($design_id, $item->get_product_id());
+    $summary = nb_get_design_attribute_summary($design_id, $item->get_product_id(), $item);
     $download_link = nb_render_design_download_link($preview, $design_id, $print);
 
     echo '<div class="nb-order-design">';
@@ -177,7 +284,7 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
   }
 
   $product_id = $product && is_a($product, 'WC_Product') ? $product->get_id() : 0;
-  $summary = nb_get_design_attribute_summary($design_id, $product_id);
+  $summary = nb_get_design_attribute_summary($design_id, $product_id, $item);
   $download_link = nb_render_design_download_link($preview, $design_id, $print);
 
   if (empty($summary) && ! $download_link){
