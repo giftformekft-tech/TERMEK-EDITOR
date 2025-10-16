@@ -120,11 +120,34 @@ if ( ! function_exists('nb_normalize_attribute_display') ) {
 }
 
 if ( ! function_exists('nb_designer_settings_cache') ) {
-  function nb_designer_settings_cache(){
+  function nb_designer_settings_cache($refresh = false){
     static $cache = null;
+    if ($refresh){
+      $cache = null;
+    }
     if ($cache === null){
-      $settings = get_option('nb_settings', []);
-      $cache = is_array($settings) ? $settings : [];
+      $stored = get_option('nb_settings', []);
+      $settings = is_array($stored) ? $stored : [];
+
+      if (function_exists('nb_clean_settings_unicode')){
+        $cleaned = nb_clean_settings_unicode($settings);
+        $encoder = function_exists('wp_json_encode') ? 'wp_json_encode' : 'json_encode';
+        if ($encoder($cleaned) !== $encoder($settings)){
+          $settings = $cleaned;
+          update_option('nb_settings', $settings);
+        } else {
+          $settings = $cleaned;
+        }
+      }
+
+      if (!empty($settings['catalog']) && is_array($settings['catalog']) && function_exists('nb_sync_product_color_configuration')){
+        foreach ($settings['catalog'] as &$catalogCfg){
+          nb_sync_product_color_configuration($catalogCfg, $settings);
+        }
+        unset($catalogCfg);
+      }
+
+      $cache = $settings;
     }
     return $cache;
   }
