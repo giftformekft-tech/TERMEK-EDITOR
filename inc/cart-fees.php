@@ -12,8 +12,8 @@ function nb_calc_fee_for_design($design_id){
 
   $price_ctx = json_decode(get_post_meta($design_id,'price_ctx',true), true) ?: [];
   $pid = intval($price_ctx['product_id'] ?? get_post_meta($design_id,'product_id',true));
-  $type = strtolower($price_ctx['type'] ?? '');
-  $color = strtolower($price_ctx['color'] ?? '');
+  $type = nb_normalize_type_key($price_ctx['type'] ?? '');
+  $color = nb_normalize_color_key($price_ctx['color'] ?? '');
   $size  = $price_ctx['size'] ?? '';
 
   $per = $global_per; $min = $global_min; $base = 0; $size_add = 0;

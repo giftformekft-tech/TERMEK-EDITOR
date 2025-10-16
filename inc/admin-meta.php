@@ -56,7 +56,7 @@ if ( ! function_exists('nb_detect_attribute_group_from_key') ) {
       if (function_exists('remove_accents')){
         $normalized = remove_accents($normalized);
       }
-      $key = strtolower($normalized);
+      $key = nb_utf8_strtolower($normalized);
     } else {
       $key = '';
     }
@@ -120,11 +120,34 @@ if ( ! function_exists('nb_normalize_attribute_display') ) {
 }
 
 if ( ! function_exists('nb_designer_settings_cache') ) {
-  function nb_designer_settings_cache(){
+  function nb_designer_settings_cache($refresh = false){
     static $cache = null;
+    if ($refresh){
+      $cache = null;
+    }
     if ($cache === null){
-      $settings = get_option('nb_settings', []);
-      $cache = is_array($settings) ? $settings : [];
+      $stored = get_option('nb_settings', []);
+      $settings = is_array($stored) ? $stored : [];
+
+      if (function_exists('nb_clean_settings_unicode')){
+        $cleaned = nb_clean_settings_unicode($settings);
+        $encoder = function_exists('wp_json_encode') ? 'wp_json_encode' : 'json_encode';
+        if ($encoder($cleaned) !== $encoder($settings)){
+          $settings = $cleaned;
+          update_option('nb_settings', $settings);
+        } else {
+          $settings = $cleaned;
+        }
+      }
+
+      if (!empty($settings['catalog']) && is_array($settings['catalog']) && function_exists('nb_sync_product_color_configuration')){
+        foreach ($settings['catalog'] as &$catalogCfg){
+          nb_sync_product_color_configuration($catalogCfg, $settings);
+        }
+        unset($catalogCfg);
+      }
+
+      $cache = $settings;
     }
     return $cache;
   }
@@ -145,7 +168,7 @@ if ( ! function_exists('nb_designer_normalize_type_key') ) {
     if (function_exists('remove_accents')){
       $string = remove_accents($string);
     }
-    return strtolower($string);
+    return nb_utf8_strtolower($string);
   }
 }
 
@@ -164,7 +187,7 @@ if ( ! function_exists('nb_designer_normalize_color_key') ) {
     if (function_exists('remove_accents')){
       $string = remove_accents($string);
     }
-    return strtolower($string);
+    return nb_utf8_strtolower($string);
   }
 }
 
@@ -207,9 +230,21 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
         $candidates[] = $settings['types'];
       }
       $normalizedSelected = nb_designer_normalize_type_key($selected);
+      if (function_exists('nb_resolve_type_order_label')){
+        $mapped = nb_resolve_type_order_label($selected !== '' ? $selected : $value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
+        }
+      }
       if (! empty($price_ctx['type_label'])){
-        $label = trim((string)$price_ctx['type_label']);
+        $label = nb_clean_label_string($price_ctx['type_label']);
         if ($label !== ''){
+          if (function_exists('nb_resolve_type_order_label')){
+            $mapped = nb_resolve_type_order_label($label, $settings);
+            if ($mapped !== ''){
+              return $mapped;
+            }
+          }
           return $label;
         }
       }
@@ -220,11 +255,29 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
             continue;
           }
           if (strcasecmp($value, $label) === 0){
+            if (function_exists('nb_resolve_type_order_label')){
+              $mapped = nb_resolve_type_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
           if ($normalizedSelected !== '' && nb_designer_normalize_type_key($label) === $normalizedSelected){
+            if (function_exists('nb_resolve_type_order_label')){
+              $mapped = nb_resolve_type_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
+        }
+      }
+      if (function_exists('nb_resolve_type_order_label')){
+        $mapped = nb_resolve_type_order_label($value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
         }
       }
       return $value;
@@ -232,9 +285,21 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
 
     if ($group === 'color'){
       $normalizedSelected = nb_designer_normalize_color_key($selected);
+      if (function_exists('nb_resolve_color_order_label')){
+        $mapped = nb_resolve_color_order_label($selected !== '' ? $selected : $value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
+        }
+      }
       if (! empty($price_ctx['color_label'])){
-        $label = trim((string)$price_ctx['color_label']);
+        $label = nb_clean_label_string($price_ctx['color_label']);
         if ($label !== ''){
+          if (function_exists('nb_resolve_color_order_label')){
+            $mapped = nb_resolve_color_order_label($label, $settings);
+            if ($mapped !== ''){
+              return $mapped;
+            }
+          }
           return $label;
         }
       }
@@ -267,14 +332,32 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
             continue;
           }
           if (strcasecmp($value, $label) === 0){
+            if (function_exists('nb_resolve_color_order_label')){
+              $mapped = nb_resolve_color_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
           if ($normalizedSelected !== '' && nb_designer_normalize_color_key($label) === $normalizedSelected){
+            if (function_exists('nb_resolve_color_order_label')){
+              $mapped = nb_resolve_color_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
         }
       }
 
+      if (function_exists('nb_resolve_color_order_label')){
+        $mapped = nb_resolve_color_order_label($value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
+        }
+      }
       return $value;
     }
 
@@ -286,7 +369,7 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
         }
       }
 
-      $normalizedSelected = strtolower($selected);
+      $normalizedSelected = nb_utf8_strtolower($selected);
       $candidateLists = [];
       if ($cfg && ! empty($cfg['sizes']) && is_array($cfg['sizes'])){
         $candidateLists[] = $cfg['sizes'];
@@ -309,7 +392,7 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
           if (strcasecmp($value, $label) === 0){
             return $label;
           }
-          if ($normalizedSelected !== '' && strtolower($label) === $normalizedSelected){
+          if ($normalizedSelected !== '' && nb_utf8_strtolower($label) === $normalizedSelected){
             return $label;
           }
         }
@@ -329,13 +412,30 @@ if ( ! function_exists('nb_normalize_attribute_candidates') ) {
       $values = [$values];
     }
     foreach ($values as $value){
-      if (is_scalar($value)){
-        $clean = trim((string)$value);
-        if ($clean !== '' && ! in_array($clean, $list, true)){
-          $list[] = $clean;
-        }
+      if (! is_scalar($value)){
+        continue;
+      }
+
+      $string = (string)$value;
+      if (function_exists('wp_unslash')){
+        $string = wp_unslash($string);
+      }
+
+      if (function_exists('nb_clean_label_string')){
+        $clean = nb_clean_label_string($string);
+      } else {
+        $clean = trim($string);
+      }
+
+      if ($clean === ''){
+        continue;
+      }
+
+      if (! in_array($clean, $list, true)){
+        $list[] = $clean;
       }
     }
+
     return $list;
   }
 }
