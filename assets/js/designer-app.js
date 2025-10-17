@@ -10,6 +10,25 @@
   const settings = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
   const c = new fabric.Canvas('nb-canvas', {preserveObjectStacking:true, backgroundColor:'#fff'});
 
+  const objectUiDefaults = {
+    cornerStyle: 'circle',
+    transparentCorners: false,
+    hasBorders: false,
+    borderColor: 'rgba(0,0,0,0)',
+    borderOpacityWhenMoving: 0
+  };
+
+  function applyObjectUiDefaults(obj){
+    if (!obj || typeof obj !== 'object') return;
+    if (typeof objectUiDefaults.cornerStyle !== 'undefined') obj.cornerStyle = objectUiDefaults.cornerStyle;
+    if (typeof objectUiDefaults.transparentCorners !== 'undefined') obj.transparentCorners = objectUiDefaults.transparentCorners;
+    if (typeof objectUiDefaults.hasBorders !== 'undefined') obj.hasBorders = objectUiDefaults.hasBorders;
+    if (typeof objectUiDefaults.borderColor !== 'undefined') obj.borderColor = objectUiDefaults.borderColor;
+    if (typeof objectUiDefaults.borderOpacityWhenMoving !== 'undefined') obj.borderOpacityWhenMoving = objectUiDefaults.borderOpacityWhenMoving;
+  }
+
+  applyObjectUiDefaults(fabric.Object.prototype);
+
   const baseControlProfile = {
     cornerSize: fabric.Object.prototype.cornerSize,
     touchCornerSize: fabric.Object.prototype.touchCornerSize,
@@ -38,10 +57,12 @@
     fabric.Object.prototype.cornerSize = cornerSize;
     fabric.Object.prototype.touchCornerSize = touchCornerSize;
     fabric.Object.prototype.borderScaleFactor = borderScaleFactor;
+    applyObjectUiDefaults(fabric.Object.prototype);
     designObjects().forEach(obj=>{
       obj.cornerSize = cornerSize;
       obj.touchCornerSize = touchCornerSize;
       obj.borderScaleFactor = borderScaleFactor;
+      applyObjectUiDefaults(obj);
     });
     c.requestRenderAll();
   }
@@ -54,6 +75,7 @@
   }
 
   refreshControlProfile();
+  designObjects().forEach(applyObjectUiDefaults);
   if (controlMedia){
     const mediaListener = () => refreshControlProfile();
     if (typeof controlMedia.addEventListener === 'function'){
@@ -1750,6 +1772,7 @@
 
   c.on('object:added', e=>{
     if (isDesignObject(e.target)){
+      applyObjectUiDefaults(e.target);
       ensureLayerId(e.target);
       keepObjectInside(e.target);
       markDesignDirty();
@@ -1895,7 +1918,7 @@
     addTextBtn.onclick = () => {
       const a = c.__nb_area || fallbackArea;
       const textboxWidth = Math.max(80, a.w - 40);
-      const t = new fabric.Textbox('Írd ide a feliratot',{ 
+      const t = new fabric.Textbox('Írd ide a feliratot',{
         fill: currentFontColor(),
         fontSize: currentFontSize(),
         width: textboxWidth,
@@ -1909,6 +1932,7 @@
         transparentCorners:false,
         lockScalingFlip:true
       });
+      applyObjectUiDefaults(t);
       c.add(t).setActiveObject(t);
       keepObjectInside(t);
       syncTextControls();
@@ -1935,6 +1959,7 @@
           transparentCorners: false,
           lockScalingFlip: true
         });
+        applyObjectUiDefaults(img);
         if (f && typeof f.name === 'string' && f.name){
           const baseName = f.name.split(/[/\\]/).pop() || f.name;
           img.__nb_layer_name = baseName.replace(/\.[^.]+$/, '') || 'Kép';
