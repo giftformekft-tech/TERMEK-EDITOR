@@ -76,6 +76,9 @@ add_action('rest_api_init', function(){
       if ( null === WC()->cart ) {
         return new WP_Error('wc_cart','WooCommerce kosár nem elérhető', ['status'=>500]);
       }
+      if ( method_exists(WC()->cart, 'get_cart') ) {
+        WC()->cart->get_cart();
+      }
       $design_id = intval($req->get_param('design_id'));
       if (! $design_id) return new WP_Error('bad','Hiányzó design_id', ['status'=>400]);
 
