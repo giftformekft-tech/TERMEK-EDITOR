@@ -657,17 +657,17 @@
   function updatePriceDisplay(){
     if (!priceDisplayEl) return;
     priceDisplayEl.classList.remove('nb-price-display--pending');
+    const markup = currentProductPriceMarkup();
+    if (markup){
+      priceDisplayEl.innerHTML = markup;
+      return;
+    }
     if (designState.savedDesignId){
       priceDisplayEl.textContent = `Mentve (#${designState.savedDesignId})`;
       return;
     }
-    const markup = currentProductPriceMarkup();
-    if (markup){
-      priceDisplayEl.innerHTML = markup;
-    } else {
-      priceDisplayEl.textContent = 'Az egyedi felár a mentés után kerül kiszámításra.';
-      priceDisplayEl.classList.add('nb-price-display--pending');
-    }
+    priceDisplayEl.textContent = 'Az egyedi felár a mentés után kerül kiszámításra.';
+    priceDisplayEl.classList.add('nb-price-display--pending');
   }
 
   function resolveMockupPointer(value, arr){
