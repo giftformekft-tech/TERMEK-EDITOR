@@ -1,7 +1,7 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
-function nb_calc_fee_for_design($design_id){
+function nb_calc_fee_for_design($design_id, $override_ctx = []){
   $settings = get_option('nb_settings',[]);
   $global_per = isset($settings['fee_per_cm2']) ? floatval($settings['fee_per_cm2']) : 3;
   $global_min = isset($settings['min_fee']) ? floatval($settings['min_fee']) : 990;
@@ -11,9 +11,28 @@ function nb_calc_fee_for_design($design_id){
   $area_cm2 = max(0,$w*$h);
 
   $price_ctx = json_decode(get_post_meta($design_id,'price_ctx',true), true) ?: [];
+  if (is_array($override_ctx) && !empty($override_ctx)){
+    foreach ($override_ctx as $key=>$value){
+      if ($value === null) {
+        continue;
+      }
+      if ($key === 'product_id'){
+        $price_ctx[$key] = intval($value);
+        continue;
+      }
+      if (is_scalar($value)){
+        $string_value = (string)$value;
+        if ($key === 'size_label' || $key === 'type_label' || $key === 'color_label'){
+          $price_ctx[$key] = trim($string_value);
+        } else {
+          $price_ctx[$key] = $string_value;
+        }
+      }
+    }
+  }
   $pid = intval($price_ctx['product_id'] ?? get_post_meta($design_id,'product_id',true));
-  $type = strtolower($price_ctx['type'] ?? '');
-  $color = strtolower($price_ctx['color'] ?? '');
+  $type = nb_normalize_type_key($price_ctx['type'] ?? '');
+  $color = nb_normalize_color_key($price_ctx['color'] ?? '');
   $size  = $price_ctx['size'] ?? '';
 
   $per = $global_per; $min = $global_min; $base = 0; $size_add = 0;
@@ -37,14 +56,69 @@ function nb_calc_fee_for_design($design_id){
 add_action('woocommerce_cart_calculate_fees', function($cart){
   if ( is_admin() && ! defined('DOING_AJAX') ) return;
   $total_fee = 0; $has=false;
+  $discount_groups = [];
   foreach ($cart->get_cart() as $item){
     if (!empty($item['nb_design_id'])){
       $has=true;
-      $total_fee += nb_calc_fee_for_design($item['nb_design_id']);
+      $override = [];
+      if (!empty($item['nb_price_ctx_override']) && is_array($item['nb_price_ctx_override'])){
+        $override = $item['nb_price_ctx_override'];
+      }
+      $total_fee += nb_calc_fee_for_design($item['nb_design_id'], $override);
+    }
+    if (!empty($item['nb_bulk_group_id']) && !empty($item['nb_bulk_discount'])){
+      $group_id = (string)$item['nb_bulk_group_id'];
+      if ($group_id !== ''){
+        if (!isset($discount_groups[$group_id])){
+          $discount_groups[$group_id] = [
+            'percent' => floatval($item['nb_bulk_discount']),
+            'base'    => 0,
+          ];
+        } elseif (floatval($item['nb_bulk_discount']) > $discount_groups[$group_id]['percent']){
+          $discount_groups[$group_id]['percent'] = floatval($item['nb_bulk_discount']);
+        }
+        $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
+        if ($quantity < 1){
+          $quantity = 1;
+        }
+        $line_total = 0;
+        if (!empty($item['data']) && is_a($item['data'], 'WC_Product')){
+          if (function_exists('wc_get_price_excluding_tax')){
+            $line_total = wc_get_price_excluding_tax($item['data'], ['qty'=>$quantity]);
+          } else {
+            $line_total = floatval($item['data']->get_price()) * $quantity;
+          }
+        }
+        $discount_groups[$group_id]['base'] += max(0, $line_total);
+      }
     }
   }
   if ($has && $total_fee>0){
     $cart->add_fee(__('Egyedi nyomat','nb'), $total_fee, true);
+  }
+  if (!empty($discount_groups)){
+    foreach ($discount_groups as $group){
+      $percent = floatval($group['percent']);
+      $base = floatval($group['base']);
+      if ($percent <= 0 || $base <= 0){
+        continue;
+      }
+      $discount_amount = round($base * ($percent / 100), 2);
+      if ($discount_amount <= 0){
+        continue;
+      }
+      $percent_label = function_exists('wc_format_decimal') ? wc_format_decimal($percent, 2) : number_format_i18n($percent, 2);
+      if (function_exists('wp_strip_all_tags')){
+        $percent_label = wp_strip_all_tags($percent_label);
+      }
+      if (function_exists('wc_clean')){
+        $percent_label = wc_clean($percent_label);
+      } elseif (function_exists('sanitize_text_field')) {
+        $percent_label = sanitize_text_field($percent_label);
+      }
+      $label = sprintf(__('Mennyiségi kedvezmény (−%s%%)','nb'), $percent_label);
+      $cart->add_fee($label, -$discount_amount, false);
+    }
   }
 });
 
@@ -87,6 +161,18 @@ add_action('woocommerce_checkout_create_order_line_item', function($item, $cart_
         }
         if (! in_array($clean, $extra_candidates[$group], true)){
           $extra_candidates[$group][] = $clean;
+        }
+      }
+    }
+
+    if (! empty($values['nb_size_label_override'])){
+      $clean_override = trim((string)$values['nb_size_label_override']);
+      if ($clean_override !== ''){
+        if (! isset($extra_candidates['size'])){
+          $extra_candidates['size'] = [];
+        }
+        if (! in_array($clean_override, $extra_candidates['size'], true)){
+          $extra_candidates['size'][] = $clean_override;
         }
       }
     }
