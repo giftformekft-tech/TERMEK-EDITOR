@@ -81,7 +81,6 @@
           <h2 id="nb-product-title">Termék</h2>
           <div class="nb-price-display" id="nb-price-display"></div>
         </div>
-        <div id="nb-product-meta" class="nb-product-meta"></div>
         <div class="nb-selection-summary" id="nb-selection-summary"></div>
         <div class="nb-summary-actions">
           <button id="nb-add-to-cart" class="nb-cart-button" disabled>Kosárba</button>

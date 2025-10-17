@@ -107,7 +107,6 @@
   const bulkDiscountHint = document.getElementById('nb-bulk-discount-hint');
   const selectionSummaryEl = document.getElementById('nb-selection-summary');
   const productTitleEl = document.getElementById('nb-product-title');
-  const productMetaEl = document.getElementById('nb-product-meta');
   const priceDisplayEl = document.getElementById('nb-price-display');
   const fontFamilySel = document.getElementById('nb-font-family');
   const fontSizeInput = document.getElementById('nb-font-size');
@@ -948,13 +947,6 @@
     const sizeLabel = sizeSel.value || '';
     if (productTitleEl){
       productTitleEl.textContent = sel.cfg?.title || 'Termék';
-    }
-    if (productMetaEl){
-      const parts = [];
-      if (typeLabel) parts.push(`Típus: ${typeLabel}`);
-      if (colorLabel) parts.push(`Szín: ${colorLabel}`);
-      if (sizeLabel) parts.push(`Méret: ${sizeLabel}`);
-      productMetaEl.textContent = parts.join(' • ');
     }
     if (selectionSummaryEl){
       selectionSummaryEl.innerHTML = '';
