@@ -1,6 +1,330 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
+if ( ! function_exists('nb_rest_prepare_cart_environment') ) {
+  function nb_rest_prepare_cart_environment(){
+    if ( ! function_exists('WC') || ! WC() ) {
+      return new WP_Error('wc','WooCommerce szükséges', ['status'=>500]);
+    }
+    if ( null === WC()->cart && function_exists('wc_load_cart') ) {
+      wc_load_cart();
+    }
+    if ( null === WC()->session && method_exists(WC(), 'initialize_session') ) {
+      WC()->initialize_session();
+    }
+    if ( null === WC()->cart ) {
+      return new WP_Error('wc_cart','WooCommerce kosár nem elérhető', ['status'=>500]);
+    }
+    if ( method_exists(WC()->cart, 'get_cart') ) {
+      WC()->cart->get_cart();
+    }
+    if ( function_exists('wc_clear_notices') ) {
+      wc_clear_notices();
+    }
+    if ( WC()->session && method_exists(WC()->session, 'set_customer_session_cookie') ) {
+      WC()->session->set_customer_session_cookie(true);
+    }
+    return true;
+  }
+}
+
+if ( ! function_exists('nb_rest_cart_single_add') ) {
+  function nb_rest_cart_single_add($design_id, $args = []){
+    $design_id = intval($design_id);
+    if (! $design_id) {
+      return new WP_Error('bad','Hiányzó design_id', ['status'=>400]);
+    }
+
+    $quantity = isset($args['quantity']) ? intval($args['quantity']) : 1;
+    if ($quantity < 1) {
+      $quantity = 1;
+    }
+
+    $extra_cart_item_data = [];
+    if (!empty($args['cart_item_data']) && is_array($args['cart_item_data'])){
+      $extra_cart_item_data = $args['cart_item_data'];
+    }
+
+    $size_value = '';
+    $size_label = '';
+    if (!empty($args['size'])){
+      $size_input = $args['size'];
+      if (is_array($size_input)){
+        if (isset($size_input['value'])){
+          $size_value = (string)$size_input['value'];
+        } elseif (isset($size_input['size'])){
+          $size_value = (string)$size_input['size'];
+        }
+        if (isset($size_input['label'])){
+          $size_label = (string)$size_input['label'];
+        } elseif (isset($size_input['display'])){
+          $size_label = (string)$size_input['display'];
+        }
+      } else {
+        $size_value = (string)$size_input;
+      }
+    }
+
+    $size_value = trim($size_value);
+    if ($size_value !== '' && function_exists('wc_clean')) {
+      $size_value = wc_clean($size_value);
+    }
+    $size_label = trim(wp_strip_all_tags($size_label));
+    if ($size_label === '' && $size_value !== '') {
+      $size_label = $size_value;
+    }
+
+    $product_id = intval(get_post_meta($design_id,'product_id',true));
+    if (! $product_id) {
+      return new WP_Error('product','Hiányzó termék', ['status'=>400]);
+    }
+
+    $product = wc_get_product($product_id);
+    if (! $product) {
+      return new WP_Error('product','A termék nem található', ['status'=>400]);
+    }
+
+    $raw_attrs = json_decode(get_post_meta($design_id,'attributes_json',true), true);
+    if (!is_array($raw_attrs)) {
+      $raw_attrs = [];
+    }
+    if ($size_value !== ''){
+      $raw_attrs['pa_size'] = $size_value;
+      $raw_attrs['size'] = $size_value;
+      $raw_attrs['attribute_pa_size'] = $size_value;
+    }
+    if ($size_label !== ''){
+      $raw_attrs['size_label'] = $size_label;
+    }
+
+    $price_ctx = json_decode(get_post_meta($design_id,'price_ctx',true), true);
+    if (!is_array($price_ctx)) {
+      $price_ctx = [];
+    }
+    if ($size_value !== ''){
+      $price_ctx['size'] = $size_value;
+    }
+    if ($size_label !== ''){
+      $price_ctx['size_label'] = $size_label;
+    }
+
+    $variation_attrs = [];
+    $cart_product_id = $product_id;
+    $variation_id = 0;
+
+    if ($product->is_type('variation')){
+      $variation_id = $product->get_id();
+      $cart_product_id = $product->get_parent_id() ?: $product_id;
+      foreach ($product->get_attributes() as $attr_name => $attr_value){
+        $attr_name = is_string($attr_name) ? trim($attr_name) : '';
+        if ($attr_name === '') continue;
+        $variation_attrs['attribute_'.$attr_name] = $attr_value;
+      }
+      $parent = wc_get_product($cart_product_id);
+      if ($parent) {
+        $product = $parent;
+      }
+    } elseif ($product->is_type('variable')) {
+      $normalized_map = [];
+      foreach ($raw_attrs as $key=>$value){
+        if (!is_scalar($value)) continue;
+        $clean_value = wc_clean((string)$value);
+        if ($clean_value === '') continue;
+        $clean_key = '';
+        if (is_string($key) || is_numeric($key)){
+          $clean_key = nb_utf8_strtolower(trim((string)$key));
+        }
+        if ($clean_key === '') continue;
+        $normalized_map[$clean_key] = $clean_value;
+        if (strpos($clean_key, 'attribute_') === 0){
+          $normalized_map[substr($clean_key, 10)] = $clean_value;
+        } elseif (strpos($clean_key, 'pa_') === 0){
+          $normalized_map['attribute_'.$clean_key] = $clean_value;
+          $normalized_map[substr($clean_key, 3)] = $clean_value;
+        } else {
+          $normalized_map['attribute_'.$clean_key] = $clean_value;
+          $normalized_map['pa_'.$clean_key] = $clean_value;
+        }
+      }
+
+      $product_variation_attributes = $product->get_variation_attributes();
+      foreach ($product_variation_attributes as $attribute_name=>$options){
+        $attribute_key = (string)$attribute_name;
+        $normalized_attribute = nb_utf8_strtolower($attribute_key);
+        $search_keys = [
+          $normalized_attribute,
+          nb_utf8_strtolower(str_replace('attribute_', '', $attribute_key)),
+        ];
+        $short = str_replace('attribute_', '', $attribute_key);
+        $short_lower = nb_utf8_strtolower($short);
+        if (strpos($short_lower, 'pa_') === 0){
+          $search_keys[] = substr($short_lower, 3);
+        } else {
+          $search_keys[] = 'pa_'.$short_lower;
+        }
+        $matched_value = null;
+        foreach ($search_keys as $candidate){
+          if (isset($normalized_map[$candidate])){
+            $matched_value = $normalized_map[$candidate];
+            break;
+          }
+        }
+        if ($matched_value === null) continue;
+        if (is_array($options) && !empty($options) && !in_array($matched_value, $options, true)){
+          $slug_candidate = sanitize_title($matched_value);
+          if (in_array($slug_candidate, $options, true)){
+            $matched_value = $slug_candidate;
+          }
+        }
+        $variation_attrs[$attribute_name] = $matched_value;
+      }
+
+      $required_keys = array_filter(array_keys($product_variation_attributes));
+      if (!empty($required_keys)){
+        $missing = array_diff($required_keys, array_keys($variation_attrs));
+        if (!empty($missing)){
+          return new WP_Error('variant','Hiányzó variációs adatok', ['status'=>400]);
+        }
+      }
+
+      if (!empty($variation_attrs)){
+        if (!class_exists('WC_Data_Store')){
+          return new WP_Error('wc','WooCommerce adatbolt nem érhető el', ['status'=>500]);
+        }
+        $data_store = WC_Data_Store::load('product');
+        $match = $data_store->find_matching_product_variation($product, $variation_attrs);
+        if ($match){
+          $variation_id = $match;
+          if (function_exists('wc_get_product_variation_attributes')) {
+            $resolved_attrs = wc_get_product_variation_attributes($variation_id);
+            if (is_array($resolved_attrs) && !empty($resolved_attrs)){
+              $variation_attrs = $resolved_attrs;
+            }
+          }
+        } else {
+          return new WP_Error('variant','A kiválasztott kombináció nem elérhető', ['status'=>400]);
+        }
+      }
+      if (! $variation_id) {
+        return new WP_Error('variant','A kiválasztott kombináció nem elérhető', ['status'=>400]);
+      }
+    }
+
+    $variation_product = null;
+    if ($variation_id){
+      $variation_product = wc_get_product($variation_id);
+      if (! $variation_product){
+        return new WP_Error('variant','A kiválasztott variáció nem található', ['status'=>400]);
+      }
+      if ('publish' !== $variation_product->get_status()){
+        return new WP_Error('variant','A kiválasztott variáció nem érhető el', ['status'=>400]);
+      }
+      if (! $variation_product->is_in_stock() && ! $variation_product->backorders_allowed()){
+        return new WP_Error('variant','A kiválasztott variáció nincs készleten', ['status'=>400]);
+      }
+    } else {
+      if ('publish' !== $product->get_status()){
+        return new WP_Error('product','A termék nem érhető el', ['status'=>400]);
+      }
+      if (! $product->is_in_stock() && ! $product->backorders_allowed()){
+        return new WP_Error('product','A termék nincs készleten', ['status'=>400]);
+      }
+    }
+
+    $preview_url = get_post_meta($design_id,'preview_url',true);
+    $print_url = get_post_meta($design_id,'print_url',true);
+    $print_width_px = intval(get_post_meta($design_id,'print_width_px',true));
+    $print_height_px = intval(get_post_meta($design_id,'print_height_px',true));
+
+    $unique_key = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : uniqid('nb_', true);
+
+    $cart_item_data = [
+      'nb_design_id'     => $design_id,
+      'preview_url'      => $preview_url,
+      'print_url'        => $print_url ?: $preview_url,
+      'print_width_px'   => $print_width_px,
+      'print_height_px'  => $print_height_px,
+      'nb_cart_line_uid' => $unique_key,
+      'unique_key'       => 'nb_'.$unique_key,
+    ];
+
+    if (!empty($extra_cart_item_data)){
+      foreach ($extra_cart_item_data as $extra_key => $extra_value){
+        if (!is_string($extra_key) || $extra_key === ''){
+          continue;
+        }
+        if (is_scalar($extra_value) || is_array($extra_value)){
+          $cart_item_data[$extra_key] = $extra_value;
+        }
+      }
+    }
+
+    if (!empty($price_ctx)){
+      $cart_item_data['nb_price_ctx_override'] = $price_ctx;
+    }
+    if ($size_label !== ''){
+      $cart_item_data['nb_size_label_override'] = $size_label;
+    }
+
+    $override_ids = array_filter([$cart_product_id, $variation_id ? $variation_id : null]);
+    $purchasable_filter = function($purchasable, $product_obj) use ($override_ids) {
+      if (! is_object($product_obj) || ! is_a($product_obj, 'WC_Product')) {
+        return $purchasable;
+      }
+      $id = $product_obj->get_id();
+      if (! in_array($id, $override_ids, true)) {
+        return $purchasable;
+      }
+      if (! $product_obj->exists()) {
+        return false;
+      }
+      if ('publish' !== $product_obj->get_status()) {
+        return false;
+      }
+      if (! $product_obj->is_in_stock() && ! $product_obj->backorders_allowed()) {
+        return false;
+      }
+      if ($product_obj->get_price() === '') {
+        return true;
+      }
+      return $purchasable;
+    };
+
+    add_filter('woocommerce_is_purchasable', $purchasable_filter, 10, 2);
+    add_filter('woocommerce_variation_is_purchasable', $purchasable_filter, 10, 2);
+
+    $added = WC()->cart->add_to_cart($cart_product_id, $quantity, $variation_id, $variation_attrs, $cart_item_data);
+
+    remove_filter('woocommerce_is_purchasable', $purchasable_filter, 10);
+    remove_filter('woocommerce_variation_is_purchasable', $purchasable_filter, 10);
+
+    if (! $added) {
+      $message = '';
+      if (function_exists('wc_get_notices')){
+        $errors = wc_get_notices('error');
+        if (!empty($errors)){
+          $pieces = [];
+          foreach ($errors as $notice){
+            if (is_array($notice) && isset($notice['notice'])){
+              $pieces[] = wp_strip_all_tags($notice['notice']);
+            } elseif (is_string($notice)){
+              $pieces[] = wp_strip_all_tags($notice);
+            }
+          }
+          $message = trim(implode(' ', array_filter($pieces)));
+        }
+        wc_clear_notices();
+      }
+      if ($message === ''){
+        $message = 'Nem sikerült kosárba tenni';
+      }
+      return new WP_Error('cart', $message, ['status'=>500]);
+    }
+
+    return ['cart_item_key'=>$added];
+  }
+}
+
 add_action('rest_api_init', function(){
   register_rest_route('nb/v1','/save', [
     'methods'  => 'POST',
@@ -64,221 +388,122 @@ add_action('rest_api_init', function(){
   register_rest_route('nb/v1','/add-to-cart', [
     'methods'=>'POST','permission_callback'=>'__return_true',
     'callback'=>function($req){
-      if ( ! function_exists('WC') || ! WC() ) {
-        return new WP_Error('wc','WooCommerce szükséges', ['status'=>500]);
-      }
-      if ( null === WC()->cart && function_exists('wc_load_cart') ) {
-        wc_load_cart();
-      }
-      if ( null === WC()->session && method_exists(WC(), 'initialize_session') ) {
-        WC()->initialize_session();
-      }
-      if ( null === WC()->cart ) {
-        return new WP_Error('wc_cart','WooCommerce kosár nem elérhető', ['status'=>500]);
-      }
       $design_id = intval($req->get_param('design_id'));
-      if (! $design_id) return new WP_Error('bad','Hiányzó design_id', ['status'=>400]);
-
-      $product_id = intval(get_post_meta($design_id,'product_id',true));
-      if (! $product_id) return new WP_Error('product','Hiányzó termék', ['status'=>400]);
-
-      $product = wc_get_product($product_id);
-      if (! $product) return new WP_Error('product','A termék nem található', ['status'=>400]);
-
-      $raw_attrs = json_decode(get_post_meta($design_id,'attributes_json',true), true) ?: [];
-      $variation_attrs = [];
-      $cart_product_id = $product_id;
-      $variation_id = 0;
-
-      if ($product->is_type('variation')){
-        $variation_id = $product->get_id();
-        $cart_product_id = $product->get_parent_id() ?: $product_id;
-        foreach ($product->get_attributes() as $attr_name => $attr_value){
-          $attr_name = is_string($attr_name) ? trim($attr_name) : '';
-          if ($attr_name === '') continue;
-          $variation_attrs['attribute_'.$attr_name] = $attr_value;
-        }
-        $parent = wc_get_product($cart_product_id);
-        if ($parent) {
-          $product = $parent;
-        }
-      } elseif ($product->is_type('variable')) {
-        $normalized_map = [];
-        foreach ($raw_attrs as $key=>$value){
-          if (!is_scalar($value)) continue;
-          $clean_value = wc_clean((string)$value);
-          if ($clean_value === '') continue;
-          $clean_key = is_string($key) ? strtolower(trim($key)) : '';
-          if ($clean_key === '') continue;
-          $normalized_map[$clean_key] = $clean_value;
-          if (strpos($clean_key, 'attribute_') === 0){
-            $normalized_map[substr($clean_key, 10)] = $clean_value;
-          } elseif (strpos($clean_key, 'pa_') === 0){
-            $normalized_map['attribute_'.$clean_key] = $clean_value;
-            $normalized_map[substr($clean_key, 3)] = $clean_value;
-          } else {
-            $normalized_map['attribute_'.$clean_key] = $clean_value;
-            $normalized_map['pa_'.$clean_key] = $clean_value;
-          }
-        }
-
-        $product_variation_attributes = $product->get_variation_attributes();
-        foreach ($product_variation_attributes as $attribute_name=>$options){
-          $search_keys = [
-            strtolower($attribute_name),
-            strtolower(str_replace('attribute_', '', $attribute_name)),
-          ];
-          $short = str_replace('attribute_', '', $attribute_name);
-          if (strpos($short, 'pa_') === 0){
-            $search_keys[] = substr($short, 3);
-          } else {
-            $search_keys[] = 'pa_'.$short;
-          }
-          $matched_value = null;
-          foreach ($search_keys as $candidate){
-            if (isset($normalized_map[$candidate])){
-              $matched_value = $normalized_map[$candidate];
-              break;
-            }
-          }
-          if ($matched_value === null) continue;
-          if (is_array($options) && !empty($options) && !in_array($matched_value, $options, true)){
-            $slug_candidate = sanitize_title($matched_value);
-            if (in_array($slug_candidate, $options, true)){
-              $matched_value = $slug_candidate;
-            }
-          }
-          $variation_attrs[$attribute_name] = $matched_value;
-        }
-
-        $required_keys = array_filter(array_keys($product_variation_attributes));
-        if (!empty($required_keys)){
-          $missing = array_diff($required_keys, array_keys($variation_attrs));
-          if (!empty($missing)){
-            return new WP_Error('variant','Hiányzó variációs adatok', ['status'=>400]);
-          }
-        }
-
-        if (!empty($variation_attrs)){
-          if (!class_exists('WC_Data_Store')){
-            return new WP_Error('wc','WooCommerce adatbolt nem érhető el', ['status'=>500]);
-          }
-          $data_store = WC_Data_Store::load('product');
-          $match = $data_store->find_matching_product_variation($product, $variation_attrs);
-          if ($match){
-            $variation_id = $match;
-            if (function_exists('wc_get_product_variation_attributes')) {
-              $resolved_attrs = wc_get_product_variation_attributes($variation_id);
-              if (is_array($resolved_attrs) && !empty($resolved_attrs)){
-                $variation_attrs = $resolved_attrs;
-              }
-            }
-          } else {
-            return new WP_Error('variant','A kiválasztott kombináció nem elérhető', ['status'=>400]);
-          }
-        }
-        if (! $variation_id) {
-          return new WP_Error('variant','A kiválasztott kombináció nem elérhető', ['status'=>400]);
-        }
+      if (! $design_id) {
+        return new WP_Error('bad','Hiányzó design_id', ['status'=>400]);
       }
 
-      $variation_product = null;
-      if ($variation_id){
-        $variation_product = wc_get_product($variation_id);
-        if (! $variation_product){
-          return new WP_Error('variant','A kiválasztott variáció nem található', ['status'=>400]);
+      $prepared = nb_rest_prepare_cart_environment();
+      if (is_wp_error($prepared)) {
+        return $prepared;
+      }
+
+      $storedSettings = get_option('nb_settings', []);
+      $settings = is_array($storedSettings) ? $storedSettings : [];
+      $settings = nb_clean_settings_unicode($settings);
+
+      $added = false;
+      $bulk_sizes = $req->get_param('bulk_sizes');
+      if (is_array($bulk_sizes) && !empty($bulk_sizes)){
+        $normalized_entries = [];
+        foreach ($bulk_sizes as $entry){
+          if (!is_array($entry)){
+            if (is_string($entry) && trim($entry) !== ''){
+              $entry = ['value'=>$entry, 'quantity'=>1];
+            } else {
+              continue;
+            }
+          }
+          $quantity = isset($entry['quantity']) ? intval($entry['quantity']) : 0;
+          if ($quantity < 1) {
+            continue;
+          }
+          $size_value = '';
+          if (isset($entry['value'])){
+            $size_value = $entry['value'];
+          } elseif (isset($entry['size'])){
+            $size_value = $entry['size'];
+          }
+          $size_label = '';
+          if (isset($entry['label'])){
+            $size_label = $entry['label'];
+          } elseif (isset($entry['display'])){
+            $size_label = $entry['display'];
+          }
+          $normalized_entries[] = [
+            'quantity' => $quantity,
+            'size_value' => $size_value,
+            'size_label' => $size_label,
+          ];
         }
-        if ('publish' !== $variation_product->get_status()){
-          return new WP_Error('variant','A kiválasztott variáció nem érhető el', ['status'=>400]);
+        $total_quantity = 0;
+        foreach ($normalized_entries as $entry){
+          $total_quantity += $entry['quantity'];
         }
-        if (! $variation_product->is_in_stock() && ! $variation_product->backorders_allowed()){
-          return new WP_Error('variant','A kiválasztott variáció nincs készleten', ['status'=>400]);
+        if ($total_quantity <= 0){
+          return new WP_Error('cart','Nem lett mennyiség kiválasztva', ['status'=>400]);
+        }
+        $bulk_discount = nb_find_bulk_discount_for_quantity($total_quantity, $settings);
+        $group_id = '';
+        if ($bulk_discount > 0){
+          $group_id = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : uniqid('nb_bulk_', true);
+        }
+        foreach ($normalized_entries as $entry){
+          $cart_item_data = [];
+          if ($group_id !== ''){
+            $cart_item_data['nb_bulk_group_id'] = $group_id;
+            $cart_item_data['nb_bulk_discount'] = $bulk_discount;
+            $cart_item_data['nb_bulk_group_quantity'] = $total_quantity;
+          }
+          $result = nb_rest_cart_single_add($design_id, [
+            'size'     => ['value'=>$entry['size_value'], 'label'=>$entry['size_label']],
+            'quantity' => $entry['quantity'],
+            'cart_item_data' => $cart_item_data,
+          ]);
+          if (is_wp_error($result)) {
+            return $result;
+          }
+          $added = true;
         }
       } else {
-        if ('publish' !== $product->get_status()){
-          return new WP_Error('product','A termék nem érhető el', ['status'=>400]);
+        $quantity = intval($req->get_param('quantity'));
+        if ($quantity < 1) {
+          $quantity = 1;
         }
-        if (! $product->is_in_stock() && ! $product->backorders_allowed()){
-          return new WP_Error('product','A termék nincs készleten', ['status'=>400]);
+        $size_override = $req->get_param('size_override');
+        $size_arg = null;
+        if (is_array($size_override)){
+          $size_arg = [
+            'value' => $size_override['value'] ?? ($size_override['size'] ?? ''),
+            'label' => $size_override['label'] ?? ($size_override['display'] ?? ''),
+          ];
+        } elseif (is_string($size_override) && trim($size_override) !== ''){
+          $size_arg = ['value'=>$size_override];
         }
+        $result = nb_rest_cart_single_add($design_id, [
+          'size'     => $size_arg,
+          'quantity' => $quantity,
+        ]);
+        if (is_wp_error($result)) {
+          return $result;
+        }
+        $added = true;
       }
 
-      $preview_url = get_post_meta($design_id,'preview_url',true);
-      $print_url = get_post_meta($design_id,'print_url',true);
-      $print_width_px = intval(get_post_meta($design_id,'print_width_px',true));
-      $print_height_px = intval(get_post_meta($design_id,'print_height_px',true));
-
-      $cart_item_data = [
-        'nb_design_id'     => $design_id,
-        'preview_url'      => $preview_url,
-        'print_url'        => $print_url ?: $preview_url,
-        'print_width_px'   => $print_width_px,
-        'print_height_px'  => $print_height_px,
-      ];
-
-      if (function_exists('wc_clear_notices')) {
-        wc_clear_notices();
+      if ($added) {
+        if (method_exists(WC()->cart, 'set_session')) {
+          WC()->cart->set_session();
+        }
+        if (method_exists(WC()->cart, 'maybe_set_cart_cookies')) {
+          WC()->cart->maybe_set_cart_cookies();
+        }
+        if (method_exists(WC()->cart, 'calculate_totals')) {
+          WC()->cart->calculate_totals();
+        }
+        return ['ok'=>true,'redirect'=>wc_get_cart_url()];
       }
 
-      if (WC()->session && method_exists(WC()->session, 'set_customer_session_cookie')) {
-        WC()->session->set_customer_session_cookie(true);
-      }
-
-      $override_ids = array_filter([$cart_product_id, $variation_id ? $variation_id : null]);
-      $purchasable_filter = function($purchasable, $product_obj) use ($override_ids) {
-        if (! is_object($product_obj) || ! is_a($product_obj, 'WC_Product')) {
-          return $purchasable;
-        }
-        $id = $product_obj->get_id();
-        if (! in_array($id, $override_ids, true)) {
-          return $purchasable;
-        }
-        if (! $product_obj->exists()) {
-          return false;
-        }
-        if ('publish' !== $product_obj->get_status()) {
-          return false;
-        }
-        if (! $product_obj->is_in_stock() && ! $product_obj->backorders_allowed()) {
-          return false;
-        }
-        if ($product_obj->get_price() === '') {
-          return true;
-        }
-        return $purchasable;
-      };
-
-      add_filter('woocommerce_is_purchasable', $purchasable_filter, 10, 2);
-      add_filter('woocommerce_variation_is_purchasable', $purchasable_filter, 10, 2);
-
-      $added = WC()->cart->add_to_cart($cart_product_id, 1, $variation_id, $variation_attrs, $cart_item_data);
-
-      remove_filter('woocommerce_is_purchasable', $purchasable_filter, 10);
-      remove_filter('woocommerce_variation_is_purchasable', $purchasable_filter, 10);
-
-      if (! $added) {
-        $message = '';
-        if (function_exists('wc_get_notices')){
-          $errors = wc_get_notices('error');
-          if (!empty($errors)){
-            $pieces = [];
-            foreach ($errors as $notice){
-              if (is_array($notice) && isset($notice['notice'])){
-                $pieces[] = wp_strip_all_tags($notice['notice']);
-              } elseif (is_string($notice)){
-                $pieces[] = wp_strip_all_tags($notice);
-              }
-            }
-            $message = trim(implode(' ', array_filter($pieces))); 
-          }
-          wc_clear_notices();
-        }
-        if ($message === ''){
-          $message = 'Nem sikerült kosárba tenni';
-        }
-        return new WP_Error('cart', $message, ['status'=>500]);
-      }
-      return ['ok'=>true,'redirect'=>wc_get_cart_url()];
+      return new WP_Error('cart','Nem sikerült kosárba tenni', ['status'=>500]);
     }
   ]);
 
