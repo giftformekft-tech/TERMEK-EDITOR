@@ -103,9 +103,11 @@ function nb_admin_render(){
       $settings['products'] = array_map('intval', $_POST['products'] ?? []);
       $designerInputs = isset($_POST['types_designer']) ? (array)$_POST['types_designer'] : [];
       $orderInputs    = isset($_POST['types_order']) ? (array)$_POST['types_order'] : [];
+      $productInputs  = isset($_POST['types_product']) ? (array)$_POST['types_product'] : [];
       $typeLabels = [];
       $typeOrderMap = [];
-      $max = max(count($designerInputs), count($orderInputs));
+      $typeProductMap = [];
+      $max = max(count($designerInputs), count($orderInputs), count($productInputs));
       for ($i = 0; $i < $max; $i++){
         $rawDesigner = $designerInputs[$i] ?? '';
         if (!is_scalar($rawDesigner)){
@@ -145,9 +147,19 @@ function nb_admin_render(){
         if ($normKey !== ''){
           $typeOrderMap[$normKey] = $orderLabel;
         }
+        if ($normKey !== ''){
+          $rawProduct = $productInputs[$i] ?? '';
+          if (is_scalar($rawProduct)){
+            $productId = intval(wp_unslash($rawProduct));
+            if ($productId > 0 && in_array($productId, $settings['products'], true)){
+              $typeProductMap[$normKey] = $productId;
+            }
+          }
+        }
       }
       $settings['types'] = $typeLabels;
       $settings['type_order_labels'] = $typeOrderMap;
+      $settings['type_products'] = $typeProductMap;
       if (!isset($settings['catalog'])) $settings['catalog'] = [];
       foreach($settings['products'] as $pid){
         if (empty($settings['catalog'][$pid])){

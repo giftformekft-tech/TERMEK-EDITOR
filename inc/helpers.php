@@ -169,6 +169,30 @@ if ( ! function_exists('nb_clean_settings_unicode') ) {
       $settings['type_order_labels'] = $cleanTypeOrders;
     }
 
+    if (isset($settings['type_products']) && is_array($settings['type_products'])) {
+      $cleanTypeProducts = [];
+      foreach ($settings['type_products'] as $key => $product){
+        if (is_array($product) || is_object($product)) {
+          continue;
+        }
+        $cleanKey = nb_normalize_type_key(nb_decode_unicode_sequences((string)$key));
+        if ($cleanKey === '') {
+          continue;
+        }
+        $productId = intval($product);
+        if (function_exists('absint')){
+          $productId = absint($productId);
+        } else {
+          $productId = max(0, $productId);
+        }
+        if ($productId <= 0) {
+          continue;
+        }
+        $cleanTypeProducts[$cleanKey] = $productId;
+      }
+      $settings['type_products'] = $cleanTypeProducts;
+    }
+
     if (isset($settings['color_palette'])) {
       $settings['color_palette'] = nb_clean_label_list($settings['color_palette']);
     }
