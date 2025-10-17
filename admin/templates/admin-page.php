@@ -25,8 +25,44 @@
         ?>
       </div>
       <h2>Globális terméktípusok</h2>
-      <p>Add meg vesszővel elválasztva (pl. <code>Póló,Pulóver,Hosszú ujjú</code>).</p>
-      <input type="text" name="types" value="<?php echo esc_attr(implode(',', $settings['types'] ?? ['Póló','Pulóver'])); ?>" size="80" />
+      <p>Add meg külön a tervezőben látható és a rendelésben megjelenő elnevezést.</p>
+      <?php
+        $globalTypeOrderMap = isset($settings['type_order_labels']) && is_array($settings['type_order_labels']) ? $settings['type_order_labels'] : [];
+        $globalTypeRows = $settings['types'] ?? [];
+        if (!is_array($globalTypeRows)) {
+          $globalTypeRows = [];
+        }
+        if (empty($globalTypeRows)) {
+          $globalTypeRows = ['Póló','Pulóver'];
+        }
+        $typeRowCount = max(count($globalTypeRows) + 1, 3);
+      ?>
+      <table class="widefat nb-label-table">
+        <thead>
+          <tr>
+            <th>Tervezőben megjelenő név</th>
+            <th>Rendelésben megjelenő név</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php for ($i = 0; $i < $typeRowCount; $i++):
+            $designer = $globalTypeRows[$i] ?? '';
+            $order = '';
+            if ($designer !== ''){
+              $typeKey = nb_normalize_type_key($designer);
+              if ($typeKey && !empty($globalTypeOrderMap[$typeKey])){
+                $order = $globalTypeOrderMap[$typeKey];
+              }
+            }
+          ?>
+          <tr>
+            <td><input type="text" name="types_designer[]" value="<?php echo esc_attr($designer); ?>" placeholder="Póló" /></td>
+            <td><input type="text" name="types_order[]" value="<?php echo esc_attr($order); ?>" placeholder="polo" /></td>
+          </tr>
+          <?php endfor; ?>
+        </tbody>
+      </table>
+      <p class="description">Hagyd üresen a sort a típus törléséhez vagy új sorban add hozzá az újat.</p>
 
     <?php elseif ($tab==='variants'): ?>
       <h2>Típus–Szín → Mockup & Ár</h2>
@@ -95,7 +131,9 @@
                   continue;
                 }
                 foreach ($colorList as $color):
-                  $key = strtolower($type).'|'.strtolower($color);
+                  $colorKey = nb_normalize_color_key($color);
+                  if ($colorKey === '') continue;
+                  $key = $typeKey.'|'.$colorKey;
                   $hash = md5($key);
                   $map = $cfg['map'][$key] ?? ['mockup_index'=>-1,'fee_per_cm2'=>'','min_fee'=>'','base_fee'=>''];
                   $renderedRows++;
@@ -139,15 +177,41 @@
             }
           }
         }
-        $paletteText = implode("\n", $savedPalette);
+        $colorOrderMap = isset($settings['color_order_labels']) && is_array($settings['color_order_labels']) ? $settings['color_order_labels'] : [];
+        $paletteRows = $savedPalette;
+        $paletteRowCount = max(count($paletteRows) + 2, 4);
         $typeColors = $settings['type_colors'] ?? [];
         if (!is_array($typeColors)) $typeColors = [];
         $globalTypes = $settings['types'] ?? [];
         if (!is_array($globalTypes)) $globalTypes = [];
       ?>
       <h2>Szín elérhetőség</h2>
-      <p>Add meg a teljes palettát (soronként egy szín vagy vesszővel elválasztva). Ez alapján állíthatod be, hogy típusonként (pl. póló, pulóver) mely árnyalatok érhetők el.</p>
-      <textarea name="color_palette" rows="6" cols="80"><?php echo esc_textarea($paletteText); ?></textarea>
+      <p>Add meg a színek tervezőben és rendelésben használt nevét. Hagyd üresen a sort a törléshez.</p>
+      <table class="widefat nb-label-table">
+        <thead>
+          <tr>
+            <th>Tervezőben megjelenő név</th>
+            <th>Rendelésben megjelenő név</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php for ($i = 0; $i < $paletteRowCount; $i++):
+            $designer = $paletteRows[$i] ?? '';
+            $order = '';
+            if ($designer !== ''){
+              $colorKey = nb_normalize_color_key($designer);
+              if ($colorKey && !empty($colorOrderMap[$colorKey])){
+                $order = $colorOrderMap[$colorKey];
+              }
+            }
+          ?>
+          <tr>
+            <td><input type="text" name="color_designer[]" value="<?php echo esc_attr($designer); ?>" placeholder="Fekete" /></td>
+            <td><input type="text" name="color_order[]" value="<?php echo esc_attr($order); ?>" placeholder="fekete" /></td>
+          </tr>
+          <?php endfor; ?>
+        </tbody>
+      </table>
       <?php if (!empty($globalTypes)): ?>
         <h3>Színek típusonként</h3>
         <?php foreach ($globalTypes as $typeLabel):
