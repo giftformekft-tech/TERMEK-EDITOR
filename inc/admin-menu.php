@@ -1,16 +1,6 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
-function nb_normalize_type_key($value){
-  if ($value === null) return '';
-  return strtolower(trim((string)$value));
-}
-
-function nb_normalize_color_key($value){
-  if ($value === null) return '';
-  return strtolower(trim((string)$value));
-}
-
 function nb_sync_product_color_configuration(&$cfg, $settings){
   if (!is_array($cfg)) $cfg = [];
   $existingColors = [];
@@ -99,13 +89,77 @@ add_action('admin_menu', function(){
 function nb_admin_render(){
   if ( ! current_user_can('manage_options') ) return;
   $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'products';
-  $settings = get_option('nb_settings',[]);
+  $stored = get_option('nb_settings',[]);
+  $settings = is_array($stored) ? $stored : [];
+  $cleaned = nb_clean_settings_unicode($settings);
+  if (wp_json_encode($cleaned) !== wp_json_encode($settings)){
+    $settings = $cleaned;
+    update_option('nb_settings', $settings);
+  } else {
+    $settings = $cleaned;
+  }
   if ($_SERVER['REQUEST_METHOD']==='POST' && check_admin_referer('nb_save','nb_nonce')){
     if ($tab==='products'){
       $settings['products'] = array_map('intval', $_POST['products'] ?? []);
-      $types_csv = sanitize_text_field($_POST['types'] ?? '');
-      $types = array_values(array_filter(array_map('trim', explode(',', $types_csv))));
-      if (!empty($types)) $settings['types'] = $types;
+      $designerInputs = isset($_POST['types_designer']) ? (array)$_POST['types_designer'] : [];
+      $orderInputs    = isset($_POST['types_order']) ? (array)$_POST['types_order'] : [];
+      $productInputs  = isset($_POST['types_product']) ? (array)$_POST['types_product'] : [];
+      $typeLabels = [];
+      $typeOrderMap = [];
+      $typeProductMap = [];
+      $max = max(count($designerInputs), count($orderInputs), count($productInputs));
+      for ($i = 0; $i < $max; $i++){
+        $rawDesigner = $designerInputs[$i] ?? '';
+        if (!is_scalar($rawDesigner)){
+          continue;
+        }
+        $rawDesigner = (string)$rawDesigner;
+        if (function_exists('wp_unslash')){
+          $rawDesigner = wp_unslash($rawDesigner);
+        }
+        if (function_exists('sanitize_text_field')){
+          $rawDesigner = sanitize_text_field($rawDesigner);
+        }
+        $designer = nb_clean_label_string($rawDesigner);
+        if ($designer === ''){
+          continue;
+        }
+        if (in_array($designer, $typeLabels, true)){
+          continue;
+        }
+        $typeLabels[] = $designer;
+        $rawOrder = $orderInputs[$i] ?? '';
+        if (!is_scalar($rawOrder)){
+          continue;
+        }
+        $rawOrder = (string)$rawOrder;
+        if (function_exists('wp_unslash')){
+          $rawOrder = wp_unslash($rawOrder);
+        }
+        if (function_exists('sanitize_text_field')){
+          $rawOrder = sanitize_text_field($rawOrder);
+        }
+        $orderLabel = nb_clean_label_string($rawOrder);
+        if ($orderLabel === ''){
+          continue;
+        }
+        $normKey = nb_normalize_type_key($designer);
+        if ($normKey !== ''){
+          $typeOrderMap[$normKey] = $orderLabel;
+        }
+        if ($normKey !== ''){
+          $rawProduct = $productInputs[$i] ?? '';
+          if (is_scalar($rawProduct)){
+            $productId = intval(wp_unslash($rawProduct));
+            if ($productId > 0 && in_array($productId, $settings['products'], true)){
+              $typeProductMap[$normKey] = $productId;
+            }
+          }
+        }
+      }
+      $settings['types'] = $typeLabels;
+      $settings['type_order_labels'] = $typeOrderMap;
+      $settings['type_products'] = $typeProductMap;
       if (!isset($settings['catalog'])) $settings['catalog'] = [];
       foreach($settings['products'] as $pid){
         if (empty($settings['catalog'][$pid])){
@@ -118,27 +172,59 @@ function nb_admin_render(){
       $decoded = json_decode($mockups_json, true);
       if (is_array($decoded)) $settings['mockups'] = $decoded;
     } elseif ($tab==='fonts'){
-      $settings['fonts'] = array_values(array_filter(array_map('esc_url_raw', $_POST['fonts'] ?? [])));
+      $fontInputs = isset($_POST['fonts']) ? array_map('wp_unslash', (array)$_POST['fonts']) : [];
+      $settings['fonts'] = array_values(array_filter(array_map('esc_url_raw', $fontInputs)));
     } elseif ($tab==='pricing'){
       $settings['fee_per_cm2'] = isset($_POST['fee_per_cm2']) ? floatval($_POST['fee_per_cm2']) : 3;
       $settings['min_fee']     = isset($_POST['min_fee']) ? floatval($_POST['min_fee']) : 990;
     } elseif ($tab==='colors'){
-      $palette_raw = $_POST['color_palette'] ?? '';
-      if (is_string($palette_raw)){
-        $palette_raw = sanitize_textarea_field(wp_unslash($palette_raw));
-      } else {
-        $palette_raw = '';
-      }
-      $parts = preg_split('/[\r\n,]+/', $palette_raw);
+      $designerInputs = isset($_POST['color_designer']) ? (array)$_POST['color_designer'] : [];
+      $orderInputs    = isset($_POST['color_order']) ? (array)$_POST['color_order'] : [];
       $palette = [];
-      if (is_array($parts)){
-        foreach ($parts as $entry){
-          $entry = trim($entry);
-          if ($entry === '') continue;
-          if (!in_array($entry, $palette, true)) $palette[] = $entry;
+      $colorOrderMap = [];
+      $max = max(count($designerInputs), count($orderInputs));
+      for ($i = 0; $i < $max; $i++){
+        $rawDesigner = $designerInputs[$i] ?? '';
+        if (!is_scalar($rawDesigner)){
+          continue;
+        }
+        $rawDesigner = (string)$rawDesigner;
+        if (function_exists('wp_unslash')){
+          $rawDesigner = wp_unslash($rawDesigner);
+        }
+        if (function_exists('sanitize_text_field')){
+          $rawDesigner = sanitize_text_field($rawDesigner);
+        }
+        $designer = nb_clean_label_string($rawDesigner);
+        if ($designer === ''){
+          continue;
+        }
+        if (in_array($designer, $palette, true)){
+          continue;
+        }
+        $palette[] = $designer;
+        $rawOrder = $orderInputs[$i] ?? '';
+        if (!is_scalar($rawOrder)){
+          continue;
+        }
+        $rawOrder = (string)$rawOrder;
+        if (function_exists('wp_unslash')){
+          $rawOrder = wp_unslash($rawOrder);
+        }
+        if (function_exists('sanitize_text_field')){
+          $rawOrder = sanitize_text_field($rawOrder);
+        }
+        $orderLabel = nb_clean_label_string($rawOrder);
+        if ($orderLabel === ''){
+          continue;
+        }
+        $normKey = nb_normalize_color_key($designer);
+        if ($normKey !== ''){
+          $colorOrderMap[$normKey] = $orderLabel;
         }
       }
       $settings['color_palette'] = $palette;
+      $settings['color_order_labels'] = $colorOrderMap;
       $typeInputs = $_POST['type_colors'] ?? [];
       if (!is_array($typeInputs)) $typeInputs = [];
       $globalTypes = $settings['types'] ?? [];
@@ -179,12 +265,15 @@ function nb_admin_render(){
       $pids = array_map('intval', $_POST['var_pid'] ?? []);
       foreach($pids as $idx=>$pid){
         if (!isset($catalog[$pid])) $catalog[$pid]=['title'=>get_the_title($pid),'types'=>[],'colors'=>[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
-        $types_csv  = sanitize_text_field($_POST['types_'.$pid] ?? '');
-        $sizes_csv  = sanitize_text_field($_POST['sizes_'.$pid] ?? '');
-        $catalog[$pid]['types']  = array_values(array_filter(array_map('trim', explode(',', $types_csv))));
-        $catalog[$pid]['sizes']  = array_values(array_filter(array_map('trim', explode(',', $sizes_csv))));
+        $types_input = isset($_POST['types_'.$pid]) ? wp_unslash($_POST['types_'.$pid]) : '';
+        $sizes_input = isset($_POST['sizes_'.$pid]) ? wp_unslash($_POST['sizes_'.$pid]) : '';
+        $types_csv  = sanitize_text_field($types_input);
+        $sizes_csv  = sanitize_text_field($sizes_input);
+        $catalog[$pid]['types']  = nb_clean_label_list(array_map('trim', explode(',', $types_csv)));
+        $catalog[$pid]['sizes']  = nb_clean_label_list(array_map('trim', explode(',', $sizes_csv)));
         // size surcharge parse "XL:300,XXL:600"
-        $ss_csv = sanitize_text_field($_POST['size_surcharge_'.$pid] ?? '');
+        $ss_input = isset($_POST['size_surcharge_'.$pid]) ? wp_unslash($_POST['size_surcharge_'.$pid]) : '';
+        $ss_csv = sanitize_text_field($ss_input);
         $ss = [];
         foreach (explode(',', $ss_csv) as $pair){
           $pair = trim($pair);
@@ -199,9 +288,12 @@ function nb_admin_render(){
         $colorsByType = $catalog[$pid]['colors_by_type'] ?? [];
         foreach ($catalog[$pid]['types'] as $type){
           $typeKey = nb_normalize_type_key($type);
+          if ($typeKey === '') continue;
           $colorList = $colorsByType[$typeKey] ?? [];
           foreach ($colorList as $color){
-            $key = strtolower($type).'|'.strtolower($color);
+            $colorKey = nb_normalize_color_key($color);
+            if ($colorKey === '') continue;
+            $key = $typeKey.'|'.$colorKey;
             $hash = md5($key);
             $catalog[$pid]['map'][$key] = [
               'mockup_index' => intval($_POST['mockup_'.$pid.'_'.$hash] ?? -1),
@@ -213,6 +305,13 @@ function nb_admin_render(){
         }
       }
       $settings['catalog'] = $catalog;
+    }
+    $settings = nb_clean_settings_unicode($settings);
+    if (isset($settings['catalog']) && is_array($settings['catalog'])){
+      foreach ($settings['catalog'] as &$catalogCfg){
+        nb_sync_product_color_configuration($catalogCfg, $settings);
+      }
+      unset($catalogCfg);
     }
     update_option('nb_settings',$settings);
     echo '<div class="updated"><p>Mentve.</p></div>';
