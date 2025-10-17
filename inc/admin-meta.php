@@ -766,6 +766,71 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
   echo '</div>';
 }, 10, 4);
 
+add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
+  if (! is_array($hidden)){
+    $hidden = [];
+  }
+
+  foreach (['nb_design_id','preview_url','print_url','print_width_px','print_height_px'] as $key){
+    if (! in_array($key, $hidden, true)){
+      $hidden[] = $key;
+    }
+  }
+
+  return $hidden;
+});
+
+add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, $plain_text){
+  if ($plain_text){
+    return;
+  }
+
+  if (is_admin()){
+    $doing_ajax = function_exists('wp_doing_ajax') ? wp_doing_ajax() : (defined('DOING_AJAX') && DOING_AJAX);
+    if (! $doing_ajax){
+      return;
+    }
+  }
+
+  if (! $item || ! is_a($item, 'WC_Order_Item_Product')){
+    return;
+  }
+
+  $preview = $item->get_meta('preview_url');
+  $design_id = intval($item->get_meta('nb_design_id'));
+
+  if (! $preview && ! $design_id){
+    return;
+  }
+
+  $product = $item->get_product();
+  $product_id = $product && is_a($product, 'WC_Product') ? $product->get_id() : $item->get_product_id();
+  $summary = nb_get_design_attribute_summary($design_id, $product_id, $item);
+
+  if (! $preview && empty($summary)){
+    return;
+  }
+
+  echo '<div class="nb-order-item-design-summary" style="margin-top:12px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">';
+
+  if ($preview){
+    echo '<div class="nb-order-item-design-summary__preview"><img src="'.esc_url($preview).'" alt="" loading="lazy" style="max-width:220px;height:auto;display:block;border:1px solid #e5e5e5;border-radius:4px;" /></div>';
+  }
+
+  if (! empty($summary)){
+    echo '<ul class="nb-order-item-design-summary__attributes" style="margin:0;padding:0;list-style:none;">';
+    foreach ($summary as $row){
+      if (empty($row['label']) || empty($row['value'])){
+        continue;
+      }
+      echo '<li style="margin:0 0 6px;padding:0;"><strong style="display:inline-block;min-width:120px;font-weight:600;">'.esc_html($row['label']).':</strong> <span>'.esc_html($row['value']).'</span></li>';
+    }
+    echo '</ul>';
+  }
+
+  echo '</div>';
+}, 10, 4);
+
 add_action('admin_head', function(){
   if (! function_exists('get_current_screen')){
     return;
