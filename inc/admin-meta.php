@@ -731,7 +731,7 @@ add_action('woocommerce_admin_order_data_after_order_details', function($order){
   echo '<div class="order_data_column nb-order-designs"><h3>'.esc_html__('Tervezett minta','nb').'</h3>'.$content.'</div>';
 });
 
-add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $product, $order_id){
+add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $product, $order_id = null){
   if (! is_admin()){
     return;
   }
