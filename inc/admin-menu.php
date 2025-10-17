@@ -177,6 +177,37 @@ function nb_admin_render(){
     } elseif ($tab==='pricing'){
       $settings['fee_per_cm2'] = isset($_POST['fee_per_cm2']) ? floatval($_POST['fee_per_cm2']) : 3;
       $settings['min_fee']     = isset($_POST['min_fee']) ? floatval($_POST['min_fee']) : 990;
+      $bulkFrom = isset($_POST['bulk_from']) ? (array)$_POST['bulk_from'] : [];
+      $bulkTo   = isset($_POST['bulk_to']) ? (array)$_POST['bulk_to'] : [];
+      $bulkPct  = isset($_POST['bulk_discount']) ? (array)$_POST['bulk_discount'] : [];
+      $rows = [];
+      $maxRows = max(count($bulkFrom), count($bulkTo), count($bulkPct));
+      for ($i = 0; $i < $maxRows; $i++){
+        $rawFrom = isset($bulkFrom[$i]) ? $bulkFrom[$i] : '';
+        $rawTo   = isset($bulkTo[$i]) ? $bulkTo[$i] : '';
+        $rawPct  = isset($bulkPct[$i]) ? $bulkPct[$i] : '';
+        if (function_exists('wp_unslash')){
+          $rawFrom = wp_unslash($rawFrom);
+          $rawTo   = wp_unslash($rawTo);
+          $rawPct  = wp_unslash($rawPct);
+        }
+        $from = intval($rawFrom);
+        $to   = intval($rawTo);
+        $pct  = floatval(str_replace(',', '.', (string)$rawPct));
+        if ($from <= 0 || $pct <= 0){
+          continue;
+        }
+        $rows[] = [
+          'min_qty' => $from,
+          'max_qty' => ($to > 0 ? $to : 0),
+          'percent' => $pct,
+        ];
+      }
+      if (!empty($rows)){
+        $settings['bulk_discounts'] = nb_normalize_bulk_discount_tiers($rows);
+      } else {
+        $settings['bulk_discounts'] = [];
+      }
     } elseif ($tab==='colors'){
       $designerInputs = isset($_POST['color_designer']) ? (array)$_POST['color_designer'] : [];
       $orderInputs    = isset($_POST['color_order']) ? (array)$_POST['color_order'] : [];

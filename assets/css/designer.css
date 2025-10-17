@@ -108,6 +108,14 @@ body.nb-modal-open{overflow:hidden}
 .nb-bulk-size-input{display:flex;align-items:center;gap:8px;color:#475569;font-size:13px;font-weight:600}
 .nb-bulk-size-input input{width:72px;border-radius:12px;border:1px solid rgba(148,163,184,.6);padding:6px 10px;font-size:14px;font-weight:700;text-align:center;color:#0f172a;background:#ffffff;box-shadow:inset 0 1px 2px rgba(15,23,42,.08)}
 .nb-bulk-size-input input:focus{outline:2px solid #2563eb;outline-offset:2px}
+.nb-modal-section--discounts{margin-top:24px;padding-top:16px;border-top:1px solid rgba(148,163,184,.35)}
+.nb-bulk-discount-table{margin-top:12px;border-radius:12px;overflow:hidden;border:1px solid rgba(148,163,184,.35)}
+.nb-bulk-discount-table table{width:100%;border-collapse:collapse;background:#fff}
+.nb-bulk-discount-table th,.nb-bulk-discount-table td{padding:8px 12px;font-size:13px;line-height:1.4;color:#0f172a}
+.nb-bulk-discount-table thead th{background:#f1f5f9;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#475569}
+.nb-bulk-discount-table tbody tr:nth-child(even){background:#f8fafc}
+.nb-bulk-discount-hint{margin-top:10px;font-size:14px;font-weight:600;color:#0f172a}
+.nb-bulk-discount-hint strong{color:#2563eb}
 
 @media(max-width:1180px){
   #nb-designer{margin:12px}

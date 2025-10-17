@@ -303,6 +303,37 @@
         <tr><th>Ft / cm²</th><td><input type="number" step="0.1" name="fee_per_cm2" value="<?php echo esc_attr($settings['fee_per_cm2'] ?? 3); ?>"></td></tr>
         <tr><th>Minimum felár (Ft)</th><td><input type="number" step="1" name="min_fee" value="<?php echo esc_attr($settings['min_fee'] ?? 990); ?>"></td></tr>
       </table>
+      <?php
+        $bulkTiers = isset($settings['bulk_discounts']) && is_array($settings['bulk_discounts']) ? $settings['bulk_discounts'] : [];
+        $rowCount = max(count($bulkTiers) + 1, 3);
+      ?>
+      <h3>Mennyiségi kedvezmények</h3>
+      <p>Add meg, hogy hány darabtól hány darabig milyen százalékos kedvezményt kapjon a több darabos vásárlás. A felső határ üresen hagyható, ha nincs maximum.</p>
+      <table class="widefat nb-label-table nb-bulk-table">
+        <thead>
+          <tr>
+            <th>Darabtól</th>
+            <th>Darabig</th>
+            <th>Kedvezmény (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php for ($i = 0; $i < $rowCount; $i++):
+            $tier = $bulkTiers[$i] ?? ['min_qty'=>'','max_qty'=>'','percent'=>''];
+            $from = $tier['min_qty'] ?? '';
+            $to   = $tier['max_qty'] ?? '';
+            $pct  = $tier['percent'] ?? '';
+            if ($to === 0) { $to = ''; }
+          ?>
+          <tr>
+            <td><input type="number" min="1" step="1" name="bulk_from[]" value="<?php echo esc_attr($from); ?>" placeholder="5"></td>
+            <td><input type="number" min="0" step="1" name="bulk_to[]" value="<?php echo esc_attr($to); ?>" placeholder="10"></td>
+            <td><input type="number" min="0" step="0.1" name="bulk_discount[]" value="<?php echo esc_attr($pct); ?>" placeholder="5"></td>
+          </tr>
+          <?php endfor; ?>
+        </tbody>
+      </table>
+      <p class="description">A sorok üresen hagyásával törölheted a kedvezményt. A kedvezmények a "Többet vennék" kosárba helyezéskor lépnek életbe.</p>
     <?php endif; ?>
 
     <p><button class="button button-primary">Mentés</button></p>

@@ -141,6 +141,12 @@
           <p class="nb-modal-help">Állítsd be, hány darabot szeretnél az egyes méretekből.</p>
           <div class="nb-bulk-size-list" id="nb-bulk-size-list"></div>
         </div>
+        <div class="nb-modal-section nb-modal-section--discounts" id="nb-bulk-discount-section" hidden>
+          <h3>Mennyiségi kedvezmények</h3>
+          <p class="nb-modal-help">A megadott darabszám alapján automatikusan jóváírjuk a kedvezményt.</p>
+          <div class="nb-bulk-discount-table" id="nb-bulk-discount-table"></div>
+          <div class="nb-bulk-discount-hint" id="nb-bulk-discount-hint"></div>
+        </div>
       </div>
       <div class="nb-modal-footer">
         <button type="button" class="nb-secondary-button" data-nb-close="bulk-modal">Mégse</button>

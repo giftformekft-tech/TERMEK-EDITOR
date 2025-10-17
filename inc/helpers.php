@@ -31,6 +31,119 @@ if ( ! function_exists('nb_normalize_color_key') ) {
   }
 }
 
+if ( ! function_exists('nb_normalize_bulk_discount_tiers') ) {
+  function nb_normalize_bulk_discount_tiers($tiers){
+    if (!is_array($tiers)) {
+      return [];
+    }
+    $normalized = [];
+    foreach ($tiers as $row){
+      if (!is_array($row)) {
+        continue;
+      }
+      $min = 0;
+      $max = 0;
+      $percent = 0;
+      if (isset($row['min_qty'])){
+        $min = intval($row['min_qty']);
+      } elseif (isset($row['from'])){
+        $min = intval($row['from']);
+      } elseif (isset($row['min'])){
+        $min = intval($row['min']);
+      }
+      if (isset($row['max_qty'])){
+        $max = intval($row['max_qty']);
+      } elseif (isset($row['to'])){
+        $max = intval($row['to']);
+      } elseif (isset($row['max'])){
+        $max = intval($row['max']);
+      }
+      if (isset($row['percent'])){
+        $percent = floatval($row['percent']);
+      } elseif (isset($row['discount'])){
+        $percent = floatval($row['discount']);
+      }
+      if ($min <= 0 || $percent <= 0){
+        continue;
+      }
+      if ($max > 0 && $max < $min){
+        $tmp = $min;
+        $min = $max;
+        $max = $tmp;
+      }
+      $normalized[] = [
+        'min_qty' => $min,
+        'max_qty' => ($max > 0 ? $max : 0),
+        'percent' => round($percent, 4),
+      ];
+    }
+    if (empty($normalized)){
+      return [];
+    }
+    usort($normalized, function($a, $b){
+      if ($a['min_qty'] === $b['min_qty']){
+        $aMax = $a['max_qty'] > 0 ? $a['max_qty'] : PHP_INT_MAX;
+        $bMax = $b['max_qty'] > 0 ? $b['max_qty'] : PHP_INT_MAX;
+        if ($aMax === $bMax){
+          return ($b['percent'] <=> $a['percent']);
+        }
+        return ($aMax <=> $bMax);
+      }
+      return ($a['min_qty'] <=> $b['min_qty']);
+    });
+    $deduped = [];
+    foreach ($normalized as $row){
+      $key = $row['min_qty'].'-'.$row['max_qty'];
+      if (isset($deduped[$key])){
+        if ($row['percent'] > $deduped[$key]['percent']){
+          $deduped[$key]['percent'] = $row['percent'];
+        }
+        continue;
+      }
+      $deduped[$key] = $row;
+    }
+    return array_values($deduped);
+  }
+}
+
+if ( ! function_exists('nb_find_bulk_discount_for_quantity') ) {
+  function nb_find_bulk_discount_for_quantity($quantity, $settings = null){
+    $qty = intval($quantity);
+    if ($qty <= 0){
+      return 0;
+    }
+    if ($settings === null){
+      $settings = get_option('nb_settings', []);
+    }
+    $tiers = [];
+    if (isset($settings['bulk_discounts']) && is_array($settings['bulk_discounts'])){
+      $tiers = nb_normalize_bulk_discount_tiers($settings['bulk_discounts']);
+    }
+    if (empty($tiers)){
+      return 0;
+    }
+    $matched = 0;
+    foreach ($tiers as $tier){
+      $min = intval($tier['min_qty'] ?? 0);
+      $max = intval($tier['max_qty'] ?? 0);
+      $percent = floatval($tier['percent'] ?? 0);
+      if ($min <= 0 || $percent <= 0){
+        continue;
+      }
+      if ($qty < $min){
+        continue;
+      }
+      if ($max > 0 && $qty > $max){
+        continue;
+      }
+      if ($percent > $matched){
+        $matched = $percent;
+      }
+    }
+    return $matched;
+  }
+}
+
 if ( ! function_exists('nb_resolve_type_order_label') ) {
   function nb_resolve_type_order_label($value, $settings, $fallback = ''){
     $map = [];
@@ -229,6 +342,10 @@ if ( ! function_exists('nb_clean_settings_unicode') ) {
         $cleanTypeColors[$cleanKey] = nb_clean_label_list(is_array($values) ? $values : []);
       }
       $settings['type_colors'] = $cleanTypeColors;
+    }
+
+    if (isset($settings['bulk_discounts'])) {
+      $settings['bulk_discounts'] = nb_normalize_bulk_discount_tiers($settings['bulk_discounts']);
     }
 
     if (isset($settings['catalog']) && is_array($settings['catalog'])) {

@@ -102,6 +102,9 @@
   const bulkModalTrigger = document.getElementById('nb-bulk-modal-trigger');
   const bulkModalList = document.getElementById('nb-bulk-size-list');
   const bulkConfirmBtn = document.getElementById('nb-bulk-confirm');
+  const bulkDiscountSection = document.getElementById('nb-bulk-discount-section');
+  const bulkDiscountTable = document.getElementById('nb-bulk-discount-table');
+  const bulkDiscountHint = document.getElementById('nb-bulk-discount-hint');
   const selectionSummaryEl = document.getElementById('nb-selection-summary');
   const productTitleEl = document.getElementById('nb-product-title');
   const productMetaEl = document.getElementById('nb-product-meta');
@@ -126,6 +129,48 @@
   let actionSubmitting = false;
   let layerIdSeq = 1;
   const bulkSizeState = {};
+  const bulkDiscountTiers = (()=>{
+    const raw = settings.bulk_discounts;
+    const tiers = [];
+    if (Array.isArray(raw)){
+      raw.forEach(entry => {
+        if (!entry) return;
+        const minRaw = entry.min_qty ?? entry.min ?? entry.from;
+        const maxRaw = entry.max_qty ?? entry.max ?? entry.to;
+        const pctRaw = entry.percent ?? entry.discount;
+        let min = parseInt(minRaw, 10);
+        const pct = parseFloat(pctRaw);
+        if (!Number.isFinite(min) || min <= 0) return;
+        if (!Number.isFinite(pct) || pct <= 0) return;
+        let max = parseInt(maxRaw, 10);
+        if (!Number.isFinite(max) || max <= 0){
+          max = 0;
+        }
+        if (max > 0 && max < min){
+          const temp = min;
+          min = max;
+          max = temp;
+        }
+        tiers.push({
+          min,
+          max,
+          percent: pct,
+        });
+      });
+    }
+    tiers.sort((a, b)=>{
+      if (a.min === b.min){
+        const aMax = a.max > 0 ? a.max : Number.MAX_SAFE_INTEGER;
+        const bMax = b.max > 0 ? b.max : Number.MAX_SAFE_INTEGER;
+        if (aMax === bMax){
+          return b.percent - a.percent;
+        }
+        return aMax - bMax;
+      }
+      return a.min - b.min;
+    });
+    return tiers;
+  })();
 
   function getCatalog(){ return settings.catalog || {}; }
   function productList(){ return settings.products || []; }
@@ -521,6 +566,135 @@
 
   function clearBulkSizeState(){
     Object.keys(bulkSizeState).forEach(key=>{ delete bulkSizeState[key]; });
+    updateBulkDiscountHint();
+  }
+
+  function hasBulkDiscounts(){
+    return Array.isArray(bulkDiscountTiers) && bulkDiscountTiers.length > 0;
+  }
+
+  function totalBulkQuantity(){
+    return Object.keys(bulkSizeState).reduce((sum, key)=>{
+      const qty = parseInt(bulkSizeState[key], 10);
+      if (!Number.isFinite(qty) || qty <= 0){
+        return sum;
+      }
+      return sum + qty;
+    }, 0);
+  }
+
+  function resolveBulkDiscountForQuantity(qty){
+    const quantity = parseInt(qty, 10);
+    if (!Number.isFinite(quantity) || quantity <= 0){
+      return null;
+    }
+    let matched = null;
+    bulkDiscountTiers.forEach(tier => {
+      if (!tier) return;
+      if (quantity < tier.min) return;
+      if (tier.max > 0 && quantity > tier.max) return;
+      if (!matched || tier.percent > matched.percent || (tier.percent === matched.percent && tier.min > matched.min)){
+        matched = tier;
+      }
+    });
+    return matched;
+  }
+
+  function nextBulkDiscountAfter(qty){
+    const quantity = parseInt(qty, 10);
+    if (!Number.isFinite(quantity)){
+      return null;
+    }
+    for (let i = 0; i < bulkDiscountTiers.length; i++){
+      const tier = bulkDiscountTiers[i];
+      if (!tier) continue;
+      if (quantity < tier.min){
+        return tier;
+      }
+    }
+    return null;
+  }
+
+  function formatPercent(value){
+    const num = Number(value);
+    if (!Number.isFinite(num)){
+      return '0';
+    }
+    const fractionDigits = Math.abs(num - Math.round(num)) < 0.005 ? 0 : 2;
+    try {
+      return num.toLocaleString(undefined, {minimumFractionDigits:fractionDigits, maximumFractionDigits:2});
+    } catch(e){
+      return num.toFixed(fractionDigits);
+    }
+  }
+
+  function renderBulkDiscountTable(){
+    if (!bulkDiscountSection || !bulkDiscountTable){
+      return;
+    }
+    if (!hasBulkDiscounts()){
+      bulkDiscountSection.hidden = true;
+      bulkDiscountTable.innerHTML = '';
+      if (bulkDiscountHint){
+        bulkDiscountHint.textContent = '';
+      }
+      return;
+    }
+    bulkDiscountSection.hidden = false;
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    ['Darabtól','Darabig','Kedvezmény'].forEach(label=>{
+      const th = document.createElement('th');
+      th.textContent = label;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    bulkDiscountTiers.forEach(tier => {
+      if (!tier) return;
+      const row = document.createElement('tr');
+      const fromCell = document.createElement('td');
+      fromCell.textContent = tier.min.toString();
+      const toCell = document.createElement('td');
+      toCell.textContent = tier.max > 0 ? tier.max.toString() : '∞';
+      const pctCell = document.createElement('td');
+      pctCell.textContent = formatPercent(tier.percent) + ' %';
+      row.appendChild(fromCell);
+      row.appendChild(toCell);
+      row.appendChild(pctCell);
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    bulkDiscountTable.innerHTML = '';
+    bulkDiscountTable.appendChild(table);
+  }
+
+  function updateBulkDiscountHint(){
+    if (!bulkDiscountHint || !hasBulkDiscounts()){
+      if (bulkDiscountHint){
+        bulkDiscountHint.textContent = '';
+      }
+      return;
+    }
+    const qty = totalBulkQuantity();
+    if (!qty){
+      bulkDiscountHint.textContent = 'Adj meg mennyiségeket a kedvezmény kiszámításához.';
+      return;
+    }
+    const active = resolveBulkDiscountForQuantity(qty);
+    if (active){
+      bulkDiscountHint.innerHTML = `Jelenleg <strong>${qty} db</strong> után <strong>${formatPercent(active.percent)}% kedvezmény</strong> jár.`;
+      return;
+    }
+    const upcoming = nextBulkDiscountAfter(qty);
+    if (upcoming){
+      const remaining = Math.max(0, upcoming.min - qty);
+      bulkDiscountHint.textContent = `Még ${remaining} darabnál indul a ${formatPercent(upcoming.percent)}% kedvezmény.`;
+      return;
+    }
+    bulkDiscountHint.textContent = '';
   }
 
   function renderBulkSizeList(){
@@ -583,6 +757,7 @@
           bulkSizeState[value] = parsed;
           input.value = String(parsed);
         }
+        updateBulkDiscountHint();
       });
 
       inputWrap.appendChild(qtyLabel);
@@ -591,6 +766,7 @@
       row.appendChild(inputWrap);
       bulkModalList.appendChild(row);
     });
+    updateBulkDiscountHint();
   }
 
   function collectBulkSizeEntries(){
@@ -617,126 +793,15 @@
       entries.push({value, label, quantity: qty});
     });
     updateActionStates();
+    updateBulkDiscountHint();
     return entries;
   }
 
   function openBulkModal(){
     if (!bulkModal) return;
     renderBulkSizeList();
-    bulkModal.hidden = false;
-    updateModalBodyState();
-  }
-
-  function closeBulkModal(){
-    if (!bulkModal) return;
-    bulkModal.hidden = true;
-    updateModalBodyState();
-  }
-
-  function clearBulkSizeState(){
-    Object.keys(bulkSizeState).forEach(key=>{ delete bulkSizeState[key]; });
-  }
-
-  function renderBulkSizeList(){
-    if (!bulkModalList) return;
-    bulkModalList.innerHTML = '';
-    const options = sizeSel ? Array.from(sizeSel.options) : [];
-    if (!options.length){
-      if (bulkModalTrigger) bulkModalTrigger.disabled = true;
-      const empty = document.createElement('div');
-      empty.className = 'nb-modal-empty';
-      empty.textContent = 'Nincs méret megadva.';
-      bulkModalList.appendChild(empty);
-      return;
-    }
-    if (bulkModalTrigger) bulkModalTrigger.disabled = false;
-    options.forEach(opt=>{
-      const value = (opt.value || '').toString();
-      if (!value) return;
-      const label = opt.dataset.label || opt.textContent || value;
-      const row = document.createElement('div');
-      row.className = 'nb-bulk-size-row';
-      row.dataset.sizeValue = value;
-      row.dataset.sizeLabel = label;
-
-      const title = document.createElement('span');
-      title.className = 'nb-bulk-size-label';
-      title.textContent = label;
-
-      const inputWrap = document.createElement('div');
-      inputWrap.className = 'nb-bulk-size-input';
-
-      const qtyLabel = document.createElement('span');
-      qtyLabel.textContent = 'Darab';
-
-      const input = document.createElement('input');
-      input.type = 'number';
-      input.min = '0';
-      input.step = '1';
-      input.inputMode = 'numeric';
-      const current = Object.prototype.hasOwnProperty.call(bulkSizeState, value) ? parseInt(bulkSizeState[value], 10) : 0;
-      if (Number.isFinite(current) && current > 0){
-        input.value = String(current);
-      } else {
-        input.value = '';
-      }
-      input.placeholder = '0';
-
-      input.addEventListener('input', ()=>{
-        const digitsOnly = input.value.replace(/[^0-9]/g, '');
-        if (digitsOnly !== input.value){
-          input.value = digitsOnly;
-        }
-      });
-
-      input.addEventListener('change', ()=>{
-        const parsed = parseInt(input.value, 10);
-        if (!Number.isFinite(parsed) || parsed <= 0){
-          delete bulkSizeState[value];
-          input.value = '';
-        } else {
-          bulkSizeState[value] = parsed;
-          input.value = String(parsed);
-        }
-      });
-
-      inputWrap.appendChild(qtyLabel);
-      inputWrap.appendChild(input);
-      row.appendChild(title);
-      row.appendChild(inputWrap);
-      bulkModalList.appendChild(row);
-    });
-  }
-
-  function collectBulkSizeEntries(){
-    if (!bulkModalList) return [];
-    const entries = [];
-    const rows = Array.from(bulkModalList.querySelectorAll('.nb-bulk-size-row'));
-    rows.forEach(row=>{
-      const value = (row.dataset.sizeValue || '').toString();
-      if (!value) return;
-      const label = row.dataset.sizeLabel || value;
-      const input = row.querySelector('input');
-      const raw = input ? input.value : '';
-      const qty = parseInt(raw, 10);
-      if (!Number.isFinite(qty) || qty <= 0){
-        if (Object.prototype.hasOwnProperty.call(bulkSizeState, value)){
-          delete bulkSizeState[value];
-        }
-        if (input && raw !== ''){
-          input.value = '';
-        }
-        return;
-      }
-      bulkSizeState[value] = qty;
-      entries.push({value, label, quantity: qty});
-    });
-    return entries;
-  }
-
-  function openBulkModal(){
-    if (!bulkModal) return;
-    renderBulkSizeList();
+    renderBulkDiscountTable();
+    updateBulkDiscountHint();
     bulkModal.hidden = false;
     updateModalBodyState();
   }
@@ -912,19 +977,6 @@
     updateColorTriggerLabel();
     updatePriceDisplay();
     updateActionStates();
-  }
-
-  function currentProductPriceMarkup(){
-    const sel = currentSelection();
-    if (!sel || !sel.cfg) return '';
-    const cfg = sel.cfg;
-    if (cfg.price_html && typeof cfg.price_html === 'string' && cfg.price_html.trim()){
-      return cfg.price_html;
-    }
-    if (cfg.price_text && typeof cfg.price_text === 'string' && cfg.price_text.trim()){
-      return cfg.price_text;
-    }
-    return '';
   }
 
   function currentProductPriceMarkup(){
@@ -1743,6 +1795,9 @@
     });
   }
 
+  renderBulkDiscountTable();
+  updateBulkDiscountHint();
+
   if (bulkModalTrigger){
     bulkModalTrigger.addEventListener('click', ()=>{
       if (bulkModalTrigger.disabled) return;
@@ -2045,41 +2100,6 @@
         bulkConfirmBtn.disabled = false;
         actionSubmitting = false;
         updateActionStates();
-      }
-    };
-  }
-
-  if (bulkConfirmBtn){
-    bulkConfirmBtn.onclick = async ()=>{
-      const entries = collectBulkSizeEntries();
-      if (!entries.length){
-        alert('Adj meg legalább egy mennyiséget!');
-        return;
-      }
-      if (!designState.savedDesignId){
-        alert('Előbb mentsd a tervet!');
-        return;
-      }
-      bulkConfirmBtn.disabled = true;
-      try{
-        const res = await fetch(NB_DESIGNER.rest + 'add-to-cart', {
-          method:'POST',
-          headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
-          body: JSON.stringify({design_id: designState.savedDesignId, bulk_sizes: entries})
-        });
-        const j = await res.json();
-        if (!res.ok){
-          alert(j.message || 'Kosár hiba');
-          return;
-        }
-        closeBulkModal();
-        if (j.redirect){
-          window.location = j.redirect;
-        }
-      }catch(e){
-        alert('Hálózati hiba');
-      } finally {
-        bulkConfirmBtn.disabled = false;
       }
     };
   }

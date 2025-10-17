@@ -40,6 +40,11 @@ if ( ! function_exists('nb_rest_cart_single_add') ) {
       $quantity = 1;
     }
 
+    $extra_cart_item_data = [];
+    if (!empty($args['cart_item_data']) && is_array($args['cart_item_data'])){
+      $extra_cart_item_data = $args['cart_item_data'];
+    }
+
     $size_value = '';
     $size_label = '';
     if (!empty($args['size'])){
@@ -243,6 +248,17 @@ if ( ! function_exists('nb_rest_cart_single_add') ) {
       'unique_key'       => 'nb_'.$unique_key,
     ];
 
+    if (!empty($extra_cart_item_data)){
+      foreach ($extra_cart_item_data as $extra_key => $extra_value){
+        if (!is_string($extra_key) || $extra_key === ''){
+          continue;
+        }
+        if (is_scalar($extra_value) || is_array($extra_value)){
+          $cart_item_data[$extra_key] = $extra_value;
+        }
+      }
+    }
+
     if (!empty($price_ctx)){
       $cart_item_data['nb_price_ctx_override'] = $price_ctx;
     }
@@ -382,9 +398,14 @@ add_action('rest_api_init', function(){
         return $prepared;
       }
 
+      $storedSettings = get_option('nb_settings', []);
+      $settings = is_array($storedSettings) ? $storedSettings : [];
+      $settings = nb_clean_settings_unicode($settings);
+
       $added = false;
       $bulk_sizes = $req->get_param('bulk_sizes');
       if (is_array($bulk_sizes) && !empty($bulk_sizes)){
+        $normalized_entries = [];
         foreach ($bulk_sizes as $entry){
           if (!is_array($entry)){
             if (is_string($entry) && trim($entry) !== ''){
@@ -409,17 +430,40 @@ add_action('rest_api_init', function(){
           } elseif (isset($entry['display'])){
             $size_label = $entry['display'];
           }
-          $result = nb_rest_cart_single_add($design_id, [
-            'size'     => ['value'=>$size_value, 'label'=>$size_label],
+          $normalized_entries[] = [
             'quantity' => $quantity,
+            'size_value' => $size_value,
+            'size_label' => $size_label,
+          ];
+        }
+        $total_quantity = 0;
+        foreach ($normalized_entries as $entry){
+          $total_quantity += $entry['quantity'];
+        }
+        if ($total_quantity <= 0){
+          return new WP_Error('cart','Nem lett mennyiség kiválasztva', ['status'=>400]);
+        }
+        $bulk_discount = nb_find_bulk_discount_for_quantity($total_quantity, $settings);
+        $group_id = '';
+        if ($bulk_discount > 0){
+          $group_id = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : uniqid('nb_bulk_', true);
+        }
+        foreach ($normalized_entries as $entry){
+          $cart_item_data = [];
+          if ($group_id !== ''){
+            $cart_item_data['nb_bulk_group_id'] = $group_id;
+            $cart_item_data['nb_bulk_discount'] = $bulk_discount;
+            $cart_item_data['nb_bulk_group_quantity'] = $total_quantity;
+          }
+          $result = nb_rest_cart_single_add($design_id, [
+            'size'     => ['value'=>$entry['size_value'], 'label'=>$entry['size_label']],
+            'quantity' => $entry['quantity'],
+            'cart_item_data' => $cart_item_data,
           ]);
           if (is_wp_error($result)) {
             return $result;
           }
           $added = true;
-        }
-        if (! $added) {
-          return new WP_Error('cart','Nem lett mennyiség kiválasztva', ['status'=>400]);
         }
       } else {
         $quantity = intval($req->get_param('quantity'));

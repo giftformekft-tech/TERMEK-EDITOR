@@ -16,3 +16,4 @@
 .nb-label-table td{padding:8px}
 .nb-label-table input[type=text]{width:100%;max-width:100%}
 .nb-label-table select{width:100%;max-width:100%}
+.nb-bulk-table input[type=number]{width:100%;max-width:100%}
