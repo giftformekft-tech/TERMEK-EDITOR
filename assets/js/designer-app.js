@@ -10,6 +10,46 @@
   const settings = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
   const c = new fabric.Canvas('nb-canvas', {preserveObjectStacking:true, backgroundColor:'#fff'});
 
+  const controlProfiles = {
+    desktop: {cornerSize: 22, touchCornerSize: 40, borderScaleFactor: 18},
+    mobile: {cornerSize: 14, touchCornerSize: 26, borderScaleFactor: 12}
+  };
+  let activeControlProfile = '';
+  const controlMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
+    ? window.matchMedia('(max-width: 720px)')
+    : null;
+
+  function applyControlProfile(profile){
+    if (!profile) return;
+    const {cornerSize, touchCornerSize, borderScaleFactor} = profile;
+    fabric.Object.prototype.cornerSize = cornerSize;
+    fabric.Object.prototype.touchCornerSize = touchCornerSize;
+    fabric.Object.prototype.borderScaleFactor = borderScaleFactor;
+    designObjects().forEach(obj=>{
+      obj.cornerSize = cornerSize;
+      obj.touchCornerSize = touchCornerSize;
+      obj.borderScaleFactor = borderScaleFactor;
+    });
+    c.requestRenderAll();
+  }
+
+  function refreshControlProfile(){
+    const nextKey = controlMedia && controlMedia.matches ? 'mobile' : 'desktop';
+    if (nextKey === activeControlProfile) return;
+    activeControlProfile = nextKey;
+    applyControlProfile(controlProfiles[nextKey] || controlProfiles.desktop);
+  }
+
+  refreshControlProfile();
+  if (controlMedia){
+    const mediaListener = () => refreshControlProfile();
+    if (typeof controlMedia.addEventListener === 'function'){
+      controlMedia.addEventListener('change', mediaListener);
+    } else if (typeof controlMedia.addListener === 'function'){
+      controlMedia.addListener(mediaListener);
+    }
+  }
+
   const defaultCanvasSize = {w:baseCanvasSize.w, h:baseCanvasSize.h};
   const fallbackArea = {
     x: Math.round(defaultCanvasSize.w * 0.15),
@@ -1827,6 +1867,7 @@
   window.addEventListener('resize', ()=>{
     if (resizeRaf) cancelAnimationFrame(resizeRaf);
     resizeRaf = requestAnimationFrame(()=>{
+      refreshControlProfile();
       setMockupBgAndArea();
     });
   });
