@@ -1,7 +1,7 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
-function nb_calc_fee_for_design($design_id){
+function nb_calc_fee_for_design($design_id, $override_ctx = []){
   $settings = get_option('nb_settings',[]);
   $global_per = isset($settings['fee_per_cm2']) ? floatval($settings['fee_per_cm2']) : 3;
   $global_min = isset($settings['min_fee']) ? floatval($settings['min_fee']) : 990;
@@ -11,6 +11,25 @@ function nb_calc_fee_for_design($design_id){
   $area_cm2 = max(0,$w*$h);
 
   $price_ctx = json_decode(get_post_meta($design_id,'price_ctx',true), true) ?: [];
+  if (is_array($override_ctx) && !empty($override_ctx)){
+    foreach ($override_ctx as $key=>$value){
+      if ($value === null) {
+        continue;
+      }
+      if ($key === 'product_id'){
+        $price_ctx[$key] = intval($value);
+        continue;
+      }
+      if (is_scalar($value)){
+        $string_value = (string)$value;
+        if ($key === 'size_label' || $key === 'type_label' || $key === 'color_label'){
+          $price_ctx[$key] = trim($string_value);
+        } else {
+          $price_ctx[$key] = $string_value;
+        }
+      }
+    }
+  }
   $pid = intval($price_ctx['product_id'] ?? get_post_meta($design_id,'product_id',true));
   $type = nb_normalize_type_key($price_ctx['type'] ?? '');
   $color = nb_normalize_color_key($price_ctx['color'] ?? '');
@@ -40,7 +59,11 @@ add_action('woocommerce_cart_calculate_fees', function($cart){
   foreach ($cart->get_cart() as $item){
     if (!empty($item['nb_design_id'])){
       $has=true;
-      $total_fee += nb_calc_fee_for_design($item['nb_design_id']);
+      $override = [];
+      if (!empty($item['nb_price_ctx_override']) && is_array($item['nb_price_ctx_override'])){
+        $override = $item['nb_price_ctx_override'];
+      }
+      $total_fee += nb_calc_fee_for_design($item['nb_design_id'], $override);
     }
   }
   if ($has && $total_fee>0){
@@ -87,6 +110,18 @@ add_action('woocommerce_checkout_create_order_line_item', function($item, $cart_
         }
         if (! in_array($clean, $extra_candidates[$group], true)){
           $extra_candidates[$group][] = $clean;
+        }
+      }
+    }
+
+    if (! empty($values['nb_size_label_override'])){
+      $clean_override = trim((string)$values['nb_size_label_override']);
+      if ($clean_override !== ''){
+        if (! isset($extra_candidates['size'])){
+          $extra_candidates['size'] = [];
+        }
+        if (! in_array($clean_override, $extra_candidates['size'], true)){
+          $extra_candidates['size'][] = $clean_override;
         }
       }
     }

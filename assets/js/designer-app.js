@@ -98,6 +98,10 @@
   const modalColorList = document.getElementById('nb-modal-color-list');
   const colorModalLabel = document.getElementById('nb-color-modal-label');
   const sizeButtonsWrap = document.getElementById('nb-size-buttons');
+  const bulkModal = document.getElementById('nb-bulk-modal');
+  const bulkModalTrigger = document.getElementById('nb-bulk-modal-trigger');
+  const bulkModalList = document.getElementById('nb-bulk-size-list');
+  const bulkConfirmBtn = document.getElementById('nb-bulk-confirm');
   const selectionSummaryEl = document.getElementById('nb-selection-summary');
   const productTitleEl = document.getElementById('nb-product-title');
   const productMetaEl = document.getElementById('nb-product-meta');
@@ -119,6 +123,7 @@
   const loadedFontUrls = new Set();
   const designState = {savedDesignId:null};
   let layerIdSeq = 1;
+  const bulkSizeState = {};
 
   function getCatalog(){ return settings.catalog || {}; }
   function productList(){ return settings.products || []; }
@@ -477,6 +482,120 @@
     });
   }
 
+  function clearBulkSizeState(){
+    Object.keys(bulkSizeState).forEach(key=>{ delete bulkSizeState[key]; });
+  }
+
+  function renderBulkSizeList(){
+    if (!bulkModalList) return;
+    bulkModalList.innerHTML = '';
+    const options = sizeSel ? Array.from(sizeSel.options) : [];
+    if (!options.length){
+      if (bulkModalTrigger) bulkModalTrigger.disabled = true;
+      const empty = document.createElement('div');
+      empty.className = 'nb-modal-empty';
+      empty.textContent = 'Nincs méret megadva.';
+      bulkModalList.appendChild(empty);
+      return;
+    }
+    if (bulkModalTrigger) bulkModalTrigger.disabled = false;
+    options.forEach(opt=>{
+      const value = (opt.value || '').toString();
+      if (!value) return;
+      const label = opt.dataset.label || opt.textContent || value;
+      const row = document.createElement('div');
+      row.className = 'nb-bulk-size-row';
+      row.dataset.sizeValue = value;
+      row.dataset.sizeLabel = label;
+
+      const title = document.createElement('span');
+      title.className = 'nb-bulk-size-label';
+      title.textContent = label;
+
+      const inputWrap = document.createElement('div');
+      inputWrap.className = 'nb-bulk-size-input';
+
+      const qtyLabel = document.createElement('span');
+      qtyLabel.textContent = 'Darab';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.step = '1';
+      input.inputMode = 'numeric';
+      const current = Object.prototype.hasOwnProperty.call(bulkSizeState, value) ? parseInt(bulkSizeState[value], 10) : 0;
+      if (Number.isFinite(current) && current > 0){
+        input.value = String(current);
+      } else {
+        input.value = '';
+      }
+      input.placeholder = '0';
+
+      input.addEventListener('input', ()=>{
+        const digitsOnly = input.value.replace(/[^0-9]/g, '');
+        if (digitsOnly !== input.value){
+          input.value = digitsOnly;
+        }
+      });
+
+      input.addEventListener('change', ()=>{
+        const parsed = parseInt(input.value, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0){
+          delete bulkSizeState[value];
+          input.value = '';
+        } else {
+          bulkSizeState[value] = parsed;
+          input.value = String(parsed);
+        }
+      });
+
+      inputWrap.appendChild(qtyLabel);
+      inputWrap.appendChild(input);
+      row.appendChild(title);
+      row.appendChild(inputWrap);
+      bulkModalList.appendChild(row);
+    });
+  }
+
+  function collectBulkSizeEntries(){
+    if (!bulkModalList) return [];
+    const entries = [];
+    const rows = Array.from(bulkModalList.querySelectorAll('.nb-bulk-size-row'));
+    rows.forEach(row=>{
+      const value = (row.dataset.sizeValue || '').toString();
+      if (!value) return;
+      const label = row.dataset.sizeLabel || value;
+      const input = row.querySelector('input');
+      const raw = input ? input.value : '';
+      const qty = parseInt(raw, 10);
+      if (!Number.isFinite(qty) || qty <= 0){
+        if (Object.prototype.hasOwnProperty.call(bulkSizeState, value)){
+          delete bulkSizeState[value];
+        }
+        if (input && raw !== ''){
+          input.value = '';
+        }
+        return;
+      }
+      bulkSizeState[value] = qty;
+      entries.push({value, label, quantity: qty});
+    });
+    return entries;
+  }
+
+  function openBulkModal(){
+    if (!bulkModal) return;
+    renderBulkSizeList();
+    bulkModal.hidden = false;
+    updateModalBodyState();
+  }
+
+  function closeBulkModal(){
+    if (!bulkModal) return;
+    bulkModal.hidden = true;
+    updateModalBodyState();
+  }
+
   function renderModalTypes(){
     if (!modalTypeList) return;
     modalTypeList.innerHTML = '';
@@ -560,7 +679,7 @@
   }
 
   function updateModalBodyState(){
-    const anyOpen = (productModal && !productModal.hidden) || (colorModal && !colorModal.hidden);
+    const anyOpen = (productModal && !productModal.hidden) || (colorModal && !colorModal.hidden) || (bulkModal && !bulkModal.hidden);
     if (anyOpen){
       document.body.classList.add('nb-modal-open');
     } else {
@@ -1321,6 +1440,10 @@
     ensureSelectValue(colorSel);
     renderColorChoices();
 
+    clearBulkSizeState();
+    if (bulkModal && !bulkModal.hidden){
+      closeBulkModal();
+    }
     sizeSel.innerHTML = '';
     (cfg.sizes || []).forEach(size=>{
       const val = (size || '').toString().trim();
@@ -1332,6 +1455,7 @@
     });
     ensureSelectValue(sizeSel);
     renderSizeButtons();
+    renderBulkSizeList();
   }
 
   // initial populate
@@ -1457,8 +1581,29 @@
     });
   }
 
+  if (bulkModalTrigger){
+    bulkModalTrigger.addEventListener('click', ()=>{
+      if (bulkModalTrigger.disabled) return;
+      openBulkModal();
+    });
+  }
+
+  if (bulkModal){
+    const closeButtons = Array.from(bulkModal.querySelectorAll('[data-nb-close="bulk-modal"]'));
+    closeButtons.forEach(btn=>btn.addEventListener('click', closeBulkModal));
+    bulkModal.addEventListener('click', evt=>{
+      if (evt.target && evt.target.dataset && evt.target.dataset.nbClose === 'bulk-modal'){
+        closeBulkModal();
+      }
+    });
+  }
+
   document.addEventListener('keydown', evt=>{
     if (evt.key === 'Escape'){
+      if (bulkModal && !bulkModal.hidden){
+        closeBulkModal();
+        return;
+      }
       if (colorModal && !colorModal.hidden){
         closeColorModal();
         return;
@@ -1664,6 +1809,41 @@
         }
       } finally {
         saving = false;
+      }
+    };
+  }
+
+  if (bulkConfirmBtn){
+    bulkConfirmBtn.onclick = async ()=>{
+      const entries = collectBulkSizeEntries();
+      if (!entries.length){
+        alert('Adj meg legalább egy mennyiséget!');
+        return;
+      }
+      if (!designState.savedDesignId){
+        alert('Előbb mentsd a tervet!');
+        return;
+      }
+      bulkConfirmBtn.disabled = true;
+      try{
+        const res = await fetch(NB_DESIGNER.rest + 'add-to-cart', {
+          method:'POST',
+          headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
+          body: JSON.stringify({design_id: designState.savedDesignId, bulk_sizes: entries})
+        });
+        const j = await res.json();
+        if (!res.ok){
+          alert(j.message || 'Kosár hiba');
+          return;
+        }
+        closeBulkModal();
+        if (j.redirect){
+          window.location = j.redirect;
+        }
+      }catch(e){
+        alert('Hálózati hiba');
+      } finally {
+        bulkConfirmBtn.disabled = false;
       }
     };
   }
