@@ -76,6 +76,9 @@ add_action('rest_api_init', function(){
       if ( null === WC()->cart ) {
         return new WP_Error('wc_cart','WooCommerce kosár nem elérhető', ['status'=>500]);
       }
+      if ( method_exists(WC()->cart, 'get_cart') ) {
+        WC()->cart->get_cart();
+      }
       $design_id = intval($req->get_param('design_id'));
       if (! $design_id) return new WP_Error('bad','Hiányzó design_id', ['status'=>400]);
 
@@ -108,7 +111,10 @@ add_action('rest_api_init', function(){
           if (!is_scalar($value)) continue;
           $clean_value = wc_clean((string)$value);
           if ($clean_value === '') continue;
-          $clean_key = is_string($key) ? strtolower(trim($key)) : '';
+          $clean_key = '';
+          if (is_string($key) || is_numeric($key)){
+            $clean_key = nb_utf8_strtolower(trim((string)$key));
+          }
           if ($clean_key === '') continue;
           $normalized_map[$clean_key] = $clean_value;
           if (strpos($clean_key, 'attribute_') === 0){
@@ -124,15 +130,18 @@ add_action('rest_api_init', function(){
 
         $product_variation_attributes = $product->get_variation_attributes();
         foreach ($product_variation_attributes as $attribute_name=>$options){
+          $attribute_key = (string)$attribute_name;
+          $normalized_attribute = nb_utf8_strtolower($attribute_key);
           $search_keys = [
-            strtolower($attribute_name),
-            strtolower(str_replace('attribute_', '', $attribute_name)),
+            $normalized_attribute,
+            nb_utf8_strtolower(str_replace('attribute_', '', $attribute_key)),
           ];
-          $short = str_replace('attribute_', '', $attribute_name);
-          if (strpos($short, 'pa_') === 0){
-            $search_keys[] = substr($short, 3);
+          $short = str_replace('attribute_', '', $attribute_key);
+          $short_lower = nb_utf8_strtolower($short);
+          if (strpos($short_lower, 'pa_') === 0){
+            $search_keys[] = substr($short_lower, 3);
           } else {
-            $search_keys[] = 'pa_'.$short;
+            $search_keys[] = 'pa_'.$short_lower;
           }
           $matched_value = null;
           foreach ($search_keys as $candidate){
@@ -208,12 +217,16 @@ add_action('rest_api_init', function(){
       $print_width_px = intval(get_post_meta($design_id,'print_width_px',true));
       $print_height_px = intval(get_post_meta($design_id,'print_height_px',true));
 
+      $unique_key = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : uniqid('nb_', true);
+
       $cart_item_data = [
         'nb_design_id'     => $design_id,
         'preview_url'      => $preview_url,
         'print_url'        => $print_url ?: $preview_url,
         'print_width_px'   => $print_width_px,
         'print_height_px'  => $print_height_px,
+        'nb_cart_line_uid' => $unique_key,
+        'unique_key'       => 'nb_'.$unique_key,
       ];
 
       if (function_exists('wc_clear_notices')) {
@@ -277,6 +290,15 @@ add_action('rest_api_init', function(){
           $message = 'Nem sikerült kosárba tenni';
         }
         return new WP_Error('cart', $message, ['status'=>500]);
+      }
+      if (method_exists(WC()->cart, 'set_session')) {
+        WC()->cart->set_session();
+      }
+      if (method_exists(WC()->cart, 'maybe_set_cart_cookies')) {
+        WC()->cart->maybe_set_cart_cookies();
+      }
+      if (method_exists(WC()->cart, 'calculate_totals')) {
+        WC()->cart->calculate_totals();
       }
       return ['ok'=>true,'redirect'=>wc_get_cart_url()];
     }
