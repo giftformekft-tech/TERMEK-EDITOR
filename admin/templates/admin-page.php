@@ -16,17 +16,90 @@
       <h2>Tervezhető termékek</h2>
       <div class="nb-products">
         <?php
-          $q = new WP_Query(['post_type'=>'product','posts_per_page'=>100,'post_status'=>'publish']);
-          while($q->have_posts()): $q->the_post();
+          $product_query = new WP_Query([
+            'post_type'      => 'product',
+            'posts_per_page' => 200,
+            'post_status'    => 'publish',
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+          ]);
+          $product_options = [];
+          while($product_query->have_posts()): $product_query->the_post();
             $pid = get_the_ID();
+            $title = get_the_title();
+            $product_options[$pid] = $title;
             $checked = in_array($pid, $settings['products'] ?? []) ? 'checked' : '';
-            echo '<label class="nb-prod"><input type="checkbox" name="products[]" value="'.$pid.'" '.$checked.'> '.esc_html(get_the_title()).' (#'.$pid.')</label>';
-          endwhile; wp_reset_postdata();
+            echo '<label class="nb-prod"><input type="checkbox" name="products[]" value="'.$pid.'" '.$checked.'> '.esc_html($title).' (#'.$pid.')</label>';
+          endwhile;
+          wp_reset_postdata();
         ?>
       </div>
       <h2>Globális terméktípusok</h2>
-      <p>Add meg vesszővel elválasztva (pl. <code>Póló,Pulóver,Hosszú ujjú</code>).</p>
-      <input type="text" name="types" value="<?php echo esc_attr(implode(',', $settings['types'] ?? ['Póló','Pulóver'])); ?>" size="80" />
+      <p>Add meg külön a tervezőben látható és a rendelésben megjelenő elnevezést, valamint válassz alap WooCommerce terméket az árakhoz.</p>
+      <?php
+        $globalTypeOrderMap = isset($settings['type_order_labels']) && is_array($settings['type_order_labels']) ? $settings['type_order_labels'] : [];
+        $globalTypeProductMap = isset($settings['type_products']) && is_array($settings['type_products']) ? $settings['type_products'] : [];
+        $globalTypeRows = $settings['types'] ?? [];
+        if (!is_array($globalTypeRows)) {
+          $globalTypeRows = [];
+        }
+        if (empty($globalTypeRows)) {
+          $globalTypeRows = ['Póló','Pulóver'];
+        }
+        $typeRowCount = max(count($globalTypeRows) + 1, 3);
+        $selectedProductIds = isset($settings['products']) && is_array($settings['products']) ? array_map('intval', $settings['products']) : [];
+      ?>
+      <table class="widefat nb-label-table">
+        <thead>
+          <tr>
+            <th>Tervezőben megjelenő név</th>
+            <th>Rendelésben megjelenő név</th>
+            <th>WooCommerce termék</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php for ($i = 0; $i < $typeRowCount; $i++):
+            $designer = $globalTypeRows[$i] ?? '';
+            $order = '';
+            $productChoice = '';
+            if ($designer !== ''){
+              $typeKey = nb_normalize_type_key($designer);
+              if ($typeKey && !empty($globalTypeOrderMap[$typeKey])){
+                $order = $globalTypeOrderMap[$typeKey];
+              }
+              if ($typeKey && !empty($globalTypeProductMap[$typeKey])){
+                $productChoice = intval($globalTypeProductMap[$typeKey]);
+              }
+            }
+          ?>
+          <tr>
+            <td><input type="text" name="types_designer[]" value="<?php echo esc_attr($designer); ?>" placeholder="Póló" /></td>
+            <td><input type="text" name="types_order[]" value="<?php echo esc_attr($order); ?>" placeholder="polo" /></td>
+            <td>
+              <select name="types_product[]">
+                <option value="">— nincs kiválasztva —</option>
+                <?php
+                  foreach ($product_options as $pid => $title){
+                    $isActive = in_array($pid, $selectedProductIds, true);
+                    $labelText = esc_html($title);
+                    if (!empty($selectedProductIds) && ! $isActive){
+                      $labelText .= ' – nincs kijelölve';
+                    }
+                    printf(
+                      '<option value="%1$d" %3$s>%2$s (#%1$d)</option>',
+                      $pid,
+                      $labelText,
+                      selected($productChoice, $pid, false)
+                    );
+                  }
+                ?>
+              </select>
+            </td>
+          </tr>
+          <?php endfor; ?>
+        </tbody>
+      </table>
+      <p class="description">Hagyd üresen a sort a típus törléséhez vagy új sorban add hozzá az újat.</p>
 
     <?php elseif ($tab==='variants'): ?>
       <h2>Típus–Szín → Mockup & Ár</h2>
@@ -95,7 +168,9 @@
                   continue;
                 }
                 foreach ($colorList as $color):
-                  $key = strtolower($type).'|'.strtolower($color);
+                  $colorKey = nb_normalize_color_key($color);
+                  if ($colorKey === '') continue;
+                  $key = $typeKey.'|'.$colorKey;
                   $hash = md5($key);
                   $map = $cfg['map'][$key] ?? ['mockup_index'=>-1,'fee_per_cm2'=>'','min_fee'=>'','base_fee'=>''];
                   $renderedRows++;
@@ -139,15 +214,41 @@
             }
           }
         }
-        $paletteText = implode("\n", $savedPalette);
+        $colorOrderMap = isset($settings['color_order_labels']) && is_array($settings['color_order_labels']) ? $settings['color_order_labels'] : [];
+        $paletteRows = $savedPalette;
+        $paletteRowCount = max(count($paletteRows) + 2, 4);
         $typeColors = $settings['type_colors'] ?? [];
         if (!is_array($typeColors)) $typeColors = [];
         $globalTypes = $settings['types'] ?? [];
         if (!is_array($globalTypes)) $globalTypes = [];
       ?>
       <h2>Szín elérhetőség</h2>
-      <p>Add meg a teljes palettát (soronként egy szín vagy vesszővel elválasztva). Ez alapján állíthatod be, hogy típusonként (pl. póló, pulóver) mely árnyalatok érhetők el.</p>
-      <textarea name="color_palette" rows="6" cols="80"><?php echo esc_textarea($paletteText); ?></textarea>
+      <p>Add meg a színek tervezőben és rendelésben használt nevét. Hagyd üresen a sort a törléshez.</p>
+      <table class="widefat nb-label-table">
+        <thead>
+          <tr>
+            <th>Tervezőben megjelenő név</th>
+            <th>Rendelésben megjelenő név</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php for ($i = 0; $i < $paletteRowCount; $i++):
+            $designer = $paletteRows[$i] ?? '';
+            $order = '';
+            if ($designer !== ''){
+              $colorKey = nb_normalize_color_key($designer);
+              if ($colorKey && !empty($colorOrderMap[$colorKey])){
+                $order = $colorOrderMap[$colorKey];
+              }
+            }
+          ?>
+          <tr>
+            <td><input type="text" name="color_designer[]" value="<?php echo esc_attr($designer); ?>" placeholder="Fekete" /></td>
+            <td><input type="text" name="color_order[]" value="<?php echo esc_attr($order); ?>" placeholder="fekete" /></td>
+          </tr>
+          <?php endfor; ?>
+        </tbody>
+      </table>
       <?php if (!empty($globalTypes)): ?>
         <h3>Színek típusonként</h3>
         <?php foreach ($globalTypes as $typeLabel):
