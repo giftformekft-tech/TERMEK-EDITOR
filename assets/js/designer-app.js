@@ -15,7 +15,9 @@
     transparentCorners: false,
     hasBorders: false,
     borderColor: 'rgba(0,0,0,0)',
-    borderOpacityWhenMoving: 0
+    borderOpacityWhenMoving: 0,
+    padding: 0,
+    cornerPadding: 0
   };
 
   function applyObjectUiDefaults(obj){
@@ -25,6 +27,8 @@
     if (typeof objectUiDefaults.hasBorders !== 'undefined') obj.hasBorders = objectUiDefaults.hasBorders;
     if (typeof objectUiDefaults.borderColor !== 'undefined') obj.borderColor = objectUiDefaults.borderColor;
     if (typeof objectUiDefaults.borderOpacityWhenMoving !== 'undefined') obj.borderOpacityWhenMoving = objectUiDefaults.borderOpacityWhenMoving;
+    if (typeof objectUiDefaults.padding !== 'undefined') obj.padding = objectUiDefaults.padding;
+    if (typeof objectUiDefaults.cornerPadding !== 'undefined' && typeof obj.cornerPadding !== 'undefined') obj.cornerPadding = objectUiDefaults.cornerPadding;
   }
 
   applyObjectUiDefaults(fabric.Object.prototype);
@@ -50,7 +54,7 @@
     return 1;
   }
   function profileForKey(key){
-    const retina = getRetinaScale();
+    const retina = Math.max(1, getRetinaScale());
     const baseCorner = Number.isFinite(baseControlProfile.cornerSize) && baseControlProfile.cornerSize > 0
       ? baseControlProfile.cornerSize
       : 13;
