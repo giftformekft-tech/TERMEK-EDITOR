@@ -10,9 +10,22 @@
   const settings = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
   const c = new fabric.Canvas('nb-canvas', {preserveObjectStacking:true, backgroundColor:'#fff'});
 
+  const baseControlProfile = {
+    cornerSize: fabric.Object.prototype.cornerSize,
+    touchCornerSize: fabric.Object.prototype.touchCornerSize,
+    borderScaleFactor: fabric.Object.prototype.borderScaleFactor,
+  };
   const controlProfiles = {
-    desktop: {cornerSize: 22, touchCornerSize: 40, borderScaleFactor: 18},
-    mobile: {cornerSize: 14, touchCornerSize: 26, borderScaleFactor: 12}
+    desktop: {
+      cornerSize: baseControlProfile.cornerSize,
+      touchCornerSize: baseControlProfile.touchCornerSize,
+      borderScaleFactor: baseControlProfile.borderScaleFactor,
+    },
+    mobile: {
+      cornerSize: Math.max(8, Math.round((baseControlProfile.cornerSize || 13) * 0.65)),
+      touchCornerSize: Math.max(14, Math.round((baseControlProfile.touchCornerSize || 26) * 0.65)),
+      borderScaleFactor: baseControlProfile.borderScaleFactor,
+    },
   };
   let activeControlProfile = '';
   const controlMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
