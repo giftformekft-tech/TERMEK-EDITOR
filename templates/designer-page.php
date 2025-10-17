@@ -70,6 +70,12 @@
           </div>
         </div>
       </div>
+      <div class="nb-action-card nb-action-card--layers">
+        <div class="nb-card-header">
+          <h3>Rétegek</h3>
+        </div>
+        <div class="nb-layer-list" id="nb-layer-list"></div>
+      </div>
       <div class="nb-summary-card">
         <div class="nb-product-heading">
           <h2 id="nb-product-title">Termék</h2>

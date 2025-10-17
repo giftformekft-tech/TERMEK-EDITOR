@@ -114,9 +114,11 @@
   const saveBtn = document.getElementById('nb-save');
   const uploadInput = document.getElementById('nb-upload');
   const addTextBtn = document.getElementById('nb-add-text');
+  const layerListEl = document.getElementById('nb-layer-list');
 
   const loadedFontUrls = new Set();
   const designState = {savedDesignId:null};
+  let layerIdSeq = 1;
 
   function getCatalog(){ return settings.catalog || {}; }
   function productList(){ return settings.products || []; }
@@ -881,6 +883,138 @@
     return c.getObjects().filter(isDesignObject);
   }
 
+  function ensureLayerId(obj){
+    if (!obj) return '';
+    if (!obj.__nb_layer_id){
+      obj.__nb_layer_id = 'nb-layer-' + (layerIdSeq++);
+    }
+    return obj.__nb_layer_id;
+  }
+
+  function layerLabel(obj){
+    if (!obj) return '';
+    if (obj.__nb_layer_name){
+      return obj.__nb_layer_name;
+    }
+    if (obj.type === 'textbox'){
+      const raw = (obj.text || '').toString().replace(/\s+/g,' ').trim();
+      if (raw){
+        return raw.length > 28 ? raw.slice(0,25) + '…' : raw;
+      }
+      return 'Szöveg';
+    }
+    if (obj.type === 'image'){
+      return 'Kép';
+    }
+    return 'Elem';
+  }
+
+  function applyDesignOrder(order){
+    if (!Array.isArray(order) || !order.length) return;
+    const objects = c.getObjects();
+    let firstIndex = -1;
+    for (let i=0;i<objects.length;i++){
+      if (isDesignObject(objects[i])){
+        firstIndex = i;
+        break;
+      }
+    }
+    if (firstIndex === -1) return;
+    order.forEach((obj, offset)=>{
+      if (isDesignObject(obj)){
+        c.moveTo(obj, firstIndex + offset);
+      }
+    });
+    if (c.__nb_area_rect){
+      c.bringToFront(c.__nb_area_rect);
+    }
+  }
+
+  function moveLayer(obj, delta){
+    if (!isDesignObject(obj) || !Number.isInteger(delta) || !delta) return;
+    const order = designObjects();
+    const currentIndex = order.indexOf(obj);
+    if (currentIndex === -1) return;
+    const targetIndex = Math.max(0, Math.min(order.length - 1, currentIndex + delta));
+    if (targetIndex === currentIndex) return;
+    order.splice(currentIndex, 1);
+    order.splice(targetIndex, 0, obj);
+    applyDesignOrder(order);
+    c.setActiveObject(obj);
+    c.requestRenderAll();
+    markDesignDirty();
+    syncLayerList();
+    syncTextControls();
+  }
+
+  function syncLayerList(){
+    if (!layerListEl) return;
+    const objects = designObjects();
+    layerListEl.innerHTML = '';
+    if (!objects.length){
+      const empty = document.createElement('div');
+      empty.className = 'nb-layer-empty';
+      empty.textContent = 'Nincs feltöltött elem';
+      layerListEl.appendChild(empty);
+      return;
+    }
+    const active = c.getActiveObject();
+    const topFirst = objects.slice().reverse();
+    topFirst.forEach((obj, idx)=>{
+      ensureLayerId(obj);
+      const item = document.createElement('div');
+      item.className = 'nb-layer-item';
+      if (active === obj){
+        item.classList.add('is-active');
+      }
+      item.dataset.layerId = obj.__nb_layer_id;
+
+      const info = document.createElement('div');
+      info.className = 'nb-layer-info';
+      const selectBtn = document.createElement('button');
+      selectBtn.type = 'button';
+      selectBtn.textContent = layerLabel(obj);
+      selectBtn.addEventListener('click', ()=>{
+        c.setActiveObject(obj);
+        c.requestRenderAll();
+        syncTextControls();
+        syncLayerList();
+      });
+      info.appendChild(selectBtn);
+      item.appendChild(info);
+
+      const controls = document.createElement('div');
+      controls.className = 'nb-layer-controls';
+      const upBtn = document.createElement('button');
+      upBtn.type = 'button';
+      upBtn.setAttribute('aria-label', 'Feljebb');
+      upBtn.innerHTML = '▲';
+      if (idx === 0){
+        upBtn.disabled = true;
+      }
+      upBtn.addEventListener('click', ()=>{
+        moveLayer(obj, 1);
+      });
+
+      const downBtn = document.createElement('button');
+      downBtn.type = 'button';
+      downBtn.setAttribute('aria-label', 'Lejjebb');
+      downBtn.innerHTML = '▼';
+      if (idx === topFirst.length - 1){
+        downBtn.disabled = true;
+      }
+      downBtn.addEventListener('click', ()=>{
+        moveLayer(obj, -1);
+      });
+
+      controls.appendChild(upBtn);
+      controls.appendChild(downBtn);
+      item.appendChild(controls);
+
+      layerListEl.appendChild(item);
+    });
+  }
+
   function fitWithinArea(obj){
     const area = c.__nb_area || fallbackArea;
     if (!area) return;
@@ -1231,15 +1365,23 @@
   if (colorSel) colorSel.onchange = ()=>{ renderColorChoices(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
   if (sizeSel) sizeSel.onchange = ()=>{ renderSizeButtons(); updateSelectionSummary(); markDesignDirty(); };
 
-  c.on('object:added', e=>{ if (isDesignObject(e.target)){ keepObjectInside(e.target); markDesignDirty(); }});
+  c.on('object:added', e=>{
+    if (isDesignObject(e.target)){
+      ensureLayerId(e.target);
+      keepObjectInside(e.target);
+      markDesignDirty();
+      syncLayerList();
+    }
+  });
   c.on('object:moving', e=>{ keepObjectInside(e.target, {fit:false}); });
-  c.on('object:scaling', e=>{ keepObjectInside(e.target); markDesignDirty(); });
-  c.on('object:rotating', e=>{ keepObjectInside(e.target); markDesignDirty(); });
-  c.on('object:modified', e=>{ if (isDesignObject(e.target)) markDesignDirty(); });
-  c.on('object:removed', e=>{ if (isDesignObject(e.target)) markDesignDirty(); });
-  c.on('selection:created', ()=>{ syncTextControls(); });
-  c.on('selection:updated', ()=>{ syncTextControls(); });
-  c.on('selection:cleared', ()=>{ syncTextControls(); });
+  c.on('object:scaling', e=>{ keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
+  c.on('object:rotating', e=>{ keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
+  c.on('object:modified', e=>{ if (isDesignObject(e.target)){ markDesignDirty(); syncLayerList(); }});
+  c.on('object:removed', e=>{ if (isDesignObject(e.target)){ markDesignDirty(); syncLayerList(); }});
+  c.on('selection:created', ()=>{ syncTextControls(); syncLayerList(); });
+  c.on('selection:updated', ()=>{ syncTextControls(); syncLayerList(); });
+  c.on('selection:cleared', ()=>{ syncTextControls(); syncLayerList(); });
+  c.on('text:changed', e=>{ if (isDesignObject(e.target)) syncLayerList(); });
 
   if (fontFamilySel){
     fontFamilySel.onchange = ()=>{
@@ -1339,6 +1481,8 @@
     setMockupBgAndArea();
   });
 
+  syncLayerList();
+
   if (addTextBtn){
     addTextBtn.onclick = () => {
       const a = c.__nb_area || fallbackArea;
@@ -1383,6 +1527,10 @@
           transparentCorners: false,
           lockScalingFlip: true
         });
+        if (f && typeof f.name === 'string' && f.name){
+          const baseName = f.name.split(/[/\\]/).pop() || f.name;
+          img.__nb_layer_name = baseName.replace(/\.[^.]+$/, '') || 'Kép';
+        }
         c.add(img);
         c.setActiveObject(img);
         keepObjectInside(img);
@@ -1398,6 +1546,7 @@
       c.requestRenderAll();
       markDesignDirty();
       syncTextControls();
+      syncLayerList();
     };
   }
 
