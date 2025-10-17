@@ -860,6 +860,37 @@ add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, 
   echo '</div>';
 }, 10, 4);
 
+add_filter('woocommerce_cart_item_thumbnail', function($thumbnail, $cart_item, $cart_item_key){
+  if (! is_array($cart_item)){
+    return $thumbnail;
+  }
+
+  $preview = '';
+  if (! empty($cart_item['preview_url'])){
+    $preview = (string) $cart_item['preview_url'];
+  } elseif (! empty($cart_item['nb_design_id'])){
+    $design_id = intval($cart_item['nb_design_id']);
+    if ($design_id){
+      $saved_preview = get_post_meta($design_id, 'preview_url', true);
+      if (is_string($saved_preview) && $saved_preview !== ''){
+        $preview = $saved_preview;
+      }
+    }
+  }
+
+  $preview = esc_url($preview);
+  if ($preview === ''){
+    return $thumbnail;
+  }
+
+  $alt = '';
+  if (! empty($cart_item['data']) && is_object($cart_item['data']) && is_a($cart_item['data'], 'WC_Product')){
+    $alt = $cart_item['data']->get_name();
+  }
+
+  return '<img src="'.$preview.'" alt="'.esc_attr($alt).'" class="nb-cart-item-thumbnail attachment-woocommerce_thumbnail size-woocommerce_thumbnail" loading="lazy" />';
+}, 10, 3);
+
 add_action('admin_head', function(){
   if (! function_exists('get_current_screen')){
     return;
