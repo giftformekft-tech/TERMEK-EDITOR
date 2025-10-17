@@ -633,6 +633,120 @@
     updateModalBodyState();
   }
 
+  function clearBulkSizeState(){
+    Object.keys(bulkSizeState).forEach(key=>{ delete bulkSizeState[key]; });
+  }
+
+  function renderBulkSizeList(){
+    if (!bulkModalList) return;
+    bulkModalList.innerHTML = '';
+    const options = sizeSel ? Array.from(sizeSel.options) : [];
+    if (!options.length){
+      if (bulkModalTrigger) bulkModalTrigger.disabled = true;
+      const empty = document.createElement('div');
+      empty.className = 'nb-modal-empty';
+      empty.textContent = 'Nincs méret megadva.';
+      bulkModalList.appendChild(empty);
+      return;
+    }
+    if (bulkModalTrigger) bulkModalTrigger.disabled = false;
+    options.forEach(opt=>{
+      const value = (opt.value || '').toString();
+      if (!value) return;
+      const label = opt.dataset.label || opt.textContent || value;
+      const row = document.createElement('div');
+      row.className = 'nb-bulk-size-row';
+      row.dataset.sizeValue = value;
+      row.dataset.sizeLabel = label;
+
+      const title = document.createElement('span');
+      title.className = 'nb-bulk-size-label';
+      title.textContent = label;
+
+      const inputWrap = document.createElement('div');
+      inputWrap.className = 'nb-bulk-size-input';
+
+      const qtyLabel = document.createElement('span');
+      qtyLabel.textContent = 'Darab';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.step = '1';
+      input.inputMode = 'numeric';
+      const current = Object.prototype.hasOwnProperty.call(bulkSizeState, value) ? parseInt(bulkSizeState[value], 10) : 0;
+      if (Number.isFinite(current) && current > 0){
+        input.value = String(current);
+      } else {
+        input.value = '';
+      }
+      input.placeholder = '0';
+
+      input.addEventListener('input', ()=>{
+        const digitsOnly = input.value.replace(/[^0-9]/g, '');
+        if (digitsOnly !== input.value){
+          input.value = digitsOnly;
+        }
+      });
+
+      input.addEventListener('change', ()=>{
+        const parsed = parseInt(input.value, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0){
+          delete bulkSizeState[value];
+          input.value = '';
+        } else {
+          bulkSizeState[value] = parsed;
+          input.value = String(parsed);
+        }
+      });
+
+      inputWrap.appendChild(qtyLabel);
+      inputWrap.appendChild(input);
+      row.appendChild(title);
+      row.appendChild(inputWrap);
+      bulkModalList.appendChild(row);
+    });
+  }
+
+  function collectBulkSizeEntries(){
+    if (!bulkModalList) return [];
+    const entries = [];
+    const rows = Array.from(bulkModalList.querySelectorAll('.nb-bulk-size-row'));
+    rows.forEach(row=>{
+      const value = (row.dataset.sizeValue || '').toString();
+      if (!value) return;
+      const label = row.dataset.sizeLabel || value;
+      const input = row.querySelector('input');
+      const raw = input ? input.value : '';
+      const qty = parseInt(raw, 10);
+      if (!Number.isFinite(qty) || qty <= 0){
+        if (Object.prototype.hasOwnProperty.call(bulkSizeState, value)){
+          delete bulkSizeState[value];
+        }
+        if (input && raw !== ''){
+          input.value = '';
+        }
+        return;
+      }
+      bulkSizeState[value] = qty;
+      entries.push({value, label, quantity: qty});
+    });
+    return entries;
+  }
+
+  function openBulkModal(){
+    if (!bulkModal) return;
+    renderBulkSizeList();
+    bulkModal.hidden = false;
+    updateModalBodyState();
+  }
+
+  function closeBulkModal(){
+    if (!bulkModal) return;
+    bulkModal.hidden = true;
+    updateModalBodyState();
+  }
+
   function renderModalTypes(){
     if (!modalTypeList) return;
     modalTypeList.innerHTML = '';
@@ -798,6 +912,19 @@
     updateColorTriggerLabel();
     updatePriceDisplay();
     updateActionStates();
+  }
+
+  function currentProductPriceMarkup(){
+    const sel = currentSelection();
+    if (!sel || !sel.cfg) return '';
+    const cfg = sel.cfg;
+    if (cfg.price_html && typeof cfg.price_html === 'string' && cfg.price_html.trim()){
+      return cfg.price_html;
+    }
+    if (cfg.price_text && typeof cfg.price_text === 'string' && cfg.price_text.trim()){
+      return cfg.price_text;
+    }
+    return '';
   }
 
   function currentProductPriceMarkup(){
@@ -1918,6 +2045,41 @@
         bulkConfirmBtn.disabled = false;
         actionSubmitting = false;
         updateActionStates();
+      }
+    };
+  }
+
+  if (bulkConfirmBtn){
+    bulkConfirmBtn.onclick = async ()=>{
+      const entries = collectBulkSizeEntries();
+      if (!entries.length){
+        alert('Adj meg legalább egy mennyiséget!');
+        return;
+      }
+      if (!designState.savedDesignId){
+        alert('Előbb mentsd a tervet!');
+        return;
+      }
+      bulkConfirmBtn.disabled = true;
+      try{
+        const res = await fetch(NB_DESIGNER.rest + 'add-to-cart', {
+          method:'POST',
+          headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
+          body: JSON.stringify({design_id: designState.savedDesignId, bulk_sizes: entries})
+        });
+        const j = await res.json();
+        if (!res.ok){
+          alert(j.message || 'Kosár hiba');
+          return;
+        }
+        closeBulkModal();
+        if (j.redirect){
+          window.location = j.redirect;
+        }
+      }catch(e){
+        alert('Hálózati hiba');
+      } finally {
+        bulkConfirmBtn.disabled = false;
       }
     };
   }
