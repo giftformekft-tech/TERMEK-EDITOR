@@ -150,6 +150,26 @@
   function types(){ return settings.types || ['Póló','Pulóver']; }
   function fontEntries(){ return settings.fonts || []; }
 
+  const typeProductAssignments = (() => {
+    const raw = settings.type_products;
+    const map = {};
+    if (raw && typeof raw === 'object'){
+      Object.keys(raw).forEach(key => {
+        const normalizedKey = normalizedTypeValue(key);
+        if (!normalizedKey) return;
+        const rawValue = raw[key];
+        const parsed = parseInt(rawValue, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0) return;
+        map[normalizedKey] = String(parsed);
+      });
+    }
+    return map;
+  })();
+
+  function typeProductMap(){
+    return typeProductAssignments;
+  }
+
   function parseFontEntry(entry){
     if (typeof entry !== 'string') return null;
     const parts = entry.split('|').map(p=>p.trim()).filter(Boolean);
@@ -491,6 +511,17 @@
     const cat = getCatalog();
     const normalized = normalizedTypeValue(typeValue);
     const list = productList();
+    const assignedMap = typeProductMap();
+    if (normalized && assignedMap && Object.prototype.hasOwnProperty.call(assignedMap, normalized)){
+      const assigned = assignedMap[normalized];
+      if (assigned && list.some(pid => String(pid) === assigned)){
+        const assignedId = parseInt(assigned, 10);
+        const assignedCfg = cat[assignedId] || {};
+        if (!assignedId || productSupportsType(assignedCfg, typeValue) || !Array.isArray(assignedCfg?.types) || !assignedCfg.types.length){
+          return assigned;
+        }
+      }
+    }
     for (let i=0;i<list.length;i++){
       const pid = list[i];
       const cfg = cat[pid] || {};
@@ -504,6 +535,18 @@
   function ensureProductMatchesType(){
     if (!productSel.options.length) return;
     const currentType = typeSel.value;
+    const normalizedType = normalizedTypeValue(currentType);
+    const assignedMap = typeProductMap();
+    if (normalizedType && assignedMap && Object.prototype.hasOwnProperty.call(assignedMap, normalizedType)){
+      const assigned = assignedMap[normalizedType];
+      if (assigned && Array.from(productSel.options).some(opt => opt.value === assigned)){
+        if (productSel.value !== assigned){
+          productSel.value = assigned;
+          dispatchChangeEvent(productSel);
+          return;
+        }
+      }
+    }
     const pid = parseInt(productSel.value || 0, 10);
     const cfg = getCatalog()[pid] || {};
     if (productSel.value && productSupportsType(cfg, currentType)) return;
@@ -598,11 +641,29 @@
     updatePriceDisplay();
   }
 
+  function currentProductPriceMarkup(){
+    const sel = currentSelection();
+    if (!sel || !sel.cfg) return '';
+    const cfg = sel.cfg;
+    if (cfg.price_html && typeof cfg.price_html === 'string' && cfg.price_html.trim()){
+      return cfg.price_html;
+    }
+    if (cfg.price_text && typeof cfg.price_text === 'string' && cfg.price_text.trim()){
+      return cfg.price_text;
+    }
+    return '';
+  }
+
   function updatePriceDisplay(){
     if (!priceDisplayEl) return;
     priceDisplayEl.classList.remove('nb-price-display--pending');
     if (designState.savedDesignId){
       priceDisplayEl.textContent = `Mentve (#${designState.savedDesignId})`;
+      return;
+    }
+    const markup = currentProductPriceMarkup();
+    if (markup){
+      priceDisplayEl.innerHTML = markup;
     } else {
       priceDisplayEl.textContent = 'Az egyedi felár a mentés után kerül kiszámításra.';
       priceDisplayEl.classList.add('nb-price-display--pending');
