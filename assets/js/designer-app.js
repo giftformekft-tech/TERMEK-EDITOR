@@ -641,11 +641,29 @@
     updatePriceDisplay();
   }
 
+  function currentProductPriceMarkup(){
+    const sel = currentSelection();
+    if (!sel || !sel.cfg) return '';
+    const cfg = sel.cfg;
+    if (cfg.price_html && typeof cfg.price_html === 'string' && cfg.price_html.trim()){
+      return cfg.price_html;
+    }
+    if (cfg.price_text && typeof cfg.price_text === 'string' && cfg.price_text.trim()){
+      return cfg.price_text;
+    }
+    return '';
+  }
+
   function updatePriceDisplay(){
     if (!priceDisplayEl) return;
     priceDisplayEl.classList.remove('nb-price-display--pending');
     if (designState.savedDesignId){
       priceDisplayEl.textContent = `Mentve (#${designState.savedDesignId})`;
+      return;
+    }
+    const markup = currentProductPriceMarkup();
+    if (markup){
+      priceDisplayEl.innerHTML = markup;
     } else {
       priceDisplayEl.textContent = 'Az egyedi felár a mentés után kerül kiszámításra.';
       priceDisplayEl.classList.add('nb-price-display--pending');
