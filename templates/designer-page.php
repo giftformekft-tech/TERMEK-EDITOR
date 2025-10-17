@@ -86,7 +86,6 @@
         <div class="nb-summary-actions">
           <button id="nb-add-to-cart" class="nb-cart-button" disabled>Kosárba</button>
           <button type="button" id="nb-bulk-modal-trigger" class="nb-secondary-action">Többet vennék</button>
-          <button id="nb-save" class="nb-save-button">Mentés</button>
         </div>
       </div>
     </aside>

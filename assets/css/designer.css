@@ -65,9 +65,6 @@
 .nb-cart-button{background:#22c55e;color:#06281a;border:none;border-radius:18px;padding:16px;font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;transition:background .2s ease,transform .2s ease}
 .nb-cart-button:hover{background:#16a34a;transform:translateY(-2px)}
 .nb-cart-button:disabled{background:#1e293b;color:#94a3b8;cursor:not-allowed;transform:none}
-.nb-save-button{background:transparent;border:1px solid rgba(148,163,184,.45);color:#e2e8f0;border-radius:18px;padding:14px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s ease}
-.nb-save-button:hover{background:rgba(148,163,184,.15)}
-
 .nb-hidden{display:none!important}
 .nb-empty{font-size:12px;color:#6b7280}
 .nb-layer-list{display:flex;flex-direction:column;gap:10px}
