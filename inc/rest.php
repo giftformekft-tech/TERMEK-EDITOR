@@ -214,12 +214,16 @@ add_action('rest_api_init', function(){
       $print_width_px = intval(get_post_meta($design_id,'print_width_px',true));
       $print_height_px = intval(get_post_meta($design_id,'print_height_px',true));
 
+      $unique_key = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : uniqid('nb_', true);
+
       $cart_item_data = [
         'nb_design_id'     => $design_id,
         'preview_url'      => $preview_url,
         'print_url'        => $print_url ?: $preview_url,
         'print_width_px'   => $print_width_px,
         'print_height_px'  => $print_height_px,
+        'nb_cart_line_uid' => $unique_key,
+        'unique_key'       => 'nb_'.$unique_key,
       ];
 
       if (function_exists('wc_clear_notices')) {
@@ -283,6 +287,15 @@ add_action('rest_api_init', function(){
           $message = 'Nem sikerült kosárba tenni';
         }
         return new WP_Error('cart', $message, ['status'=>500]);
+      }
+      if (method_exists(WC()->cart, 'set_session')) {
+        WC()->cart->set_session();
+      }
+      if (method_exists(WC()->cart, 'maybe_set_cart_cookies')) {
+        WC()->cart->maybe_set_cart_cookies();
+      }
+      if (method_exists(WC()->cart, 'calculate_totals')) {
+        WC()->cart->calculate_totals();
       }
       return ['ok'=>true,'redirect'=>wc_get_cart_url()];
     }
