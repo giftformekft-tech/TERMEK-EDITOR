@@ -780,6 +780,35 @@ add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
   return $hidden;
 });
 
+add_filter('woocommerce_order_item_get_formatted_meta_data', function($formatted_meta, $item){
+  if (is_admin()){
+    return $formatted_meta;
+  }
+
+  if (! is_array($formatted_meta) || empty($formatted_meta)){
+    return $formatted_meta;
+  }
+
+  foreach ($formatted_meta as $meta_id => $meta){
+    if (! $meta){
+      continue;
+    }
+
+    $key = '';
+    if (is_object($meta) && isset($meta->key)){
+      $key = (string) $meta->key;
+    } elseif (is_array($meta) && isset($meta['key'])){
+      $key = (string) $meta['key'];
+    }
+
+    if ($key !== '' && in_array($key, ['nb_design_id','preview_url','print_url','print_width_px','print_height_px'], true)){
+      unset($formatted_meta[$meta_id]);
+    }
+  }
+
+  return $formatted_meta;
+}, 10, 2);
+
 add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, $plain_text){
   if ($plain_text){
     return;
