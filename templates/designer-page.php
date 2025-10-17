@@ -70,6 +70,12 @@
           </div>
         </div>
       </div>
+      <div class="nb-action-card nb-action-card--layers">
+        <div class="nb-card-header">
+          <h3>Rétegek</h3>
+        </div>
+        <div class="nb-layer-list" id="nb-layer-list"></div>
+      </div>
       <div class="nb-summary-card">
         <div class="nb-product-heading">
           <h2 id="nb-product-title">Termék</h2>
@@ -79,7 +85,7 @@
         <div class="nb-selection-summary" id="nb-selection-summary"></div>
         <div class="nb-summary-actions">
           <button id="nb-add-to-cart" class="nb-cart-button" disabled>Kosárba</button>
-          <button id="nb-save" class="nb-save-button">Mentés</button>
+          <button type="button" id="nb-bulk-modal-trigger" class="nb-secondary-action">Többet vennék</button>
         </div>
       </div>
     </aside>
@@ -118,6 +124,27 @@
           <h3>Elérhető színek</h3>
           <div class="nb-modal-color-grid" id="nb-modal-color-list"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nb-modal" id="nb-bulk-modal" hidden>
+    <div class="nb-modal-backdrop" data-nb-close="bulk-modal"></div>
+    <div class="nb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-bulk-modal-title">
+      <div class="nb-modal-header">
+        <h2 id="nb-bulk-modal-title">Több méretben</h2>
+        <button type="button" class="nb-modal-close" data-nb-close="bulk-modal" aria-label="Bezárás">×</button>
+      </div>
+      <div class="nb-modal-body">
+        <div class="nb-modal-section">
+          <h3>Méretenkénti mennyiség</h3>
+          <p class="nb-modal-help">Állítsd be, hány darabot szeretnél az egyes méretekből.</p>
+          <div class="nb-bulk-size-list" id="nb-bulk-size-list"></div>
+        </div>
+      </div>
+      <div class="nb-modal-footer">
+        <button type="button" class="nb-secondary-button" data-nb-close="bulk-modal">Mégse</button>
+        <button type="button" class="nb-primary-button" id="nb-bulk-confirm">Kosárba</button>
       </div>
     </div>
   </div>

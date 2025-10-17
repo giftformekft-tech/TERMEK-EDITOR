@@ -11,3 +11,8 @@
 .nb-color-option{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #dcdcde;background:#fafafa;border-radius:4px;cursor:pointer}
 .nb-color-option input{margin:0}
 .nb-color-empty{margin:0;color:#666}
+.nb-label-table{margin:12px 0;background:#fff}
+.nb-label-table th{text-align:left}
+.nb-label-table td{padding:8px}
+.nb-label-table input[type=text]{width:100%;max-width:100%}
+.nb-label-table select{width:100%;max-width:100%}

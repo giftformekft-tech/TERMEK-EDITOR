@@ -98,6 +98,10 @@
   const modalColorList = document.getElementById('nb-modal-color-list');
   const colorModalLabel = document.getElementById('nb-color-modal-label');
   const sizeButtonsWrap = document.getElementById('nb-size-buttons');
+  const bulkModal = document.getElementById('nb-bulk-modal');
+  const bulkModalTrigger = document.getElementById('nb-bulk-modal-trigger');
+  const bulkModalList = document.getElementById('nb-bulk-size-list');
+  const bulkConfirmBtn = document.getElementById('nb-bulk-confirm');
   const selectionSummaryEl = document.getElementById('nb-selection-summary');
   const productTitleEl = document.getElementById('nb-product-title');
   const productMetaEl = document.getElementById('nb-product-meta');
@@ -111,12 +115,17 @@
   const alignButtons = Array.from(document.querySelectorAll('[data-nb-align]'));
   const clearButton = document.getElementById('nb-clear-design');
   const addToCartBtn = document.getElementById('nb-add-to-cart');
-  const saveBtn = document.getElementById('nb-save');
   const uploadInput = document.getElementById('nb-upload');
   const addTextBtn = document.getElementById('nb-add-text');
+  const layerListEl = document.getElementById('nb-layer-list');
 
   const loadedFontUrls = new Set();
-  const designState = {savedDesignId:null};
+  const designState = {savedDesignId:null, dirty:true};
+  let saving = false;
+  let savePromise = null;
+  let actionSubmitting = false;
+  let layerIdSeq = 1;
+  const bulkSizeState = {};
 
   function getCatalog(){ return settings.catalog || {}; }
   function productList(){ return settings.products || []; }
@@ -149,6 +158,59 @@
   }
   function types(){ return settings.types || ['Póló','Pulóver']; }
   function fontEntries(){ return settings.fonts || []; }
+
+  const typeProductAssignments = (() => {
+    const raw = settings.type_products;
+    const map = {};
+    if (raw && typeof raw === 'object'){
+      Object.keys(raw).forEach(key => {
+        const normalizedKey = normalizedTypeValue(key);
+        if (!normalizedKey) return;
+        const rawValue = raw[key];
+        const parsed = parseInt(rawValue, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0) return;
+        map[normalizedKey] = String(parsed);
+      });
+    }
+    return map;
+  })();
+
+  function typeProductMap(){
+    return typeProductAssignments;
+  }
+
+  function hasSizeValue(){
+    if (!sizeSel) return false;
+    const value = (sizeSel.value || '').toString().trim();
+    return value !== '';
+  }
+
+  function hasSizeOptions(){
+    if (!sizeSel) return false;
+    return Array.from(sizeSel.options || []).some(opt=>{
+      return ((opt.value || '').toString().trim() !== '');
+    });
+  }
+
+  function hasCompleteSelection(){
+    const sel = currentSelection();
+    if (!sel || !sel.pid) return false;
+    if (!sel.type) return false;
+    if (!sel.color) return false;
+    return hasSizeValue();
+  }
+
+  function updateActionStates(){
+    const ready = hasCompleteSelection();
+    const busy = saving || actionSubmitting;
+    if (addToCartBtn){
+      addToCartBtn.disabled = !ready || busy;
+    }
+    if (bulkModalTrigger){
+      const sizesAvailable = hasSizeOptions();
+      bulkModalTrigger.disabled = !ready || !sizesAvailable || busy;
+    }
+  }
 
   function parseFontEntry(entry){
     if (typeof entry !== 'string') return null;
@@ -439,6 +501,7 @@
       empty.className = 'nb-empty';
       empty.textContent = 'Nincs méret megadva.';
       sizeButtonsWrap.appendChild(empty);
+      updateActionStates();
       return;
     }
     options.forEach(opt=>{
@@ -453,6 +516,121 @@
       };
       sizeButtonsWrap.appendChild(btn);
     });
+    updateActionStates();
+  }
+
+  function clearBulkSizeState(){
+    Object.keys(bulkSizeState).forEach(key=>{ delete bulkSizeState[key]; });
+  }
+
+  function renderBulkSizeList(){
+    if (!bulkModalList) return;
+    bulkModalList.innerHTML = '';
+    const options = sizeSel ? Array.from(sizeSel.options) : [];
+    if (!options.length){
+      const empty = document.createElement('div');
+      empty.className = 'nb-modal-empty';
+      empty.textContent = 'Nincs méret megadva.';
+      bulkModalList.appendChild(empty);
+      updateActionStates();
+      return;
+    }
+    options.forEach(opt=>{
+      const value = (opt.value || '').toString();
+      if (!value) return;
+      const label = opt.dataset.label || opt.textContent || value;
+      const row = document.createElement('div');
+      row.className = 'nb-bulk-size-row';
+      row.dataset.sizeValue = value;
+      row.dataset.sizeLabel = label;
+
+      const title = document.createElement('span');
+      title.className = 'nb-bulk-size-label';
+      title.textContent = label;
+
+      const inputWrap = document.createElement('div');
+      inputWrap.className = 'nb-bulk-size-input';
+
+      const qtyLabel = document.createElement('span');
+      qtyLabel.textContent = 'Darab';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.step = '1';
+      input.inputMode = 'numeric';
+      const current = Object.prototype.hasOwnProperty.call(bulkSizeState, value) ? parseInt(bulkSizeState[value], 10) : 0;
+      if (Number.isFinite(current) && current > 0){
+        input.value = String(current);
+      } else {
+        input.value = '';
+      }
+      input.placeholder = '0';
+
+      input.addEventListener('input', ()=>{
+        const digitsOnly = input.value.replace(/[^0-9]/g, '');
+        if (digitsOnly !== input.value){
+          input.value = digitsOnly;
+        }
+      });
+
+      input.addEventListener('change', ()=>{
+        const parsed = parseInt(input.value, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0){
+          delete bulkSizeState[value];
+          input.value = '';
+        } else {
+          bulkSizeState[value] = parsed;
+          input.value = String(parsed);
+        }
+      });
+
+      inputWrap.appendChild(qtyLabel);
+      inputWrap.appendChild(input);
+      row.appendChild(title);
+      row.appendChild(inputWrap);
+      bulkModalList.appendChild(row);
+    });
+  }
+
+  function collectBulkSizeEntries(){
+    if (!bulkModalList) return [];
+    const entries = [];
+    const rows = Array.from(bulkModalList.querySelectorAll('.nb-bulk-size-row'));
+    rows.forEach(row=>{
+      const value = (row.dataset.sizeValue || '').toString();
+      if (!value) return;
+      const label = row.dataset.sizeLabel || value;
+      const input = row.querySelector('input');
+      const raw = input ? input.value : '';
+      const qty = parseInt(raw, 10);
+      if (!Number.isFinite(qty) || qty <= 0){
+        if (Object.prototype.hasOwnProperty.call(bulkSizeState, value)){
+          delete bulkSizeState[value];
+        }
+        if (input && raw !== ''){
+          input.value = '';
+        }
+        return;
+      }
+      bulkSizeState[value] = qty;
+      entries.push({value, label, quantity: qty});
+    });
+    updateActionStates();
+    return entries;
+  }
+
+  function openBulkModal(){
+    if (!bulkModal) return;
+    renderBulkSizeList();
+    bulkModal.hidden = false;
+    updateModalBodyState();
+  }
+
+  function closeBulkModal(){
+    if (!bulkModal) return;
+    bulkModal.hidden = true;
+    updateModalBodyState();
   }
 
   function renderModalTypes(){
@@ -491,6 +669,17 @@
     const cat = getCatalog();
     const normalized = normalizedTypeValue(typeValue);
     const list = productList();
+    const assignedMap = typeProductMap();
+    if (normalized && assignedMap && Object.prototype.hasOwnProperty.call(assignedMap, normalized)){
+      const assigned = assignedMap[normalized];
+      if (assigned && list.some(pid => String(pid) === assigned)){
+        const assignedId = parseInt(assigned, 10);
+        const assignedCfg = cat[assignedId] || {};
+        if (!assignedId || productSupportsType(assignedCfg, typeValue) || !Array.isArray(assignedCfg?.types) || !assignedCfg.types.length){
+          return assigned;
+        }
+      }
+    }
     for (let i=0;i<list.length;i++){
       const pid = list[i];
       const cfg = cat[pid] || {};
@@ -504,6 +693,18 @@
   function ensureProductMatchesType(){
     if (!productSel.options.length) return;
     const currentType = typeSel.value;
+    const normalizedType = normalizedTypeValue(currentType);
+    const assignedMap = typeProductMap();
+    if (normalizedType && assignedMap && Object.prototype.hasOwnProperty.call(assignedMap, normalizedType)){
+      const assigned = assignedMap[normalizedType];
+      if (assigned && Array.from(productSel.options).some(opt => opt.value === assigned)){
+        if (productSel.value !== assigned){
+          productSel.value = assigned;
+          dispatchChangeEvent(productSel);
+          return;
+        }
+      }
+    }
     const pid = parseInt(productSel.value || 0, 10);
     const cfg = getCatalog()[pid] || {};
     if (productSel.value && productSupportsType(cfg, currentType)) return;
@@ -515,7 +716,7 @@
   }
 
   function updateModalBodyState(){
-    const anyOpen = (productModal && !productModal.hidden) || (colorModal && !colorModal.hidden);
+    const anyOpen = (productModal && !productModal.hidden) || (colorModal && !colorModal.hidden) || (bulkModal && !bulkModal.hidden);
     if (anyOpen){
       document.body.classList.add('nb-modal-open');
     } else {
@@ -596,17 +797,32 @@
     }
     updateColorTriggerLabel();
     updatePriceDisplay();
+    updateActionStates();
+  }
+
+  function currentProductPriceMarkup(){
+    const sel = currentSelection();
+    if (!sel || !sel.cfg) return '';
+    const cfg = sel.cfg;
+    if (cfg.price_html && typeof cfg.price_html === 'string' && cfg.price_html.trim()){
+      return cfg.price_html;
+    }
+    if (cfg.price_text && typeof cfg.price_text === 'string' && cfg.price_text.trim()){
+      return cfg.price_text;
+    }
+    return '';
   }
 
   function updatePriceDisplay(){
     if (!priceDisplayEl) return;
     priceDisplayEl.classList.remove('nb-price-display--pending');
-    if (designState.savedDesignId){
-      priceDisplayEl.textContent = `Mentve (#${designState.savedDesignId})`;
-    } else {
-      priceDisplayEl.textContent = 'Az egyedi felár a mentés után kerül kiszámításra.';
-      priceDisplayEl.classList.add('nb-price-display--pending');
+    const markup = currentProductPriceMarkup();
+    if (markup){
+      priceDisplayEl.innerHTML = markup;
+      return;
     }
+    priceDisplayEl.textContent = 'Ár nem elérhető.';
+    priceDisplayEl.classList.add('nb-price-display--pending');
   }
 
   function resolveMockupPointer(value, arr){
@@ -820,6 +1036,138 @@
     return c.getObjects().filter(isDesignObject);
   }
 
+  function ensureLayerId(obj){
+    if (!obj) return '';
+    if (!obj.__nb_layer_id){
+      obj.__nb_layer_id = 'nb-layer-' + (layerIdSeq++);
+    }
+    return obj.__nb_layer_id;
+  }
+
+  function layerLabel(obj){
+    if (!obj) return '';
+    if (obj.__nb_layer_name){
+      return obj.__nb_layer_name;
+    }
+    if (obj.type === 'textbox'){
+      const raw = (obj.text || '').toString().replace(/\s+/g,' ').trim();
+      if (raw){
+        return raw.length > 28 ? raw.slice(0,25) + '…' : raw;
+      }
+      return 'Szöveg';
+    }
+    if (obj.type === 'image'){
+      return 'Kép';
+    }
+    return 'Elem';
+  }
+
+  function applyDesignOrder(order){
+    if (!Array.isArray(order) || !order.length) return;
+    const objects = c.getObjects();
+    let firstIndex = -1;
+    for (let i=0;i<objects.length;i++){
+      if (isDesignObject(objects[i])){
+        firstIndex = i;
+        break;
+      }
+    }
+    if (firstIndex === -1) return;
+    order.forEach((obj, offset)=>{
+      if (isDesignObject(obj)){
+        c.moveTo(obj, firstIndex + offset);
+      }
+    });
+    if (c.__nb_area_rect){
+      c.bringToFront(c.__nb_area_rect);
+    }
+  }
+
+  function moveLayer(obj, delta){
+    if (!isDesignObject(obj) || !Number.isInteger(delta) || !delta) return;
+    const order = designObjects();
+    const currentIndex = order.indexOf(obj);
+    if (currentIndex === -1) return;
+    const targetIndex = Math.max(0, Math.min(order.length - 1, currentIndex + delta));
+    if (targetIndex === currentIndex) return;
+    order.splice(currentIndex, 1);
+    order.splice(targetIndex, 0, obj);
+    applyDesignOrder(order);
+    c.setActiveObject(obj);
+    c.requestRenderAll();
+    markDesignDirty();
+    syncLayerList();
+    syncTextControls();
+  }
+
+  function syncLayerList(){
+    if (!layerListEl) return;
+    const objects = designObjects();
+    layerListEl.innerHTML = '';
+    if (!objects.length){
+      const empty = document.createElement('div');
+      empty.className = 'nb-layer-empty';
+      empty.textContent = 'Nincs feltöltött elem';
+      layerListEl.appendChild(empty);
+      return;
+    }
+    const active = c.getActiveObject();
+    const topFirst = objects.slice().reverse();
+    topFirst.forEach((obj, idx)=>{
+      ensureLayerId(obj);
+      const item = document.createElement('div');
+      item.className = 'nb-layer-item';
+      if (active === obj){
+        item.classList.add('is-active');
+      }
+      item.dataset.layerId = obj.__nb_layer_id;
+
+      const info = document.createElement('div');
+      info.className = 'nb-layer-info';
+      const selectBtn = document.createElement('button');
+      selectBtn.type = 'button';
+      selectBtn.textContent = layerLabel(obj);
+      selectBtn.addEventListener('click', ()=>{
+        c.setActiveObject(obj);
+        c.requestRenderAll();
+        syncTextControls();
+        syncLayerList();
+      });
+      info.appendChild(selectBtn);
+      item.appendChild(info);
+
+      const controls = document.createElement('div');
+      controls.className = 'nb-layer-controls';
+      const upBtn = document.createElement('button');
+      upBtn.type = 'button';
+      upBtn.setAttribute('aria-label', 'Feljebb');
+      upBtn.innerHTML = '▲';
+      if (idx === 0){
+        upBtn.disabled = true;
+      }
+      upBtn.addEventListener('click', ()=>{
+        moveLayer(obj, 1);
+      });
+
+      const downBtn = document.createElement('button');
+      downBtn.type = 'button';
+      downBtn.setAttribute('aria-label', 'Lejjebb');
+      downBtn.innerHTML = '▼';
+      if (idx === topFirst.length - 1){
+        downBtn.disabled = true;
+      }
+      downBtn.addEventListener('click', ()=>{
+        moveLayer(obj, -1);
+      });
+
+      controls.appendChild(upBtn);
+      controls.appendChild(downBtn);
+      item.appendChild(controls);
+
+      layerListEl.appendChild(item);
+    });
+  }
+
   function fitWithinArea(obj){
     const area = c.__nb_area || fallbackArea;
     if (!area) return;
@@ -887,8 +1235,9 @@
 
   function markDesignDirty(){
     designState.savedDesignId = null;
-    if (addToCartBtn) addToCartBtn.disabled = true;
+    designState.dirty = true;
     updatePriceDisplay();
+    updateActionStates();
   }
 
   function setMockupBgAndArea(){
@@ -1126,6 +1475,10 @@
     ensureSelectValue(colorSel);
     renderColorChoices();
 
+    clearBulkSizeState();
+    if (bulkModal && !bulkModal.hidden){
+      closeBulkModal();
+    }
     sizeSel.innerHTML = '';
     (cfg.sizes || []).forEach(size=>{
       const val = (size || '').toString().trim();
@@ -1137,6 +1490,7 @@
     });
     ensureSelectValue(sizeSel);
     renderSizeButtons();
+    renderBulkSizeList();
   }
 
   // initial populate
@@ -1170,15 +1524,23 @@
   if (colorSel) colorSel.onchange = ()=>{ renderColorChoices(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
   if (sizeSel) sizeSel.onchange = ()=>{ renderSizeButtons(); updateSelectionSummary(); markDesignDirty(); };
 
-  c.on('object:added', e=>{ if (isDesignObject(e.target)){ keepObjectInside(e.target); markDesignDirty(); }});
+  c.on('object:added', e=>{
+    if (isDesignObject(e.target)){
+      ensureLayerId(e.target);
+      keepObjectInside(e.target);
+      markDesignDirty();
+      syncLayerList();
+    }
+  });
   c.on('object:moving', e=>{ keepObjectInside(e.target, {fit:false}); });
-  c.on('object:scaling', e=>{ keepObjectInside(e.target); markDesignDirty(); });
-  c.on('object:rotating', e=>{ keepObjectInside(e.target); markDesignDirty(); });
-  c.on('object:modified', e=>{ if (isDesignObject(e.target)) markDesignDirty(); });
-  c.on('object:removed', e=>{ if (isDesignObject(e.target)) markDesignDirty(); });
-  c.on('selection:created', ()=>{ syncTextControls(); });
-  c.on('selection:updated', ()=>{ syncTextControls(); });
-  c.on('selection:cleared', ()=>{ syncTextControls(); });
+  c.on('object:scaling', e=>{ keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
+  c.on('object:rotating', e=>{ keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
+  c.on('object:modified', e=>{ if (isDesignObject(e.target)){ markDesignDirty(); syncLayerList(); }});
+  c.on('object:removed', e=>{ if (isDesignObject(e.target)){ markDesignDirty(); syncLayerList(); }});
+  c.on('selection:created', ()=>{ syncTextControls(); syncLayerList(); });
+  c.on('selection:updated', ()=>{ syncTextControls(); syncLayerList(); });
+  c.on('selection:cleared', ()=>{ syncTextControls(); syncLayerList(); });
+  c.on('text:changed', e=>{ if (isDesignObject(e.target)) syncLayerList(); });
 
   if (fontFamilySel){
     fontFamilySel.onchange = ()=>{
@@ -1254,8 +1616,29 @@
     });
   }
 
+  if (bulkModalTrigger){
+    bulkModalTrigger.addEventListener('click', ()=>{
+      if (bulkModalTrigger.disabled) return;
+      openBulkModal();
+    });
+  }
+
+  if (bulkModal){
+    const closeButtons = Array.from(bulkModal.querySelectorAll('[data-nb-close="bulk-modal"]'));
+    closeButtons.forEach(btn=>btn.addEventListener('click', closeBulkModal));
+    bulkModal.addEventListener('click', evt=>{
+      if (evt.target && evt.target.dataset && evt.target.dataset.nbClose === 'bulk-modal'){
+        closeBulkModal();
+      }
+    });
+  }
+
   document.addEventListener('keydown', evt=>{
     if (evt.key === 'Escape'){
+      if (bulkModal && !bulkModal.hidden){
+        closeBulkModal();
+        return;
+      }
       if (colorModal && !colorModal.hidden){
         closeColorModal();
         return;
@@ -1277,6 +1660,8 @@
   window.addEventListener('load', ()=>{
     setMockupBgAndArea();
   });
+
+  syncLayerList();
 
   if (addTextBtn){
     addTextBtn.onclick = () => {
@@ -1322,6 +1707,10 @@
           transparentCorners: false,
           lockScalingFlip: true
         });
+        if (f && typeof f.name === 'string' && f.name){
+          const baseName = f.name.split(/[/\\]/).pop() || f.name;
+          img.__nb_layer_name = baseName.replace(/\.[^.]+$/, '') || 'Kép';
+        }
         c.add(img);
         c.setActiveObject(img);
         keepObjectInside(img);
@@ -1337,6 +1726,7 @@
       c.requestRenderAll();
       markDesignDirty();
       syncTextControls();
+      syncLayerList();
     };
   }
 
@@ -1399,33 +1789,48 @@
     };
   }
 
-  let saving = false;
-  if (saveBtn){
-    saveBtn.onclick = async ()=>{
-      if (saving) return;
-      saving = true;
-      try{
-        const previewPng = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
-        const printExport = exportPrintImage();
-        if (!printExport.dataUrl){
-          throw new Error('print-export-failed');
-        }
-        const sel = currentSelection();
-        const size = sizeSel.value || '';
-        const typeLabel = (typeSel.selectedOptions[0]?.dataset?.label || typeSel.selectedOptions[0]?.textContent || '').toString().trim();
-        const colorLabel = (getColorLabel() || '').toString().trim();
-        const rawSizeLabel = sizeSel.selectedOptions[0]?.dataset?.label || sizeSel.selectedOptions[0]?.textContent || '';
-        const sizeLabel = (rawSizeLabel || size || '').toString().trim();
-        const price_ctx = {product_id: sel.pid, type: sel.type, color: sel.color, size};
-        if (typeLabel) price_ctx.type_label = typeLabel;
-        if (colorLabel) price_ctx.color_label = colorLabel;
-        if (sizeLabel) price_ctx.size_label = sizeLabel;
-        const attributes_json = {pa_type: sel.type, pa_color: sel.color, pa_size: size};
-        if (typeLabel) attributes_json.type_label = typeLabel;
-        if (colorLabel) attributes_json.color_label = colorLabel;
-        if (sizeLabel) attributes_json.size_label = sizeLabel;
-        const meta = {width_mm:300, height_mm:400, dpi:300, product_id: sel.pid, attributes_json, price_ctx};
-        const res = await fetch(NB_DESIGNER.rest + 'save', {
+  async function persistCurrentDesign(){
+    if (!hasCompleteSelection()){
+      const err = new Error('incomplete-selection');
+      err.userMessage = 'Kérjük válaszd ki a terméket, színt és méretet!';
+      throw err;
+    }
+    if (!c){
+      const err = new Error('canvas-missing');
+      err.userMessage = 'Nem sikerült betölteni a vásznat.';
+      throw err;
+    }
+    if (saving && savePromise){
+      return savePromise;
+    }
+    saving = true;
+    updateActionStates();
+    const saveTask = (async ()=>{
+      const previewPng = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
+      const printExport = exportPrintImage();
+      if (!printExport.dataUrl){
+        const err = new Error('print-export-failed');
+        err.userMessage = 'Nem sikerült előállítani a nyomdai PNG fájlt.';
+        throw err;
+      }
+      const sel = currentSelection();
+      const size = sizeSel.value || '';
+      const typeLabel = (typeSel.selectedOptions[0]?.dataset?.label || typeSel.selectedOptions[0]?.textContent || '').toString().trim();
+      const colorLabel = (getColorLabel() || '').toString().trim();
+      const rawSizeLabel = sizeSel.selectedOptions[0]?.dataset?.label || sizeSel.selectedOptions[0]?.textContent || '';
+      const sizeLabel = (rawSizeLabel || size || '').toString().trim();
+      const price_ctx = {product_id: sel.pid, type: sel.type, color: sel.color, size};
+      if (typeLabel) price_ctx.type_label = typeLabel;
+      if (colorLabel) price_ctx.color_label = colorLabel;
+      if (sizeLabel) price_ctx.size_label = sizeLabel;
+      const attributes_json = {pa_type: sel.type, pa_color: sel.color, pa_size: size};
+      if (typeLabel) attributes_json.type_label = typeLabel;
+      if (colorLabel) attributes_json.color_label = colorLabel;
+      if (sizeLabel) attributes_json.size_label = sizeLabel;
+      const meta = {width_mm:300, height_mm:400, dpi:300, product_id: sel.pid, attributes_json, price_ctx};
+      let res;
+      try {
+        res = await fetch(NB_DESIGNER.rest + 'save', {
           method:'POST',
           headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
           body: JSON.stringify({
@@ -1437,47 +1842,122 @@
             meta
           })
         });
-        const j = await res.json();
+      } catch (networkError){
+        const err = new Error('network');
+        err.userMessage = 'Hálózati hiba';
+        throw err;
+      }
+      const j = await res.json().catch(()=>({}));
+      if (!res.ok){
+        const err = new Error('save-failed');
+        err.userMessage = (j && j.message) ? j.message : 'Mentési hiba';
+        throw err;
+      }
+      designState.savedDesignId = j.design_id;
+      designState.dirty = false;
+      updatePriceDisplay();
+      return designState.savedDesignId;
+    })();
+    savePromise = saveTask;
+    try {
+      return await saveTask;
+    } finally {
+      savePromise = null;
+      saving = false;
+      updateActionStates();
+    }
+  }
+
+  async function ensureDesignSaved(){
+    if (!designState.dirty && designState.savedDesignId){
+      return designState.savedDesignId;
+    }
+    return persistCurrentDesign();
+  }
+
+  if (bulkConfirmBtn){
+    bulkConfirmBtn.onclick = async ()=>{
+      const entries = collectBulkSizeEntries();
+      if (!entries.length){
+        alert('Adj meg legalább egy mennyiséget!');
+        return;
+      }
+      bulkConfirmBtn.disabled = true;
+      actionSubmitting = true;
+      updateActionStates();
+      try{
+        const designId = await ensureDesignSaved();
+        let res;
+        try {
+          res = await fetch(NB_DESIGNER.rest + 'add-to-cart', {
+            method:'POST',
+            headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
+            body: JSON.stringify({design_id: designId, bulk_sizes: entries})
+          });
+        } catch (networkError){
+          const err = new Error('network');
+          err.userMessage = 'Hálózati hiba';
+          throw err;
+        }
+        const j = await res.json().catch(()=>({}));
         if (!res.ok){
-          alert(j.message || 'Mentési hiba');
+          alert((j && j.message) ? j.message : 'Kosár hiba');
           return;
         }
-        designState.savedDesignId = j.design_id;
-        if (addToCartBtn) addToCartBtn.disabled = false;
-        alert('Mentve! ID: ' + designState.savedDesignId);
-        updatePriceDisplay();
+        closeBulkModal();
+        if (j.redirect){
+          window.location = j.redirect;
+        }
       }catch(e){
-        if (e && e.message === 'print-export-failed'){
-          alert('Nem sikerült előállítani a nyomdai PNG fájlt.');
+        if (e && e.userMessage){
+          alert(e.userMessage);
         } else {
           alert('Hálózati hiba');
         }
       } finally {
-        saving = false;
+        bulkConfirmBtn.disabled = false;
+        actionSubmitting = false;
+        updateActionStates();
       }
     };
   }
 
   if (addToCartBtn){
     addToCartBtn.onclick = async ()=>{
-      if (!designState.savedDesignId){
-        alert('Előbb mentsd a tervet!');
-        return;
-      }
+      if (addToCartBtn.disabled) return;
+      actionSubmitting = true;
+      updateActionStates();
       try{
-        const res = await fetch(NB_DESIGNER.rest + 'add-to-cart', {
-          method:'POST',
-          headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
-          body: JSON.stringify({design_id: designState.savedDesignId})
-        });
-        const j = await res.json();
+        const designId = await ensureDesignSaved();
+        let res;
+        try {
+          res = await fetch(NB_DESIGNER.rest + 'add-to-cart', {
+            method:'POST',
+            headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
+            body: JSON.stringify({design_id: designId})
+          });
+        } catch (networkError){
+          const err = new Error('network');
+          err.userMessage = 'Hálózati hiba';
+          throw err;
+        }
+        const j = await res.json().catch(()=>({}));
         if (!res.ok){
-          alert(j.message || 'Kosár hiba');
+          alert((j && j.message) ? j.message : 'Kosár hiba');
           return;
         }
-        window.location = j.redirect;
+        if (j.redirect){
+          window.location = j.redirect;
+        }
       }catch(e){
-        alert('Hálózati hiba');
+        if (e && e.userMessage){
+          alert(e.userMessage);
+        } else {
+          alert('Hálózati hiba');
+        }
+      } finally {
+        actionSubmitting = false;
+        updateActionStates();
       }
     };
   }
