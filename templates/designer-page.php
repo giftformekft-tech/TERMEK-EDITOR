@@ -118,6 +118,19 @@
           </div>
         </div>
         <div class="nb-selection-summary" id="nb-selection-summary"></div>
+        <div class="nb-double-sided" id="nb-double-sided">
+          <label class="nb-double-sided-toggle">
+            <input type="checkbox" id="nb-double-sided-toggle">
+            <span>
+              <strong>Kétoldalas nyomtatás</strong>
+              <small>Kapcsold be, ha a hátlapot is terveznéd.</small>
+            </span>
+          </label>
+          <div class="nb-side-status" id="nb-side-status">
+            <span data-nb-side="front">Előlap: üres</span>
+            <span data-nb-side="back">Hátlap: kikapcsolva</span>
+          </div>
+        </div>
         <div class="nb-summary-actions">
           <div class="nb-print-summary" id="nb-print-summary">Nyomtatási oldalak: 0 / 1</div>
           <button id="nb-add-to-cart" class="nb-cart-button" disabled>Kosárba</button>
