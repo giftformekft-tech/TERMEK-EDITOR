@@ -15,6 +15,19 @@
             <span class="nb-field-label">Méret</span>
             <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
           </div>
+          <div class="nb-double-sided" id="nb-double-sided">
+            <label class="nb-double-sided-toggle">
+              <input type="checkbox" id="nb-double-sided-toggle">
+              <span>
+                <strong>Kétoldalas nyomtatás</strong>
+                <small>Kapcsold be, ha a hátlapot is terveznéd.</small>
+              </span>
+            </label>
+            <div class="nb-side-status" id="nb-side-status">
+              <span data-nb-side="front">Előlap: üres</span>
+              <span data-nb-side="back">Hátlap: kikapcsolva</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -30,10 +43,20 @@
     </aside>
 
     <main class="nb-column nb-column--stage">
+      <div class="nb-stage-controls">
+        <div class="nb-side-toggle" role="tablist" aria-label="Oldal választó">
+          <button type="button" class="nb-side-button is-active" data-nb-side="front" aria-pressed="true">Előlap</button>
+          <button type="button" class="nb-side-button" data-nb-side="back" aria-pressed="false">Hátlap</button>
+        </div>
+      </div>
       <div class="nb-product-stage">
         <div class="nb-product-frame">
+          <div class="nb-canvas-empty-hint" id="nb-canvas-empty-hint" hidden>Ide húzd a mintát</div>
           <canvas id="nb-canvas" width="480" height="640"></canvas>
         </div>
+        <button type="button" class="nb-side-fab" id="nb-side-toggle-mobile" aria-label="Oldal váltása" hidden>
+          ⟲
+        </button>
       </div>
     </main>
 
@@ -79,10 +102,24 @@
       <div class="nb-summary-card">
         <div class="nb-product-heading">
           <h2 id="nb-product-title">Termék</h2>
-          <div class="nb-price-display" id="nb-price-display"></div>
+          <div class="nb-price-display nb-price-display--pending" id="nb-price-display">
+            <div class="nb-price-line">
+              <span>Alapár</span>
+              <span id="nb-price-base">—</span>
+            </div>
+            <div class="nb-price-line nb-price-line--surcharge" id="nb-price-surcharge-row" hidden>
+              <span>Kétoldalas felár</span>
+              <span id="nb-price-surcharge">+0 Ft</span>
+            </div>
+            <div class="nb-price-total">
+              <span>Végösszeg</span>
+              <span id="nb-price-total">—</span>
+            </div>
+          </div>
         </div>
         <div class="nb-selection-summary" id="nb-selection-summary"></div>
         <div class="nb-summary-actions">
+          <div class="nb-print-summary" id="nb-print-summary">Nyomtatási oldalak: 0 / 1</div>
           <button id="nb-add-to-cart" class="nb-cart-button" disabled>Kosárba</button>
           <button type="button" id="nb-bulk-modal-trigger" class="nb-secondary-action">Többet vennék</button>
         </div>
