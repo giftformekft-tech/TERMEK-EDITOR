@@ -177,6 +177,8 @@ function nb_admin_render(){
     } elseif ($tab==='pricing'){
       $settings['fee_per_cm2'] = isset($_POST['fee_per_cm2']) ? floatval($_POST['fee_per_cm2']) : 3;
       $settings['min_fee']     = isset($_POST['min_fee']) ? floatval($_POST['min_fee']) : 990;
+      $double_fee_raw = isset($_POST['double_sided_fee']) ? floatval($_POST['double_sided_fee']) : 0;
+      $settings['double_sided_fee'] = $double_fee_raw > 0 ? $double_fee_raw : 0;
       $bulkFrom = isset($_POST['bulk_from']) ? (array)$_POST['bulk_from'] : [];
       $bulkTo   = isset($_POST['bulk_to']) ? (array)$_POST['bulk_to'] : [];
       $bulkPct  = isset($_POST['bulk_discount']) ? (array)$_POST['bulk_discount'] : [];
