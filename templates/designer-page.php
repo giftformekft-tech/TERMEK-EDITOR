@@ -4,7 +4,7 @@
       <div class="nb-action-card nb-action-card--product">
         <div class="nb-sheet-section" data-nb-sheet-source="product" data-nb-sheet-title="Terméktípus">
           <button type="button" class="nb-hero-button" id="nb-product-modal-trigger">
-            <span class="nb-hero-icon">🛍️</span>
+            <span class="nb-hero-icon">👕</span>
             <span>Válassz terméket</span>
           </button>
         </div>
@@ -161,28 +161,32 @@
   <select id="nb-size" class="nb-hidden"></select>
 
   <div class="nb-mobile-toolbar" id="nb-mobile-toolbar" hidden>
-    <button type="button" class="nb-mobile-icon" data-nb-sheet-target="sides" aria-label="Előlap / hátlap">
-      <span class="nb-mobile-icon-symbol">🌀</span>
-    </button>
-    <button type="button" class="nb-mobile-icon" data-nb-sheet-target="upload" aria-label="Feltöltés">
-      <span class="nb-mobile-icon-symbol">⬆</span>
-    </button>
-    <button type="button" class="nb-mobile-icon" data-nb-sheet-target="text" aria-label="Szöveg">
-      <span class="nb-mobile-icon-symbol">✎</span>
-    </button>
-    <button type="button" class="nb-mobile-icon" data-nb-sheet-target="product" aria-label="Terméktípus">
-      <span class="nb-mobile-icon-symbol">🛍️</span>
-    </button>
-    <button type="button" class="nb-mobile-icon" data-nb-sheet-target="color" aria-label="Szín">
-      <span class="nb-mobile-icon-symbol">🎨</span>
-    </button>
-    <button type="button" class="nb-mobile-icon" data-nb-sheet-target="size" aria-label="Méret">
-      <span class="nb-mobile-icon-symbol">📏</span>
-    </button>
-    <button type="button" class="nb-mobile-icon" data-nb-sheet-target="layers" aria-label="Rétegek">
-      <span class="nb-mobile-icon-symbol">🧱</span>
-      <span class="nb-mobile-icon-badge" hidden></span>
-    </button>
+    <div class="nb-mobile-toolbar-row">
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="sides" aria-label="Előlap / hátlap">
+        <span class="nb-mobile-icon-symbol">🌀</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="upload" aria-label="Feltöltés">
+        <span class="nb-mobile-icon-symbol">⬆</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="text" aria-label="Szöveg">
+        <span class="nb-mobile-icon-symbol">✎</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="product" aria-label="Terméktípus">
+        <span class="nb-mobile-icon-symbol">👕</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="layers" aria-label="Rétegek">
+        <span class="nb-mobile-icon-symbol">🧱</span>
+        <span class="nb-mobile-icon-badge" hidden></span>
+      </button>
+    </div>
+    <div class="nb-mobile-toolbar-row nb-mobile-toolbar-row--secondary">
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="color" aria-label="Szín">
+        <span class="nb-mobile-icon-symbol">🎨</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="size" aria-label="Méret">
+        <span class="nb-mobile-icon-symbol">📏</span>
+      </button>
+    </div>
   </div>
 
   <div class="nb-mobile-status" id="nb-mobile-status" hidden>
@@ -196,7 +200,7 @@
         <button type="button" class="nb-mobile-quick" data-nb-mobile-action="backward" disabled>Hátra</button>
       </div>
     </div>
-    <button type="button" class="nb-mobile-complete" id="nb-mobile-complete">Kész</button>
+    <button type="button" class="nb-mobile-complete" id="nb-mobile-complete">Kosárba</button>
   </div>
 
   <div class="nb-mobile-overlay" id="nb-mobile-sheet-overlay" hidden></div>
