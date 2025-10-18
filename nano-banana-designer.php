@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Nano Banana – Terméktervező
  * Description: Terméktervező külön menüvel. Terméktípus (pl. póló/pulóver) + szín + méret, típus–szín → mockup és ár. A feltöltött képek nem mehetnek ki a print-area-ból.
- * Version: 1.4.28
+ * Version: 1.4.55
  * Author: Nano Banana
  * Requires Plugins: woocommerce
  * License: GPLv2 or later
@@ -11,8 +11,9 @@ if ( ! defined('ABSPATH') ) exit;
 
 define('NB_DESIGNER_PATH', plugin_dir_path(__FILE__));
 define('NB_DESIGNER_URL', plugin_dir_url(__FILE__));
-define('NB_DESIGNER_VERSION', '1.4.28');
+define('NB_DESIGNER_VERSION', '1.4.55');
 
+require_once NB_DESIGNER_PATH.'inc/helpers.php';
 require_once NB_DESIGNER_PATH.'inc/cpt.php';
 require_once NB_DESIGNER_PATH.'inc/rest.php';
 require_once NB_DESIGNER_PATH.'inc/enqueue.php';
@@ -38,12 +39,14 @@ register_activation_hook(__FILE__, function(){
       'min_fee' => 990,
       'products' => [],
       'types' => ['Póló','Pulóver'],
+      'type_products' => [],
       'color_palette' => [],
       // product_id => {title, types[], colors[], sizes[], map: {'type|color':{mockup_index, fee_per_cm2?, min_fee?, base_fee?}}, size_surcharge: {S:0,XL:300}}
       'catalog'  => [],
       'fonts' => [],
       // [{id,label,image_url,area:{x,y,w,h}}]
-      'mockups' => []
+      'mockups' => [],
+      'bulk_discounts' => [],
     ]);
   }
 });
