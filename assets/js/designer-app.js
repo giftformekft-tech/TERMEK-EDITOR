@@ -1701,10 +1701,16 @@
     const state = ensureSideState(key);
     const json = cloneSideJson(state);
     return new Promise(resolve=>{
-      const existing = c.getObjects ? c.getObjects().slice() : [];
-      existing.forEach(obj=>{
-        c.remove(obj);
-      });
+      const previousBg = (typeof c.backgroundColor !== 'undefined' && c.backgroundColor) ? c.backgroundColor : '#fff';
+      if (typeof c.clear === 'function'){
+        c.clear();
+        c.backgroundColor = previousBg || '#fff';
+      } else {
+        const existing = c.getObjects ? c.getObjects().slice() : [];
+        existing.forEach(obj=>{
+          c.remove(obj);
+        });
+      }
       c.__nb_area = null;
       c.__nb_area_rect = null;
       if (typeof c.discardActiveObject === 'function'){
