@@ -331,6 +331,7 @@
   const mobileStatusBar = document.getElementById('nb-mobile-status');
   const mobileSelectionLabel = document.getElementById('nb-mobile-selection-label');
   const mobileCompleteBtn = document.getElementById('nb-mobile-complete');
+  const mobileBulkBtn = document.getElementById('nb-mobile-bulk');
   const mobileSheet = document.getElementById('nb-mobile-sheet');
   const mobileSheetContent = document.getElementById('nb-mobile-sheet-content');
   const mobileSheetTitle = document.getElementById('nb-mobile-sheet-title');
@@ -529,6 +530,7 @@
       bulkModalTrigger.disabled = !ready || !sizesAvailable || busy;
     }
     syncMobileCompleteState();
+    syncMobileBulkState();
   }
 
   function parseFontEntry(entry){
@@ -1834,7 +1836,7 @@
 
   function syncMobileCompleteState(){
     if (!mobileCompleteBtn) return;
-    if (!mobileUiEnabled()){ 
+    if (!mobileUiEnabled()){
       mobileCompleteBtn.setAttribute('hidden','');
       return;
     }
@@ -1844,6 +1846,19 @@
     } else {
       mobileCompleteBtn.disabled = true;
     }
+  }
+
+  function syncMobileBulkState(){
+    if (!mobileBulkBtn) return;
+    if (!mobileUiEnabled()){
+      mobileBulkBtn.setAttribute('hidden','');
+      return;
+    }
+    mobileBulkBtn.removeAttribute('hidden');
+    const ready = hasCompleteSelection();
+    const sizesAvailable = hasSizeOptions();
+    const busy = saving || actionSubmitting;
+    mobileBulkBtn.disabled = !ready || !sizesAvailable || busy;
   }
 
   function updateMobileLayerBadge(){
@@ -2022,6 +2037,7 @@
     }
     syncMobileSelectionUi();
     syncMobileCompleteState();
+    syncMobileBulkState();
   }
 
   function toggleSheetExpansion(){
@@ -2791,6 +2807,14 @@
       if (addToCartBtn && !addToCartBtn.disabled){
         addToCartBtn.click();
       }
+    });
+  }
+
+  if (mobileBulkBtn){
+    mobileBulkBtn.addEventListener('click', ()=>{
+      if (!mobileUiEnabled()) return;
+      if (mobileBulkBtn.disabled) return;
+      openBulkModal();
     });
   }
 

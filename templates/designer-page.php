@@ -197,7 +197,10 @@
         <button type="button" class="nb-mobile-quick" data-nb-mobile-action="backward" disabled>Hátra</button>
       </div>
     </div>
-    <button type="button" class="nb-mobile-complete" id="nb-mobile-complete">Kosárba</button>
+    <div class="nb-mobile-status-actions">
+      <button type="button" class="nb-mobile-complete" id="nb-mobile-complete">Kosárba</button>
+      <button type="button" class="nb-mobile-secondary" id="nb-mobile-bulk">Többet vennék</button>
+    </div>
   </div>
 
   <div class="nb-mobile-overlay" id="nb-mobile-sheet-overlay" hidden></div>
