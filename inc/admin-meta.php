@@ -2,30 +2,131 @@
 if ( ! defined('ABSPATH') ) exit;
 
 if ( ! function_exists('nb_render_design_download_link') ) {
-  function nb_render_design_download_link($preview, $design_id = 0, $print = ''){
+  function nb_render_design_download_link($preview, $design_id = 0, $print = '', $item = null){
     $design_id = intval($design_id);
-    $download = '';
 
-    if ($print){
-      $download = $print;
-    } elseif ($design_id){
-      $stored = get_post_meta($design_id, 'print_url', true);
-      if ($stored){
-        $download = $stored;
+    $front_url   = '';
+    $front_width = 0;
+    $front_height = 0;
+
+    $back_url   = '';
+    $back_width = 0;
+    $back_height = 0;
+
+    if ($item && is_a($item, 'WC_Order_Item_Product')){
+      if (! $print){
+        $meta_print = (string) $item->get_meta('print_url');
+        if ($meta_print !== ''){
+          $print = $meta_print;
+        }
+      }
+
+      $meta_width = intval($item->get_meta('print_width_px'));
+      if ($meta_width > 0){
+        $front_width = $meta_width;
+      }
+
+      $meta_height = intval($item->get_meta('print_height_px'));
+      if ($meta_height > 0){
+        $front_height = $meta_height;
+      }
+
+      $meta_back_url = (string) $item->get_meta('print_back_url');
+      if ($meta_back_url !== ''){
+        $back_url = $meta_back_url;
+      }
+
+      $meta_back_width = intval($item->get_meta('print_back_width_px'));
+      if ($meta_back_width > 0){
+        $back_width = $meta_back_width;
+      }
+
+      $meta_back_height = intval($item->get_meta('print_back_height_px'));
+      if ($meta_back_height > 0){
+        $back_height = $meta_back_height;
       }
     }
 
-    if (! $download){
-      $download = $preview;
+    if (! $print && $design_id){
+      $stored = get_post_meta($design_id, 'print_url', true);
+      if ($stored){
+        $print = $stored;
+      }
     }
 
-    if (! $download){
+    if (! $front_width && $design_id){
+      $stored_width = intval(get_post_meta($design_id, 'print_width_px', true));
+      if ($stored_width > 0){
+        $front_width = $stored_width;
+      }
+    }
+
+    if (! $front_height && $design_id){
+      $stored_height = intval(get_post_meta($design_id, 'print_height_px', true));
+      if ($stored_height > 0){
+        $front_height = $stored_height;
+      }
+    }
+
+    if (! $back_url && $design_id){
+      $stored_back = get_post_meta($design_id, 'print_back_url', true);
+      if ($stored_back){
+        $back_url = $stored_back;
+      }
+    }
+
+    if (! $back_width && $design_id){
+      $stored_back_width = intval(get_post_meta($design_id, 'print_back_width_px', true));
+      if ($stored_back_width > 0){
+        $back_width = $stored_back_width;
+      }
+    }
+
+    if (! $back_height && $design_id){
+      $stored_back_height = intval(get_post_meta($design_id, 'print_back_height_px', true));
+      if ($stored_back_height > 0){
+        $back_height = $stored_back_height;
+      }
+    }
+
+    if ($print){
+      $front_url = $print;
+    }
+
+    if (! $front_url){
+      $front_url = $preview;
+    }
+
+    if (! $front_url && ! $back_url){
       return '';
     }
 
     $filename_base = $design_id ? 'nb-design-'.$design_id : 'nb-design';
+    $links = [];
 
-    return '<a class="nb-design-download" href="'.esc_url($download).'" target="_blank" rel="noopener" download="'.esc_attr($filename_base.'-print.png').'">'.esc_html__('Nyomdai PNG letöltése (3000 px)','nb').'</a>';
+    if ($front_url){
+      $front_label = __('Előlap PNG letöltése','nb');
+      if ($front_width && $front_height){
+        $front_label .= ' '.sprintf('(%d×%d px)', absint($front_width), absint($front_height));
+      } elseif ($front_width){
+        $front_label .= ' '.sprintf('(%d px)', absint($front_width));
+      }
+
+      $links[] = '<a class="nb-design-download" href="'.esc_url($front_url).'" target="_blank" rel="noopener" download="'.esc_attr($filename_base.'-front.png').'">'.esc_html($front_label).'</a>';
+    }
+
+    if ($back_url){
+      $back_label = __('Hátlap PNG letöltése','nb');
+      if ($back_width && $back_height){
+        $back_label .= ' '.sprintf('(%d×%d px)', absint($back_width), absint($back_height));
+      } elseif ($back_width){
+        $back_label .= ' '.sprintf('(%d px)', absint($back_width));
+      }
+
+      $links[] = '<a class="nb-design-download" href="'.esc_url($back_url).'" target="_blank" rel="noopener" download="'.esc_attr($filename_base.'-back.png').'">'.esc_html($back_label).'</a>';
+    }
+
+    return implode('<br>', $links);
   }
 }
 
@@ -694,7 +795,7 @@ add_action('woocommerce_admin_order_data_after_order_details', function($order){
     }
 
     $summary = nb_get_design_attribute_summary($design_id, $item->get_product_id(), $item);
-    $download_link = nb_render_design_download_link($preview, $design_id, $print);
+    $download_link = nb_render_design_download_link($preview, $design_id, $print, $item);
 
     echo '<div class="nb-order-design">';
 
@@ -746,7 +847,7 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
 
   $product_id = $product && is_a($product, 'WC_Product') ? $product->get_id() : 0;
   $summary = nb_get_design_attribute_summary($design_id, $product_id, $item);
-  $download_link = nb_render_design_download_link($preview, $design_id, $print);
+  $download_link = nb_render_design_download_link($preview, $design_id, $print, $item);
 
   if (empty($summary) && ! $download_link){
     return;
@@ -771,7 +872,7 @@ add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
     $hidden = [];
   }
 
-  foreach (['nb_design_id','preview_url','print_url','print_width_px','print_height_px'] as $key){
+  foreach (['nb_design_id','preview_url','print_url','print_width_px','print_height_px','print_back_url','print_back_width_px','print_back_height_px','nb_printed_side_count'] as $key){
     if (! in_array($key, $hidden, true)){
       $hidden[] = $key;
     }
@@ -801,7 +902,7 @@ add_filter('woocommerce_order_item_get_formatted_meta_data', function($formatted
       $key = (string) $meta['key'];
     }
 
-    if ($key !== '' && in_array($key, ['nb_design_id','preview_url','print_url','print_width_px','print_height_px'], true)){
+    if ($key !== '' && in_array($key, ['nb_design_id','preview_url','print_url','print_width_px','print_height_px','print_back_url','print_back_width_px','print_back_height_px','nb_printed_side_count'], true)){
       unset($formatted_meta[$meta_id]);
     }
   }
