@@ -164,9 +164,6 @@
     <button type="button" class="nb-mobile-icon" data-nb-sheet-target="sides" aria-label="Előlap / hátlap">
       <span class="nb-mobile-icon-symbol">🌀</span>
     </button>
-    <button type="button" class="nb-mobile-icon" data-nb-sheet-target="elements" aria-label="Mentett minták">
-      <span class="nb-mobile-icon-symbol">⭐</span>
-    </button>
     <button type="button" class="nb-mobile-icon" data-nb-sheet-target="upload" aria-label="Feltöltés">
       <span class="nb-mobile-icon-symbol">⬆</span>
     </button>
