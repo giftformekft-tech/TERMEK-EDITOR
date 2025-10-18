@@ -56,7 +56,7 @@ if ( ! function_exists('nb_detect_attribute_group_from_key') ) {
       if (function_exists('remove_accents')){
         $normalized = remove_accents($normalized);
       }
-      $key = strtolower($normalized);
+      $key = nb_utf8_strtolower($normalized);
     } else {
       $key = '';
     }
@@ -120,11 +120,34 @@ if ( ! function_exists('nb_normalize_attribute_display') ) {
 }
 
 if ( ! function_exists('nb_designer_settings_cache') ) {
-  function nb_designer_settings_cache(){
+  function nb_designer_settings_cache($refresh = false){
     static $cache = null;
+    if ($refresh){
+      $cache = null;
+    }
     if ($cache === null){
-      $settings = get_option('nb_settings', []);
-      $cache = is_array($settings) ? $settings : [];
+      $stored = get_option('nb_settings', []);
+      $settings = is_array($stored) ? $stored : [];
+
+      if (function_exists('nb_clean_settings_unicode')){
+        $cleaned = nb_clean_settings_unicode($settings);
+        $encoder = function_exists('wp_json_encode') ? 'wp_json_encode' : 'json_encode';
+        if ($encoder($cleaned) !== $encoder($settings)){
+          $settings = $cleaned;
+          update_option('nb_settings', $settings);
+        } else {
+          $settings = $cleaned;
+        }
+      }
+
+      if (!empty($settings['catalog']) && is_array($settings['catalog']) && function_exists('nb_sync_product_color_configuration')){
+        foreach ($settings['catalog'] as &$catalogCfg){
+          nb_sync_product_color_configuration($catalogCfg, $settings);
+        }
+        unset($catalogCfg);
+      }
+
+      $cache = $settings;
     }
     return $cache;
   }
@@ -145,7 +168,7 @@ if ( ! function_exists('nb_designer_normalize_type_key') ) {
     if (function_exists('remove_accents')){
       $string = remove_accents($string);
     }
-    return strtolower($string);
+    return nb_utf8_strtolower($string);
   }
 }
 
@@ -164,7 +187,7 @@ if ( ! function_exists('nb_designer_normalize_color_key') ) {
     if (function_exists('remove_accents')){
       $string = remove_accents($string);
     }
-    return strtolower($string);
+    return nb_utf8_strtolower($string);
   }
 }
 
@@ -207,9 +230,21 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
         $candidates[] = $settings['types'];
       }
       $normalizedSelected = nb_designer_normalize_type_key($selected);
+      if (function_exists('nb_resolve_type_order_label')){
+        $mapped = nb_resolve_type_order_label($selected !== '' ? $selected : $value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
+        }
+      }
       if (! empty($price_ctx['type_label'])){
-        $label = trim((string)$price_ctx['type_label']);
+        $label = nb_clean_label_string($price_ctx['type_label']);
         if ($label !== ''){
+          if (function_exists('nb_resolve_type_order_label')){
+            $mapped = nb_resolve_type_order_label($label, $settings);
+            if ($mapped !== ''){
+              return $mapped;
+            }
+          }
           return $label;
         }
       }
@@ -220,11 +255,29 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
             continue;
           }
           if (strcasecmp($value, $label) === 0){
+            if (function_exists('nb_resolve_type_order_label')){
+              $mapped = nb_resolve_type_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
           if ($normalizedSelected !== '' && nb_designer_normalize_type_key($label) === $normalizedSelected){
+            if (function_exists('nb_resolve_type_order_label')){
+              $mapped = nb_resolve_type_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
+        }
+      }
+      if (function_exists('nb_resolve_type_order_label')){
+        $mapped = nb_resolve_type_order_label($value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
         }
       }
       return $value;
@@ -232,9 +285,21 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
 
     if ($group === 'color'){
       $normalizedSelected = nb_designer_normalize_color_key($selected);
+      if (function_exists('nb_resolve_color_order_label')){
+        $mapped = nb_resolve_color_order_label($selected !== '' ? $selected : $value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
+        }
+      }
       if (! empty($price_ctx['color_label'])){
-        $label = trim((string)$price_ctx['color_label']);
+        $label = nb_clean_label_string($price_ctx['color_label']);
         if ($label !== ''){
+          if (function_exists('nb_resolve_color_order_label')){
+            $mapped = nb_resolve_color_order_label($label, $settings);
+            if ($mapped !== ''){
+              return $mapped;
+            }
+          }
           return $label;
         }
       }
@@ -267,14 +332,32 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
             continue;
           }
           if (strcasecmp($value, $label) === 0){
+            if (function_exists('nb_resolve_color_order_label')){
+              $mapped = nb_resolve_color_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
           if ($normalizedSelected !== '' && nb_designer_normalize_color_key($label) === $normalizedSelected){
+            if (function_exists('nb_resolve_color_order_label')){
+              $mapped = nb_resolve_color_order_label($label, $settings);
+              if ($mapped !== ''){
+                return $mapped;
+              }
+            }
             return $label;
           }
         }
       }
 
+      if (function_exists('nb_resolve_color_order_label')){
+        $mapped = nb_resolve_color_order_label($value, $settings);
+        if ($mapped !== ''){
+          return $mapped;
+        }
+      }
       return $value;
     }
 
@@ -286,7 +369,7 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
         }
       }
 
-      $normalizedSelected = strtolower($selected);
+      $normalizedSelected = nb_utf8_strtolower($selected);
       $candidateLists = [];
       if ($cfg && ! empty($cfg['sizes']) && is_array($cfg['sizes'])){
         $candidateLists[] = $cfg['sizes'];
@@ -309,7 +392,7 @@ if ( ! function_exists('nb_translate_attribute_value_from_catalog') ) {
           if (strcasecmp($value, $label) === 0){
             return $label;
           }
-          if ($normalizedSelected !== '' && strtolower($label) === $normalizedSelected){
+          if ($normalizedSelected !== '' && nb_utf8_strtolower($label) === $normalizedSelected){
             return $label;
           }
         }
@@ -329,13 +412,30 @@ if ( ! function_exists('nb_normalize_attribute_candidates') ) {
       $values = [$values];
     }
     foreach ($values as $value){
-      if (is_scalar($value)){
-        $clean = trim((string)$value);
-        if ($clean !== '' && ! in_array($clean, $list, true)){
-          $list[] = $clean;
-        }
+      if (! is_scalar($value)){
+        continue;
+      }
+
+      $string = (string)$value;
+      if (function_exists('wp_unslash')){
+        $string = wp_unslash($string);
+      }
+
+      if (function_exists('nb_clean_label_string')){
+        $clean = nb_clean_label_string($string);
+      } else {
+        $clean = trim($string);
+      }
+
+      if ($clean === ''){
+        continue;
+      }
+
+      if (! in_array($clean, $list, true)){
+        $list[] = $clean;
       }
     }
+
     return $list;
   }
 }
@@ -631,7 +731,7 @@ add_action('woocommerce_admin_order_data_after_order_details', function($order){
   echo '<div class="order_data_column nb-order-designs"><h3>'.esc_html__('Tervezett minta','nb').'</h3>'.$content.'</div>';
 });
 
-add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $product, $order_id){
+add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $product, $order_id = null){
   if (! is_admin()){
     return;
   }
@@ -665,6 +765,131 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
   }
   echo '</div>';
 }, 10, 4);
+
+add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
+  if (! is_array($hidden)){
+    $hidden = [];
+  }
+
+  foreach (['nb_design_id','preview_url','print_url','print_width_px','print_height_px'] as $key){
+    if (! in_array($key, $hidden, true)){
+      $hidden[] = $key;
+    }
+  }
+
+  return $hidden;
+});
+
+add_filter('woocommerce_order_item_get_formatted_meta_data', function($formatted_meta, $item){
+  if (is_admin()){
+    return $formatted_meta;
+  }
+
+  if (! is_array($formatted_meta) || empty($formatted_meta)){
+    return $formatted_meta;
+  }
+
+  foreach ($formatted_meta as $meta_id => $meta){
+    if (! $meta){
+      continue;
+    }
+
+    $key = '';
+    if (is_object($meta) && isset($meta->key)){
+      $key = (string) $meta->key;
+    } elseif (is_array($meta) && isset($meta['key'])){
+      $key = (string) $meta['key'];
+    }
+
+    if ($key !== '' && in_array($key, ['nb_design_id','preview_url','print_url','print_width_px','print_height_px'], true)){
+      unset($formatted_meta[$meta_id]);
+    }
+  }
+
+  return $formatted_meta;
+}, 10, 2);
+
+add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, $plain_text){
+  if ($plain_text){
+    return;
+  }
+
+  if (is_admin()){
+    $doing_ajax = function_exists('wp_doing_ajax') ? wp_doing_ajax() : (defined('DOING_AJAX') && DOING_AJAX);
+    if (! $doing_ajax){
+      return;
+    }
+  }
+
+  if (! $item || ! is_a($item, 'WC_Order_Item_Product')){
+    return;
+  }
+
+  $preview = $item->get_meta('preview_url');
+  $design_id = intval($item->get_meta('nb_design_id'));
+
+  if (! $preview && ! $design_id){
+    return;
+  }
+
+  $product = $item->get_product();
+  $product_id = $product && is_a($product, 'WC_Product') ? $product->get_id() : $item->get_product_id();
+  $summary = nb_get_design_attribute_summary($design_id, $product_id, $item);
+
+  if (! $preview && empty($summary)){
+    return;
+  }
+
+  echo '<div class="nb-order-item-design-summary" style="margin-top:12px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">';
+
+  if ($preview){
+    echo '<div class="nb-order-item-design-summary__preview"><img src="'.esc_url($preview).'" alt="" loading="lazy" style="max-width:220px;height:auto;display:block;border:1px solid #e5e5e5;border-radius:4px;" /></div>';
+  }
+
+  if (! empty($summary)){
+    echo '<ul class="nb-order-item-design-summary__attributes" style="margin:0;padding:0;list-style:none;">';
+    foreach ($summary as $row){
+      if (empty($row['label']) || empty($row['value'])){
+        continue;
+      }
+      echo '<li style="margin:0 0 6px;padding:0;"><strong style="display:inline-block;min-width:120px;font-weight:600;">'.esc_html($row['label']).':</strong> <span>'.esc_html($row['value']).'</span></li>';
+    }
+    echo '</ul>';
+  }
+
+  echo '</div>';
+}, 10, 4);
+
+add_filter('woocommerce_cart_item_thumbnail', function($thumbnail, $cart_item, $cart_item_key){
+  if (! is_array($cart_item)){
+    return $thumbnail;
+  }
+
+  $preview = '';
+  if (! empty($cart_item['preview_url'])){
+    $preview = (string) $cart_item['preview_url'];
+  } elseif (! empty($cart_item['nb_design_id'])){
+    $design_id = intval($cart_item['nb_design_id']);
+    if ($design_id){
+      $saved_preview = get_post_meta($design_id, 'preview_url', true);
+      if (is_string($saved_preview) && $saved_preview !== ''){
+        $preview = $saved_preview;
+      }
+    }
+  }
+
+  $preview = esc_url($preview);
+  if ($preview === ''){
+    return $thumbnail;
+  }
+
+  $alt = '';
+  if (! empty($cart_item['data']) && is_object($cart_item['data']) && is_a($cart_item['data'], 'WC_Product')){
+    $alt = $cart_item['data']->get_name();
+  }
+
+  return '<img src="'.$preview.'" alt="'.esc_attr($alt).'" class="nb-cart-item-thumbnail attachment-woocommerce_thumbnail size-woocommerce_thumbnail" loading="lazy" />';
+}, 10, 3);
 
 add_action('admin_head', function(){
   if (! function_exists('get_current_screen')){
