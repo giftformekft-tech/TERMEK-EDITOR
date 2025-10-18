@@ -130,6 +130,42 @@ if ( ! function_exists('nb_render_design_download_link') ) {
   }
 }
 
+if ( ! function_exists('nb_get_private_order_item_meta_keys') ) {
+  function nb_get_private_order_item_meta_keys(){
+    return [
+      'nb_design_id',
+      'preview_url',
+      'preview_back_url',
+      'print_url',
+      'print_width_px',
+      'print_height_px',
+      'print_back_url',
+      'print_back_width_px',
+      'print_back_height_px',
+      'nb_printed_side_count',
+    ];
+  }
+}
+
+if ( ! function_exists('nb_get_private_order_item_display_keys') ) {
+  function nb_get_private_order_item_display_keys(){
+    return [
+      'preview_url',
+      'preview_back_url',
+      'print_url',
+      'print_back_url',
+      'print_width_px',
+      'print_height_px',
+      'print_back_width_px',
+      'print_back_height_px',
+      'nb_printed_side_count',
+      'tervező',
+      'tervezo',
+      'designer',
+    ];
+  }
+}
+
 if ( ! function_exists('nb_get_design_price_context') ) {
   function nb_get_design_price_context($design_id){
     $design_id = intval($design_id);
@@ -872,7 +908,7 @@ add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
     $hidden = [];
   }
 
-  foreach (['nb_design_id','preview_url','print_url','print_width_px','print_height_px','print_back_url','print_back_width_px','print_back_height_px','nb_printed_side_count'] as $key){
+  foreach (nb_get_private_order_item_meta_keys() as $key){
     if (! in_array($key, $hidden, true)){
       $hidden[] = $key;
     }
@@ -890,6 +926,9 @@ add_filter('woocommerce_order_item_get_formatted_meta_data', function($formatted
     return $formatted_meta;
   }
 
+  $private_keys = nb_get_private_order_item_meta_keys();
+  $private_display_keys = nb_get_private_order_item_display_keys();
+
   foreach ($formatted_meta as $meta_id => $meta){
     if (! $meta){
       continue;
@@ -902,12 +941,42 @@ add_filter('woocommerce_order_item_get_formatted_meta_data', function($formatted
       $key = (string) $meta['key'];
     }
 
-    if ($key !== '' && in_array($key, ['nb_design_id','preview_url','print_url','print_width_px','print_height_px','print_back_url','print_back_width_px','print_back_height_px','nb_printed_side_count'], true)){
+    if ($key !== '' && in_array($key, $private_keys, true)){
+      unset($formatted_meta[$meta_id]);
+      continue;
+    }
+
+    $display_key = '';
+    if (is_object($meta) && isset($meta->display_key)){
+      $display_key = (string) $meta->display_key;
+    } elseif (is_array($meta) && isset($meta['display_key'])){
+      $display_key = (string) $meta['display_key'];
+    } elseif ($key !== '') {
+      $display_key = $key;
+    }
+
+    $normalized_display = '';
+    $normalized_unaccented = '';
+
+    if ($display_key !== ''){
+      $stripped = function_exists('wp_strip_all_tags') ? wp_strip_all_tags($display_key) : $display_key;
+      $trimmed = trim($stripped);
+
+      if ($trimmed !== ''){
+        $normalized_display = nb_utf8_strtolower($trimmed);
+
+        if (function_exists('remove_accents')){
+          $normalized_unaccented = nb_utf8_strtolower(remove_accents($trimmed));
+        }
+      }
+    }
+
+    if (($normalized_display !== '' && in_array($normalized_display, $private_display_keys, true)) || ($normalized_unaccented !== '' && in_array($normalized_unaccented, $private_display_keys, true))){
       unset($formatted_meta[$meta_id]);
     }
   }
 
-  return $formatted_meta;
+  return array_values($formatted_meta);
 }, 10, 2);
 
 add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, $plain_text){
