@@ -295,6 +295,10 @@
   const selectionSummaryEl = document.getElementById('nb-selection-summary');
   const productTitleEl = document.getElementById('nb-product-title');
   const priceDisplayEl = document.getElementById('nb-price-display');
+  const priceBaseEl = document.getElementById('nb-price-base');
+  const priceSurchargeRow = document.getElementById('nb-price-surcharge-row');
+  const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
+  const priceTotalEl = document.getElementById('nb-price-total');
   const fontFamilySel = document.getElementById('nb-font-family');
   const fontSizeInput = document.getElementById('nb-font-size');
   const fontSizeValue = document.getElementById('nb-font-size-value');
@@ -307,6 +311,19 @@
   const uploadInput = document.getElementById('nb-upload');
   const addTextBtn = document.getElementById('nb-add-text');
   const layerListEl = document.getElementById('nb-layer-list');
+  const summaryCardEl = document.querySelector('.nb-summary-card');
+  if (summaryCardEl){
+    const straySummaryToggle = summaryCardEl.querySelector('.nb-double-sided');
+    if (straySummaryToggle){
+      straySummaryToggle.remove();
+    }
+  }
+  const doubleSidedToggle = document.getElementById('nb-double-sided-toggle');
+  const sideStatusEl = document.getElementById('nb-side-status');
+  const printSummaryEl = document.getElementById('nb-print-summary');
+  const canvasEmptyHintEl = document.getElementById('nb-canvas-empty-hint');
+  const sideButtons = Array.from(document.querySelectorAll('[data-nb-side]'));
+  const sideFabButton = document.getElementById('nb-side-toggle-mobile');
 
   const loadedFontUrls = new Set();
   const designState = {savedDesignId:null, dirty:true};
@@ -314,6 +331,18 @@
   let savePromise = null;
   let actionSubmitting = false;
   let layerIdSeq = 1;
+  const availableSides = [
+    {key:'front', label:'Előlap'},
+    {key:'back', label:'Hátlap'}
+  ];
+  const sideStates = {};
+  let activeSideKey = 'front';
+  let doubleSidedEnabled = false;
+  let sideLoading = false;
+  let sideLoadSequence = Promise.resolve();
+  if (doubleSidedToggle && doubleSidedToggle.checked){
+    doubleSidedEnabled = true;
+  }
   const bulkSizeState = {};
   const bulkDiscountTiers = (()=>{
     const raw = settings.bulk_discounts;
@@ -1171,16 +1200,108 @@
     return '';
   }
 
+  function currentProductPriceText(){
+    const sel = currentSelection();
+    if (!sel || !sel.cfg) return '';
+    const cfg = sel.cfg;
+    if (cfg.price_text && typeof cfg.price_text === 'string'){
+      return cfg.price_text;
+    }
+    if (cfg.price_html && typeof cfg.price_html === 'string'){
+      return cfg.price_html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+    }
+    return '';
+  }
+
+  function parsePriceValue(str){
+    if (typeof str !== 'string') return null;
+    let cleaned = str.replace(/[^0-9,\.\-]/g, '');
+    if (!cleaned) return null;
+    cleaned = cleaned.replace(/,/g, '.');
+    const dotMatches = cleaned.match(/\./g) || [];
+    if (dotMatches.length > 1){
+      const lastDot = cleaned.lastIndexOf('.');
+      const integerPart = cleaned.slice(0, lastDot).replace(/\./g, '');
+      const decimalPart = cleaned.slice(lastDot + 1);
+      cleaned = integerPart + (decimalPart !== '' ? '.' + decimalPart : '');
+    } else if (dotMatches.length === 1){
+      const dotPos = cleaned.indexOf('.');
+      const decimals = cleaned.length - dotPos - 1;
+      if (decimals === 3){
+        cleaned = cleaned.replace('.', '');
+      }
+    }
+    const num = Number(cleaned);
+    return Number.isFinite(num) ? num : null;
+  }
+
+  function doubleSidedFeeValue(){
+    return positiveNumberOr(settings.double_sided_fee, 0);
+  }
+
+  function shouldApplyDoubleSidedSurcharge(){
+    return doubleSidedEnabled && sideHasContent('back') && doubleSidedFeeValue() > 0;
+  }
+
+  function formatPrice(amount){
+    if (!Number.isFinite(amount)) return '';
+    try{
+      const useDigits = Math.abs(amount % 1) > 0 ? 2 : 0;
+      return new Intl.NumberFormat('hu-HU', {style:'currency', currency:'HUF', minimumFractionDigits:useDigits, maximumFractionDigits:Math.max(0, useDigits)}).format(amount);
+    }catch(e){
+      const digits = Math.abs(amount % 1) > 0 ? 2 : 0;
+      return amount.toLocaleString('hu-HU', {minimumFractionDigits:digits, maximumFractionDigits:digits}) + ' Ft';
+    }
+  }
+
   function updatePriceDisplay(){
     if (!priceDisplayEl) return;
-    priceDisplayEl.classList.remove('nb-price-display--pending');
     const markup = currentProductPriceMarkup();
-    if (markup){
-      priceDisplayEl.innerHTML = markup;
+    const priceText = currentProductPriceText();
+    const baseAmount = parsePriceValue(priceText);
+    const surcharge = shouldApplyDoubleSidedSurcharge() ? doubleSidedFeeValue() : 0;
+    const hasBase = (markup && markup.trim()) || (priceText && priceText.trim());
+
+    if (!hasBase){
+      priceDisplayEl.classList.add('nb-price-display--pending');
+      if (priceBaseEl) priceBaseEl.textContent = '—';
+      if (priceSurchargeRow) priceSurchargeRow.hidden = true;
+      if (priceTotalEl) priceTotalEl.textContent = 'Ár nem elérhető.';
       return;
     }
-    priceDisplayEl.textContent = 'Ár nem elérhető.';
-    priceDisplayEl.classList.add('nb-price-display--pending');
+
+    priceDisplayEl.classList.remove('nb-price-display--pending');
+
+    if (priceBaseEl){
+      if (markup && markup !== priceText){
+        priceBaseEl.innerHTML = markup;
+      } else {
+        priceBaseEl.textContent = priceText;
+      }
+    } else if (markup){
+      priceDisplayEl.innerHTML = markup;
+    }
+
+    if (priceSurchargeRow && priceSurchargeValueEl){
+      if (surcharge > 0){
+        priceSurchargeRow.hidden = false;
+        priceSurchargeValueEl.textContent = `+${formatPrice(surcharge)}`;
+      } else {
+        priceSurchargeRow.hidden = true;
+        priceSurchargeValueEl.textContent = formatPrice(0);
+      }
+    }
+
+    if (priceTotalEl){
+      if (Number.isFinite(baseAmount)){
+        const total = baseAmount + (Number.isFinite(surcharge) ? surcharge : 0);
+        priceTotalEl.textContent = formatPrice(total);
+      } else if (markup && markup !== priceText){
+        priceTotalEl.innerHTML = markup;
+      } else {
+        priceTotalEl.textContent = priceText || '—';
+      }
+    }
   }
 
   function resolveMockupPointer(value, arr){
@@ -1215,22 +1336,61 @@
     return resolveMockupPointer(value, arr);
   }
 
-  function resolveMockupIndex(mapping, arr){
+  function resolveMockupIndex(mapping, arr, opts){
     const list = Array.isArray(arr) ? arr : mockups();
+    const normalizedSide = (opts && opts.side === 'back') ? 'back' : 'front';
     if (!mapping || typeof mapping !== 'object'){
       return normalizedMockupIndex(mapping, list);
     }
-    const candidates = [
+
+    const frontCandidates = [
       mapping.mockup_index,
       mapping.mockupIndex,
       mapping.mockup_id,
       mapping.mockupId,
       mapping.mockup
     ];
-    for (let i=0;i<candidates.length;i++){
-      const idx = normalizedMockupIndex(candidates[i], list);
+    const backCandidates = [
+      mapping.mockup_back_index,
+      mapping.mockupBackIndex,
+      mapping.mockup_back_id,
+      mapping.mockupBackId,
+      mapping.mockup_back,
+      mapping.mockupBack
+    ];
+
+    const pickFrom = normalizedSide === 'back' ? backCandidates : frontCandidates;
+    for (let i=0;i<pickFrom.length;i++){
+      const idx = normalizedMockupIndex(pickFrom[i], list);
       if (idx >= 0) return idx;
     }
+
+    const nested = (mapping.mockups && typeof mapping.mockups === 'object') ? mapping.mockups : null;
+    if (nested){
+      const nestedCandidates = normalizedSide === 'back'
+        ? [nested.back, nested.back_index, nested.backIndex, nested.back_id, nested.backId]
+        : [nested.front, nested.front_index, nested.frontIndex, nested.front_id, nested.frontId, nested.default];
+      for (let i=0;i<nestedCandidates.length;i++){
+        const idx = normalizedMockupIndex(nestedCandidates[i], list);
+        if (idx >= 0) return idx;
+      }
+      if (normalizedSide === 'back' && Object.prototype.hasOwnProperty.call(nested, 'front')){
+        const idx = normalizedMockupIndex(nested.front, list);
+        if (idx >= 0) return idx;
+      }
+    }
+
+    if (normalizedSide === 'back'){
+      for (let i=0;i<frontCandidates.length;i++){
+        const idx = normalizedMockupIndex(frontCandidates[i], list);
+        if (idx >= 0) return idx;
+      }
+      if (nested && Object.prototype.hasOwnProperty.call(nested, 'default')){
+        const idx = normalizedMockupIndex(nested.default, list);
+        if (idx >= 0) return idx;
+      }
+    }
+
     return -1;
   }
 
@@ -1242,9 +1402,26 @@
     const key = (type + '|' + color).toLowerCase();
     const mapping = (cfg.map || {})[key] || {};
     const list = mockups();
-    const mkIndex = resolveMockupIndex(mapping, list);
-    const mk = mkIndex >= 0 ? (list[mkIndex] || null) : null;
-    return {pid, type, color, cfg, mapping, mockup: mk};
+    const frontIndex = resolveMockupIndex(mapping, list, {side:'front'});
+    const backIndex = resolveMockupIndex(mapping, list, {side:'back'});
+    const frontMockup = frontIndex >= 0 ? (list[frontIndex] || null) : null;
+    const backMockup = backIndex >= 0 ? (list[backIndex] || null) : null;
+    const activeSide = activeSideKey === 'back' ? 'back' : 'front';
+    let selectedMockup = activeSide === 'back' ? (backMockup || frontMockup) : (frontMockup || backMockup);
+    if (!selectedMockup){
+      selectedMockup = null;
+    }
+    return {
+      pid,
+      type,
+      color,
+      cfg,
+      mapping,
+      mockup: selectedMockup,
+      mockups: {front: frontMockup, back: backMockup},
+      mockupIndex: frontIndex,
+      mockupBackIndex: backIndex
+    };
   }
 
   function referenceSizeForMockup(mk, area){
@@ -1398,6 +1575,220 @@
 
   function designObjects(){
     return c.getObjects().filter(isDesignObject);
+  }
+
+  function sideLabel(key){
+    const entry = availableSides.find(s=>s.key === key);
+    return entry ? entry.label : key;
+  }
+
+  function emptySideSnapshot(){
+    return {
+      json: {version: (c && c.version) || '5.0.0', objects: []},
+      objectCount: 0,
+      hasContent: false
+    };
+  }
+
+  function ensureSideState(key){
+    const normalized = key === 'back' ? 'back' : 'front';
+    if (!sideStates[normalized]){
+      sideStates[normalized] = emptySideSnapshot();
+    }
+    return sideStates[normalized];
+  }
+
+  const PRINT_AREA_FILL = 'rgba(59,130,246,0.08)';
+  const PRINT_AREA_STROKE = '#2563eb';
+
+  function isPrintAreaDescriptor(obj){
+    if (!obj || obj.type !== 'rect') return false;
+    if (obj.selectable !== false || obj.evented !== false) return false;
+    if (obj.stroke !== PRINT_AREA_STROKE) return false;
+    const fill = (typeof obj.fill === 'string') ? obj.fill.replace(/\s+/g, '') : '';
+    if (fill !== PRINT_AREA_FILL) return false;
+    if (!Array.isArray(obj.strokeDashArray)) return false;
+    if (obj.strokeDashArray.length < 2) return false;
+    if (obj.strokeDashArray[0] !== 10 || obj.strokeDashArray[1] !== 6) return false;
+    return true;
+  }
+
+  function prunePrintAreaObjects(json){
+    if (!json || !Array.isArray(json.objects)) return json;
+    json.objects = json.objects.filter(obj=>!isPrintAreaDescriptor(obj));
+    return json;
+  }
+
+  function sanitizeCanvasJSON(){
+    const raw = c.toJSON(['__nb_layer_id','__nb_layer_name']);
+    const clean = Object.assign({}, raw);
+    clean.background = 'rgba(0,0,0,0)';
+    clean.backgroundImage = null;
+    if (Array.isArray(clean.objects)){
+      clean.objects = clean.objects
+        .filter(obj=>!obj.__nb_bg && !obj.__nb_area)
+        .filter(obj=>!isPrintAreaDescriptor(obj));
+    } else {
+      clean.objects = [];
+    }
+    return clean;
+  }
+
+  function captureActiveSideState(){
+    const state = ensureSideState(activeSideKey);
+    const snapshot = sanitizeCanvasJSON();
+    state.json = snapshot;
+    state.objectCount = designObjects().length;
+    state.hasContent = state.objectCount > 0;
+  }
+
+  function sideHasContent(key){
+    return ensureSideState(key).hasContent;
+  }
+
+  function updateCanvasEmptyHint(){
+    if (!canvasEmptyHintEl) return;
+    const hasContent = designObjects().length > 0;
+    if (hasContent){
+      canvasEmptyHintEl.setAttribute('hidden','');
+    } else {
+      canvasEmptyHintEl.removeAttribute('hidden');
+    }
+  }
+
+  function updateSideUiState(){
+    sideButtons.forEach(btn=>{
+      if (!btn) return;
+      const key = btn.dataset.nbSide === 'back' ? 'back' : 'front';
+      const isActive = key === activeSideKey;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      if (key === 'back'){
+        btn.disabled = !doubleSidedEnabled;
+      }
+    });
+    if (sideFabButton){
+      if (doubleSidedEnabled){
+        sideFabButton.removeAttribute('hidden');
+      } else {
+        sideFabButton.setAttribute('hidden','');
+      }
+      const nextSide = activeSideKey === 'front' ? 'back' : 'front';
+      sideFabButton.setAttribute('aria-label', `Váltás: ${sideLabel(nextSide)}`);
+    }
+  }
+
+  function updateSideStatus(){
+    if (!sideStatusEl) return;
+    const badges = Array.from(sideStatusEl.querySelectorAll('[data-nb-side]'));
+    badges.forEach(el=>{
+      const key = el.dataset.nbSide === 'back' ? 'back' : 'front';
+      const hasContent = sideHasContent(key);
+      let statusText = hasContent ? 'van terv' : 'üres';
+      if (key === 'back' && !doubleSidedEnabled){
+        statusText = hasContent ? 'kikapcsolva, van terv' : 'kikapcsolva';
+      }
+      el.textContent = `${sideLabel(key)}: ${statusText}`;
+    });
+  }
+
+  function totalSideCount(){
+    return doubleSidedEnabled ? 2 : 1;
+  }
+
+  function usedSideCount(){
+    const frontUsed = sideHasContent('front') ? 1 : 0;
+    const backUsed = (doubleSidedEnabled && sideHasContent('back')) ? 1 : 0;
+    return frontUsed + backUsed;
+  }
+
+  function updatePrintSummary(){
+    if (!printSummaryEl) return;
+    const used = usedSideCount();
+    const total = totalSideCount();
+    printSummaryEl.textContent = `Nyomtatási oldalak: ${used} / ${total}`;
+  }
+
+  function cloneSideJson(state){
+    if (!state || !state.json){
+      return {version: (c && c.version) || '5.0.0', objects: []};
+    }
+    try {
+      return JSON.parse(JSON.stringify(state.json));
+    } catch(e){
+      return {version: (c && c.version) || '5.0.0', objects: []};
+    }
+  }
+
+  function loadSideState(key){
+    const state = ensureSideState(key);
+    const json = prunePrintAreaObjects(cloneSideJson(state));
+    return new Promise(resolve=>{
+      const previousBg = (typeof c.backgroundColor !== 'undefined' && c.backgroundColor) ? c.backgroundColor : '#fff';
+      if (typeof c.clear === 'function'){
+        c.clear();
+        c.backgroundColor = previousBg || '#fff';
+      } else {
+        const existing = c.getObjects ? c.getObjects().slice() : [];
+        existing.forEach(obj=>{
+          c.remove(obj);
+        });
+      }
+      c.__nb_area = null;
+      c.__nb_area_rect = null;
+      if (typeof c.discardActiveObject === 'function'){
+        c.discardActiveObject();
+      }
+      c.loadFromJSON(json, ()=>{
+        setMockupBgAndArea();
+        designObjects().forEach(obj=>{
+          applyObjectUiDefaults(obj);
+          ensureLayerId(obj);
+        });
+        c.discardActiveObject();
+        captureActiveSideState();
+        updateCanvasEmptyHint();
+        syncLayerList();
+        syncTextControls();
+        updateSideStatus();
+        updatePrintSummary();
+        updatePriceDisplay();
+        if (typeof c.requestRenderAll === 'function'){
+          c.requestRenderAll();
+        }
+        resolve();
+      }, (o, obj)=>{
+        applyObjectUiDefaults(obj);
+      });
+    });
+  }
+
+  function setActiveSide(key, options){
+    const target = key === 'back' ? 'back' : 'front';
+    const opts = options || {};
+    if (!doubleSidedEnabled && target === 'back'){
+      return Promise.resolve();
+    }
+    if (sideLoading){
+      sideLoadSequence = sideLoadSequence.then(()=>setActiveSide(target, opts));
+      return sideLoadSequence;
+    }
+    if (target === activeSideKey && !opts.force){
+      updateSideUiState();
+      updateCanvasEmptyHint();
+      updateSideStatus();
+      return Promise.resolve();
+    }
+    captureActiveSideState();
+    activeSideKey = target;
+    updateSideUiState();
+    sideLoading = true;
+    const loader = loadSideState(target).finally(()=>{
+      sideLoading = false;
+      updateSideUiState();
+    });
+    sideLoadSequence = loader;
+    return loader;
   }
 
   function ensureLayerId(obj){
@@ -1598,14 +1989,23 @@
   }
 
   function markDesignDirty(){
+    if (sideLoading) return;
     designState.savedDesignId = null;
     designState.dirty = true;
+    captureActiveSideState();
+    updateCanvasEmptyHint();
+    updateSideStatus();
+    updatePrintSummary();
     updatePriceDisplay();
     updateActionStates();
   }
 
   function setMockupBgAndArea(){
-    const {mockup: mk} = currentSelection();
+    const sel = currentSelection();
+    const mockupsBySide = sel.mockups || {front: null, back: null};
+    const mk = activeSideKey === 'back'
+      ? (mockupsBySide.back || mockupsBySide.front || sel.mockup)
+      : (mockupsBySide.front || mockupsBySide.back || sel.mockup);
 
     c.getObjects().slice().forEach(obj=>{ if (obj.__nb_bg) c.remove(obj); });
     c.getObjects().slice().forEach(obj=>{ if (obj.__nb_area) c.remove(obj); });
@@ -1636,12 +2036,13 @@
       top: area.y,
       width: area.w,
       height: area.h,
-      fill: 'rgba(59,130,246,0.08)',
-      stroke: '#2563eb',
+      fill: PRINT_AREA_FILL,
+      stroke: PRINT_AREA_STROKE,
       strokeWidth: 2,
       strokeDashArray: [10,6],
       selectable: false,
-      evented: false
+      evented: false,
+      excludeFromExport: true
     });
     printArea.__nb_area = true;
     c.add(printArea);
@@ -1674,6 +2075,7 @@
     }
 
     enforceAllObjectsInside();
+    updateCanvasEmptyHint();
   }
 
   function applyToActiveText(cb){
@@ -1867,6 +2269,44 @@
   requestAnimationFrame(()=>{ setMockupBgAndArea(); });
   updateSelectionSummary();
   syncTextControls();
+  captureActiveSideState();
+  updateCanvasEmptyHint();
+  updateSideUiState();
+  updateSideStatus();
+  updatePrintSummary();
+
+  sideButtons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const target = btn.dataset.nbSide === 'back' ? 'back' : 'front';
+      setActiveSide(target);
+    });
+  });
+
+  if (sideFabButton){
+    sideFabButton.addEventListener('click', ()=>{
+      if (!doubleSidedEnabled) return;
+      const next = activeSideKey === 'front' ? 'back' : 'front';
+      setActiveSide(next);
+    });
+  }
+
+  if (doubleSidedToggle){
+    doubleSidedToggle.onchange = ()=>{
+      doubleSidedEnabled = !!doubleSidedToggle.checked;
+      updateSideUiState();
+      updateSideStatus();
+      updatePrintSummary();
+      updatePriceDisplay();
+      const afterSwitch = ()=>{
+        markDesignDirty();
+      };
+      if (!doubleSidedEnabled && activeSideKey === 'back'){
+        setActiveSide('front').then(afterSwitch);
+      } else {
+        afterSwitch();
+      }
+    };
+  }
 
   if (typeSel) typeSel.onchange = ()=>{
     const previousProduct = productSel ? productSel.value : '';
@@ -2059,34 +2499,51 @@
 
   if (uploadInput){
     uploadInput.addEventListener('change', e=>{
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      const url = URL.createObjectURL(f);
-      fabric.Image.fromURL(url, img=>{
-        URL.revokeObjectURL(url);
-        const a = c.__nb_area || fallbackArea;
-        const maxW = a.w * 0.95;
-        const maxH = a.h * 0.95;
-        const scale = Math.min(1, maxW / img.width, maxH / img.height);
-        img.scale(scale);
-        img.set({
-          left: a.x + (a.w - img.getScaledWidth())/2,
-          top: a.y + (a.h - img.getScaledHeight())/2,
-          selectable: true,
-          cornerStyle: 'circle',
-          transparentCorners: false,
-          lockScalingFlip: true
-        });
-        applyObjectUiDefaults(img);
-        if (f && typeof f.name === 'string' && f.name){
-          const baseName = f.name.split(/[/\\]/).pop() || f.name;
-          img.__nb_layer_name = baseName.replace(/\.[^.]+$/, '') || 'Kép';
+      const file = e.target.files && e.target.files[0];
+      if (!file){
+        e.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = evt => {
+        const dataUrl = evt && evt.target && typeof evt.target.result === 'string'
+          ? evt.target.result
+          : '';
+        if (!dataUrl){
+          e.target.value = '';
+          return;
         }
-        c.add(img);
-        c.setActiveObject(img);
-        keepObjectInside(img);
-      });
-      e.target.value = '';
+        fabric.Image.fromURL(dataUrl, img=>{
+          const a = c.__nb_area || fallbackArea;
+          const maxW = a.w * 0.95;
+          const maxH = a.h * 0.95;
+          const scale = Math.min(1, maxW / img.width, maxH / img.height);
+          img.scale(scale);
+          img.set({
+            left: a.x + (a.w - img.getScaledWidth())/2,
+            top: a.y + (a.h - img.getScaledHeight())/2,
+            selectable: true,
+            cornerStyle: 'circle',
+            transparentCorners: false,
+            lockScalingFlip: true
+          });
+          applyObjectUiDefaults(img);
+          if (file && typeof file.name === 'string' && file.name){
+            const baseName = file.name.split(/[/\\]/).pop() || file.name;
+            img.__nb_layer_name = baseName.replace(/\.[^.]+$/, '') || 'Kép';
+          }
+          c.add(img);
+          c.setActiveObject(img);
+          keepObjectInside(img);
+        });
+        e.target.value = '';
+      };
+      reader.onerror = ()=>{
+        console.error('Nem sikerült beolvasni a képfájlt.');
+        e.target.value = '';
+      };
+      reader.readAsDataURL(file);
     });
   }
 
@@ -2160,6 +2617,32 @@
     };
   }
 
+  async function exportSideForSaving(sideKey){
+    const normalized = sideKey === 'back' ? 'back' : 'front';
+    const initialState = ensureSideState(normalized);
+    const canRender = (normalized === 'front') || doubleSidedEnabled;
+    if (canRender){
+      await setActiveSide(normalized);
+      captureActiveSideState();
+    }
+    const state = ensureSideState(normalized);
+    const hasContent = state.hasContent;
+    let preview = '';
+    let printData = {dataUrl:'', width:0, height:0};
+    if (hasContent && canRender){
+      preview = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
+      printData = exportPrintImage();
+    }
+    return {
+      key: normalized,
+      hasContent,
+      preview,
+      printData,
+      json: cloneSideJson(state || initialState),
+      objectCount: state ? state.objectCount : (initialState.objectCount || 0)
+    };
+  }
+
   async function persistCurrentDesign(){
     if (!hasCompleteSelection()){
       const err = new Error('incomplete-selection');
@@ -2177,8 +2660,14 @@
     saving = true;
     updateActionStates();
     const saveTask = (async ()=>{
-      const previewPng = c.toDataURL({format:'png', multiplier:2, left:0, top:0});
-      const printExport = exportPrintImage();
+      captureActiveSideState();
+      const previousSide = activeSideKey;
+      const frontData = await exportSideForSaving('front');
+      const backData = await exportSideForSaving('back');
+      await setActiveSide(previousSide);
+      const shouldIncludeBack = doubleSidedEnabled && backData.hasContent;
+      const previewPng = frontData.preview || c.toDataURL({format:'png', multiplier:2, left:0, top:0});
+      const printExport = frontData.printData || exportPrintImage();
       if (!printExport.dataUrl){
         const err = new Error('print-export-failed');
         err.userMessage = 'Nem sikerült előállítani a nyomdai PNG fájlt.';
@@ -2190,6 +2679,8 @@
       const colorLabel = (getColorLabel() || '').toString().trim();
       const rawSizeLabel = sizeSel.selectedOptions[0]?.dataset?.label || sizeSel.selectedOptions[0]?.textContent || '';
       const sizeLabel = (rawSizeLabel || size || '').toString().trim();
+      const printedSideCount = (frontData.hasContent ? 1 : 0) + (shouldIncludeBack ? 1 : 0);
+      const surchargeValue = shouldIncludeBack ? doubleSidedFeeValue() : 0;
       const price_ctx = {product_id: sel.pid, type: sel.type, color: sel.color, size};
       if (typeLabel) price_ctx.type_label = typeLabel;
       if (colorLabel) price_ctx.color_label = colorLabel;
@@ -2198,20 +2689,52 @@
       if (typeLabel) attributes_json.type_label = typeLabel;
       if (colorLabel) attributes_json.color_label = colorLabel;
       if (sizeLabel) attributes_json.size_label = sizeLabel;
-      const meta = {width_mm:300, height_mm:400, dpi:300, product_id: sel.pid, attributes_json, price_ctx};
+      const meta = {
+        width_mm:300,
+        height_mm:400,
+        dpi:300,
+        product_id: sel.pid,
+        attributes_json,
+        price_ctx,
+        double_sided_enabled: doubleSidedEnabled ? 1 : 0,
+        printed_side_count: printedSideCount,
+        double_sided_surcharge: surchargeValue,
+        printed_sides: {
+          front: {
+            has_content: frontData.hasContent,
+            object_count: frontData.objectCount,
+            included: frontData.hasContent
+          },
+          back: {
+            has_content: backData.hasContent,
+            object_count: backData.objectCount,
+            included: shouldIncludeBack
+          }
+        }
+      };
       let res;
+      const requestBody = {
+        png_base64: previewPng,
+        print_png_base64: printExport.dataUrl,
+        print_width_px: printExport.width,
+        print_height_px: printExport.height,
+        layers: {
+          front: frontData.json,
+          back: backData.json
+        },
+        meta
+      };
+      if (shouldIncludeBack){
+        requestBody.png_back_base64 = backData.preview || '';
+        requestBody.print_png_back_base64 = backData.printData?.dataUrl || '';
+        requestBody.print_back_width_px = backData.printData?.width || 0;
+        requestBody.print_back_height_px = backData.printData?.height || 0;
+      }
       try {
         res = await fetch(NB_DESIGNER.rest + 'save', {
           method:'POST',
           headers:{'X-WP-Nonce': NB_DESIGNER.nonce, 'Content-Type':'application/json'},
-          body: JSON.stringify({
-            png_base64: previewPng,
-            print_png_base64: printExport.dataUrl,
-            print_width_px: printExport.width,
-            print_height_px: printExport.height,
-            layers: c.toJSON(),
-            meta
-          })
+          body: JSON.stringify(requestBody)
         });
       } catch (networkError){
         const err = new Error('network');
