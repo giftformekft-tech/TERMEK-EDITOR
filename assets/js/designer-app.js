@@ -1301,8 +1301,6 @@
     const cssDims = {cssOnly: true};
     c.setDimensions(dims);
     c.setDimensions(dims, cssDims);
-    canvasElement.width = appliedW;
-    canvasElement.height = appliedH;
 
     const canvasWrapper = canvasElement.parentElement;
     if (canvasWrapper){
@@ -1317,6 +1315,14 @@
 
     if (c.calcOffset){
       c.calcOffset();
+    }
+    designObjects().forEach(obj=>{
+      if (obj && typeof obj.setCoords === 'function'){
+        obj.setCoords();
+      }
+    });
+    if (typeof c.requestRenderAll === 'function'){
+      c.requestRenderAll();
     }
     return {w: appliedW, h: appliedH};
   }
