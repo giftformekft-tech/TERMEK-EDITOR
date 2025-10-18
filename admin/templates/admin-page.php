@@ -302,6 +302,7 @@
       <table class="form-table">
         <tr><th>Ft / cm²</th><td><input type="number" step="0.1" name="fee_per_cm2" value="<?php echo esc_attr($settings['fee_per_cm2'] ?? 3); ?>"></td></tr>
         <tr><th>Minimum felár (Ft)</th><td><input type="number" step="1" name="min_fee" value="<?php echo esc_attr($settings['min_fee'] ?? 990); ?>"></td></tr>
+        <tr><th>Kétoldalas felár (Ft)</th><td><input type="number" step="1" name="double_sided_fee" value="<?php echo esc_attr($settings['double_sided_fee'] ?? 0); ?>"></td></tr>
       </table>
       <?php
         $bulkTiers = isset($settings['bulk_discounts']) && is_array($settings['bulk_discounts']) ? $settings['bulk_discounts'] : [];

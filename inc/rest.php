@@ -235,6 +235,11 @@ if ( ! function_exists('nb_rest_cart_single_add') ) {
     $print_url = get_post_meta($design_id,'print_url',true);
     $print_width_px = intval(get_post_meta($design_id,'print_width_px',true));
     $print_height_px = intval(get_post_meta($design_id,'print_height_px',true));
+    $preview_back_url = get_post_meta($design_id,'preview_back_url',true);
+    $print_back_url = get_post_meta($design_id,'print_back_url',true);
+    $print_back_width_px = intval(get_post_meta($design_id,'print_back_width_px',true));
+    $print_back_height_px = intval(get_post_meta($design_id,'print_back_height_px',true));
+    $printed_side_count = intval(get_post_meta($design_id,'printed_side_count',true));
 
     $unique_key = function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : uniqid('nb_', true);
 
@@ -247,6 +252,21 @@ if ( ! function_exists('nb_rest_cart_single_add') ) {
       'nb_cart_line_uid' => $unique_key,
       'unique_key'       => 'nb_'.$unique_key,
     ];
+    if ($preview_back_url){
+      $cart_item_data['preview_back_url'] = $preview_back_url;
+    }
+    if ($print_back_url){
+      $cart_item_data['print_back_url'] = $print_back_url;
+    }
+    if ($print_back_width_px){
+      $cart_item_data['print_back_width_px'] = $print_back_width_px;
+    }
+    if ($print_back_height_px){
+      $cart_item_data['print_back_height_px'] = $print_back_height_px;
+    }
+    if ($printed_side_count > 0){
+      $cart_item_data['nb_printed_side_count'] = $printed_side_count;
+    }
 
     if (!empty($extra_cart_item_data)){
       foreach ($extra_cart_item_data as $extra_key => $extra_value){
@@ -358,6 +378,41 @@ add_action('rest_api_init', function(){
       if (!empty($print_upload['error'])) return new WP_Error('print_upload','Mentési hiba: '.$print_upload['error'], ['status'=>500]);
       $print_width_px = max(0, intval($req->get_param('print_width_px')));
       $print_height_px = max(0, intval($req->get_param('print_height_px')));
+      $png_back = $req->get_param('png_back_base64');
+      $print_png_back = $req->get_param('print_png_back_base64');
+      $back_preview_upload = null;
+      $back_print_upload = null;
+      if ($png_back){
+        if (strpos($png_back,'data:image/png;base64,') !== 0){
+          return new WP_Error('bad_png_back','Hibás hátoldali PNG adat', ['status'=>400]);
+        }
+        $back_data = base64_decode(substr($png_back,22));
+        $back_preview_filename = 'nb_preview_back_'.$timestamp.'.png';
+        $back_preview_upload = wp_upload_bits($back_preview_filename, null, $back_data);
+        if (!empty($back_preview_upload['error'])){
+          return new WP_Error('upload_back','Mentési hiba: '.$back_preview_upload['error'], ['status'=>500]);
+        }
+      }
+      if ($print_png_back){
+        if (strpos($print_png_back,'data:image/png;base64,') !== 0){
+          return new WP_Error('bad_print_png_back','Hibás hátoldali nyomdai PNG adat', ['status'=>400]);
+        }
+        $back_print_data = base64_decode(substr($print_png_back,22));
+        $back_print_filename = 'nb_print_back_'.$timestamp.'.png';
+        $back_print_upload = wp_upload_bits($back_print_filename, null, $back_print_data);
+        if (!empty($back_print_upload['error'])){
+          return new WP_Error('print_upload_back','Mentési hiba: '.$back_print_upload['error'], ['status'=>500]);
+        }
+      }
+      $print_back_width_px = max(0, intval($req->get_param('print_back_width_px')));
+      $print_back_height_px = max(0, intval($req->get_param('print_back_height_px')));
+      $double_enabled = !empty($meta['double_sided_enabled']) ? 1 : 0;
+      $printed_side_count = max(0, intval($meta['printed_side_count'] ?? 0));
+      $double_fee = isset($meta['double_sided_surcharge']) ? floatval($meta['double_sided_surcharge']) : 0;
+      if ($double_fee < 0){
+        $double_fee = 0;
+      }
+      $printed_sides = isset($meta['printed_sides']) ? $meta['printed_sides'] : [];
 
       $post_id = wp_insert_post([
         'post_type'=>'nb_design','post_status'=>'publish',
@@ -374,6 +429,14 @@ add_action('rest_api_init', function(){
           'price_ctx'       => wp_json_encode($meta['price_ctx']??[]),
           'print_width_px'  => $print_width_px,
           'print_height_px' => $print_height_px,
+          'preview_back_url'    => $back_preview_upload ? esc_url_raw($back_preview_upload['url']) : '',
+          'print_back_url'      => $back_print_upload ? esc_url_raw($back_print_upload['url']) : '',
+          'print_back_width_px' => $print_back_width_px,
+          'print_back_height_px'=> $print_back_height_px,
+          'double_sided_enabled'=> $double_enabled,
+          'printed_side_count'  => $printed_side_count,
+          'double_sided_fee'    => $double_fee,
+          'printed_sides_json'  => wp_json_encode(is_array($printed_sides) ? $printed_sides : []),
         ]
       ]);
       if (is_wp_error($post_id)) return new WP_Error('db','Nem sikerült menteni', ['status'=>500]);
