@@ -15,6 +15,19 @@
             <span class="nb-field-label">Méret</span>
             <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
           </div>
+          <div class="nb-double-sided" id="nb-double-sided">
+            <label class="nb-double-sided-toggle">
+              <input type="checkbox" id="nb-double-sided-toggle">
+              <span>
+                <strong>Kétoldalas nyomtatás</strong>
+                <small>Kapcsold be, ha a hátlapot is terveznéd.</small>
+              </span>
+            </label>
+            <div class="nb-side-status" id="nb-side-status">
+              <span data-nb-side="front">Előlap: üres</span>
+              <span data-nb-side="back">Hátlap: kikapcsolva</span>
+            </div>
+          </div>
         </div>
       </div>
 

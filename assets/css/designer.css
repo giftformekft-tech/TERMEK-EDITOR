@@ -74,13 +74,13 @@
 .nb-price-display--pending{opacity:.65}
 .nb-selection-summary{display:flex;flex-wrap:wrap;gap:8px}
 .nb-selection-summary span{display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(15,23,42,.35);border-radius:999px;font-size:12px;color:#e2e8f0;border:1px solid rgba(148,163,184,.4)}
-.nb-double-sided{display:flex;flex-direction:column;gap:12px;margin-top:12px;padding:16px;border-radius:18px;background:rgba(15,23,42,.24);border:1px solid rgba(148,163,184,.25)}
-.nb-double-sided-toggle{display:flex;align-items:flex-start;gap:12px;font-size:13px;color:#e2e8f0}
+.nb-double-sided{display:flex;flex-direction:column;gap:12px;margin-top:18px;padding:18px;border-radius:18px;background:#eef2ff;border:1px solid rgba(129,140,248,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+.nb-double-sided-toggle{display:flex;align-items:flex-start;gap:12px;font-size:13px;color:#1f2937}
 .nb-double-sided-toggle input{margin-top:4px;width:18px;height:18px}
-.nb-double-sided-toggle strong{display:block;font-size:14px;letter-spacing:.06em;text-transform:uppercase}
-.nb-double-sided-toggle small{display:block;color:#94a3b8;font-size:12px;line-height:1.4}
-.nb-side-status{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#cbd5f5;letter-spacing:.02em}
-.nb-side-status span{padding:6px 10px;background:rgba(148,163,184,.18);border-radius:999px;font-weight:600}
+.nb-double-sided-toggle strong{display:block;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#0f172a}
+.nb-double-sided-toggle small{display:block;color:#475569;font-size:12px;line-height:1.4}
+.nb-side-status{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#1f2937;letter-spacing:.02em}
+.nb-side-status span{padding:6px 10px;background:#c7d2fe;border-radius:999px;font-weight:600;color:#111827}
 .nb-summary-actions{display:flex;flex-direction:column;gap:12px}
 .nb-print-summary{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#cbd5f5;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(15,23,42,.32);border:1px solid rgba(148,163,184,.3);border-radius:14px}
 .nb-secondary-action{background:#ffffff;border:1px solid rgba(148,163,184,.6);border-radius:18px;padding:14px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#0f172a;cursor:pointer;transition:all .2s ease,transform .2s ease}

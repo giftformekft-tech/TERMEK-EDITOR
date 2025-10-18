@@ -1329,22 +1329,61 @@
     return resolveMockupPointer(value, arr);
   }
 
-  function resolveMockupIndex(mapping, arr){
+  function resolveMockupIndex(mapping, arr, opts){
     const list = Array.isArray(arr) ? arr : mockups();
+    const normalizedSide = (opts && opts.side === 'back') ? 'back' : 'front';
     if (!mapping || typeof mapping !== 'object'){
       return normalizedMockupIndex(mapping, list);
     }
-    const candidates = [
+
+    const frontCandidates = [
       mapping.mockup_index,
       mapping.mockupIndex,
       mapping.mockup_id,
       mapping.mockupId,
       mapping.mockup
     ];
-    for (let i=0;i<candidates.length;i++){
-      const idx = normalizedMockupIndex(candidates[i], list);
+    const backCandidates = [
+      mapping.mockup_back_index,
+      mapping.mockupBackIndex,
+      mapping.mockup_back_id,
+      mapping.mockupBackId,
+      mapping.mockup_back,
+      mapping.mockupBack
+    ];
+
+    const pickFrom = normalizedSide === 'back' ? backCandidates : frontCandidates;
+    for (let i=0;i<pickFrom.length;i++){
+      const idx = normalizedMockupIndex(pickFrom[i], list);
       if (idx >= 0) return idx;
     }
+
+    const nested = (mapping.mockups && typeof mapping.mockups === 'object') ? mapping.mockups : null;
+    if (nested){
+      const nestedCandidates = normalizedSide === 'back'
+        ? [nested.back, nested.back_index, nested.backIndex, nested.back_id, nested.backId]
+        : [nested.front, nested.front_index, nested.frontIndex, nested.front_id, nested.frontId, nested.default];
+      for (let i=0;i<nestedCandidates.length;i++){
+        const idx = normalizedMockupIndex(nestedCandidates[i], list);
+        if (idx >= 0) return idx;
+      }
+      if (normalizedSide === 'back' && Object.prototype.hasOwnProperty.call(nested, 'front')){
+        const idx = normalizedMockupIndex(nested.front, list);
+        if (idx >= 0) return idx;
+      }
+    }
+
+    if (normalizedSide === 'back'){
+      for (let i=0;i<frontCandidates.length;i++){
+        const idx = normalizedMockupIndex(frontCandidates[i], list);
+        if (idx >= 0) return idx;
+      }
+      if (nested && Object.prototype.hasOwnProperty.call(nested, 'default')){
+        const idx = normalizedMockupIndex(nested.default, list);
+        if (idx >= 0) return idx;
+      }
+    }
+
     return -1;
   }
 
@@ -1356,9 +1395,26 @@
     const key = (type + '|' + color).toLowerCase();
     const mapping = (cfg.map || {})[key] || {};
     const list = mockups();
-    const mkIndex = resolveMockupIndex(mapping, list);
-    const mk = mkIndex >= 0 ? (list[mkIndex] || null) : null;
-    return {pid, type, color, cfg, mapping, mockup: mk};
+    const frontIndex = resolveMockupIndex(mapping, list, {side:'front'});
+    const backIndex = resolveMockupIndex(mapping, list, {side:'back'});
+    const frontMockup = frontIndex >= 0 ? (list[frontIndex] || null) : null;
+    const backMockup = backIndex >= 0 ? (list[backIndex] || null) : null;
+    const activeSide = activeSideKey === 'back' ? 'back' : 'front';
+    let selectedMockup = activeSide === 'back' ? (backMockup || frontMockup) : (frontMockup || backMockup);
+    if (!selectedMockup){
+      selectedMockup = null;
+    }
+    return {
+      pid,
+      type,
+      color,
+      cfg,
+      mapping,
+      mockup: selectedMockup,
+      mockups: {front: frontMockup, back: backMockup},
+      mockupIndex: frontIndex,
+      mockupBackIndex: backIndex
+    };
   }
 
   function referenceSizeForMockup(mk, area){
@@ -1899,7 +1955,11 @@
   }
 
   function setMockupBgAndArea(){
-    const {mockup: mk} = currentSelection();
+    const sel = currentSelection();
+    const mockupsBySide = sel.mockups || {front: null, back: null};
+    const mk = activeSideKey === 'back'
+      ? (mockupsBySide.back || mockupsBySide.front || sel.mockup)
+      : (mockupsBySide.front || mockupsBySide.back || sel.mockup);
 
     c.getObjects().slice().forEach(obj=>{ if (obj.__nb_bg) c.remove(obj); });
     c.getObjects().slice().forEach(obj=>{ if (obj.__nb_area) c.remove(obj); });

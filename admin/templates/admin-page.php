@@ -155,7 +155,7 @@
         </table>
         <h4>Mapping (Típus × Szín)</h4>
         <table class="widefat">
-          <thead><tr><th>Típus</th><th>Szín</th><th>Mockup</th><th>Ft/cm²</th><th>Min. felár</th><th>Alap felár</th></tr></thead>
+          <thead><tr><th>Típus</th><th>Szín</th><th>Előlap mockup</th><th>Hátlap mockup</th><th>Ft/cm²</th><th>Min. felár</th><th>Alap felár</th></tr></thead>
           <tbody>
             <?php
               $typeColors = $cfg['colors_by_type'] ?? [];
@@ -164,7 +164,7 @@
                 $typeKey = nb_normalize_type_key($type);
                 $colorList = $typeColors[$typeKey] ?? [];
                 if (empty($colorList)){
-                  echo '<tr><td>'.esc_html($type).'</td><td colspan="5"><em>Nincs szín beállítva ehhez a típushoz. Állítsd be a Színek fülön.</em></td></tr>';
+                  echo '<tr><td>'.esc_html($type).'</td><td colspan="6"><em>Nincs szín beállítva ehhez a típushoz. Állítsd be a Színek fülön.</em></td></tr>';
                   continue;
                 }
                 foreach ($colorList as $color):
@@ -172,7 +172,7 @@
                   if ($colorKey === '') continue;
                   $key = $typeKey.'|'.$colorKey;
                   $hash = md5($key);
-                  $map = $cfg['map'][$key] ?? ['mockup_index'=>-1,'fee_per_cm2'=>'','min_fee'=>'','base_fee'=>''];
+                  $map = $cfg['map'][$key] ?? ['mockup_index'=>-1,'mockup_back_index'=>-1,'fee_per_cm2'=>'','min_fee'=>'','base_fee'=>''];
                   $renderedRows++;
             ?>
               <tr>
@@ -186,12 +186,20 @@
                     <?php endforeach; ?>
                   </select>
                 </td>
+                <td>
+                  <select name="mockup_back_<?php echo $pid; ?>_<?php echo esc_attr($hash); ?>">
+                    <option value="-1">— nincs —</option>
+                    <?php foreach($mockups as $i=>$m): ?>
+                      <option value="<?php echo $i; ?>" <?php selected(intval($map['mockup_back_index'] ?? -1),$i); ?>><?php echo esc_html($m['label'] ?? ('Mockup #'.$i)); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </td>
                 <td><input type="number" step="0.1" name="percm2_<?php echo $pid; ?>_<?php echo esc_attr($hash); ?>" value="<?php echo esc_attr($map['fee_per_cm2']); ?>" /></td>
                 <td><input type="number" step="1"   name="minfee_<?php echo $pid; ?>_<?php echo esc_attr($hash); ?>" value="<?php echo esc_attr($map['min_fee']); ?>" /></td>
                 <td><input type="number" step="1"   name="base_<?php echo $pid; ?>_<?php echo esc_attr($hash); ?>" value="<?php echo esc_attr($map['base_fee']); ?>" /></td>
               </tr>
             <?php endforeach; endforeach; if (!$renderedRows): ?>
-              <tr><td colspan="6"><em>Nincs olyan típus–szín kombináció, amelyhez mockupot vagy árat állíthatnál be. Adj hozzá színeket a Színek fülön.</em></td></tr>
+              <tr><td colspan="7"><em>Nincs olyan típus–szín kombináció, amelyhez mockupot vagy árat állíthatnál be. Adj hozzá színeket a Színek fülön.</em></td></tr>
             <?php endif; ?>
           </tbody>
         </table>

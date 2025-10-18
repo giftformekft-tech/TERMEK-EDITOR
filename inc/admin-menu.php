@@ -330,6 +330,7 @@ function nb_admin_render(){
             $hash = md5($key);
             $catalog[$pid]['map'][$key] = [
               'mockup_index' => intval($_POST['mockup_'.$pid.'_'.$hash] ?? -1),
+              'mockup_back_index' => intval($_POST['mockup_back_'.$pid.'_'.$hash] ?? -1),
               'fee_per_cm2'  => $_POST['percm2_'.$pid.'_'.$hash] ?? '',
               'min_fee'      => $_POST['minfee_'.$pid.'_'.$hash] ?? '',
               'base_fee'     => $_POST['base_'.$pid.'_'.$hash] ?? '',
