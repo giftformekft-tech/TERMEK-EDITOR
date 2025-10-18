@@ -368,13 +368,11 @@
     });
   });
   const sheetBundles = {
-    sides: ['sides'],
+    sides: ['sides','double'],
     elements: ['elements'],
     upload: ['upload'],
     text: ['text'],
-    product: ['product'],
-    color: ['color'],
-    size: ['size','double'],
+    product: ['product','color','size','double'],
     layers: ['layers']
   };
   const sheetState = {
