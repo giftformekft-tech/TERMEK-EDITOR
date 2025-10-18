@@ -2187,6 +2187,9 @@
     doubleSidedToggle.onchange = ()=>{
       doubleSidedEnabled = !!doubleSidedToggle.checked;
       updateSideUiState();
+      updateSideStatus();
+      updatePrintSummary();
+      updatePriceDisplay();
       const afterSwitch = ()=>{
         markDesignDirty();
       };
