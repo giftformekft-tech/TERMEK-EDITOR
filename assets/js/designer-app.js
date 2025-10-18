@@ -1598,13 +1598,36 @@
     return sideStates[normalized];
   }
 
+  const PRINT_AREA_FILL = 'rgba(59,130,246,0.08)';
+  const PRINT_AREA_STROKE = '#2563eb';
+
+  function isPrintAreaDescriptor(obj){
+    if (!obj || obj.type !== 'rect') return false;
+    if (obj.selectable !== false || obj.evented !== false) return false;
+    if (obj.stroke !== PRINT_AREA_STROKE) return false;
+    const fill = (typeof obj.fill === 'string') ? obj.fill.replace(/\s+/g, '') : '';
+    if (fill !== PRINT_AREA_FILL) return false;
+    if (!Array.isArray(obj.strokeDashArray)) return false;
+    if (obj.strokeDashArray.length < 2) return false;
+    if (obj.strokeDashArray[0] !== 10 || obj.strokeDashArray[1] !== 6) return false;
+    return true;
+  }
+
+  function prunePrintAreaObjects(json){
+    if (!json || !Array.isArray(json.objects)) return json;
+    json.objects = json.objects.filter(obj=>!isPrintAreaDescriptor(obj));
+    return json;
+  }
+
   function sanitizeCanvasJSON(){
     const raw = c.toJSON(['__nb_layer_id','__nb_layer_name']);
     const clean = Object.assign({}, raw);
     clean.background = 'rgba(0,0,0,0)';
     clean.backgroundImage = null;
     if (Array.isArray(clean.objects)){
-      clean.objects = clean.objects.filter(obj=>!obj.__nb_bg && !obj.__nb_area);
+      clean.objects = clean.objects
+        .filter(obj=>!obj.__nb_bg && !obj.__nb_area)
+        .filter(obj=>!isPrintAreaDescriptor(obj));
     } else {
       clean.objects = [];
     }
@@ -1699,7 +1722,7 @@
 
   function loadSideState(key){
     const state = ensureSideState(key);
-    const json = cloneSideJson(state);
+    const json = prunePrintAreaObjects(cloneSideJson(state));
     return new Promise(resolve=>{
       const previousBg = (typeof c.backgroundColor !== 'undefined' && c.backgroundColor) ? c.backgroundColor : '#fff';
       if (typeof c.clear === 'function'){
@@ -2013,12 +2036,13 @@
       top: area.y,
       width: area.w,
       height: area.h,
-      fill: 'rgba(59,130,246,0.08)',
-      stroke: '#2563eb',
+      fill: PRINT_AREA_FILL,
+      stroke: PRINT_AREA_STROKE,
       strokeWidth: 2,
       strokeDashArray: [10,6],
       selectable: false,
-      evented: false
+      evented: false,
+      excludeFromExport: true
     });
     printArea.__nb_area = true;
     c.add(printArea);
