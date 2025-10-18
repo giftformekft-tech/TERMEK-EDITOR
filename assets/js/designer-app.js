@@ -135,8 +135,8 @@
       return Math.max(4, Math.round(raw));
     };
     if (key === 'mobile'){
-      const cornerSize = clampCorner(baseCorner * 1.5, 22);
-      const touchCornerSize = clampCorner(Math.max(baseTouch * 1.2, baseCorner * 3), 48);
+      const cornerSize = clampCorner(baseCorner * 1.75, 34);
+      const touchCornerSize = clampCorner(Math.max(baseTouch * 1.6, baseCorner * 4), 64);
       return {
         cornerSize,
         touchCornerSize: Math.max(touchCornerSize, cornerSize + 2),
