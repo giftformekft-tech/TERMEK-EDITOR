@@ -145,6 +145,128 @@
     }
   }
 
+  const objectUiDefaults = {
+    cornerStyle: 'circle',
+    transparentCorners: false,
+    hasBorders: false,
+    borderColor: 'rgba(0,0,0,0)',
+    borderOpacityWhenMoving: 0,
+    padding: 0,
+    cornerPadding: 0
+  };
+
+  function applyObjectUiDefaults(obj){
+    if (!obj || typeof obj !== 'object') return;
+    if (typeof objectUiDefaults.cornerStyle !== 'undefined') obj.cornerStyle = objectUiDefaults.cornerStyle;
+    if (typeof objectUiDefaults.transparentCorners !== 'undefined') obj.transparentCorners = objectUiDefaults.transparentCorners;
+    if (typeof objectUiDefaults.hasBorders !== 'undefined') obj.hasBorders = objectUiDefaults.hasBorders;
+    if (typeof objectUiDefaults.borderColor !== 'undefined') obj.borderColor = objectUiDefaults.borderColor;
+    if (typeof objectUiDefaults.borderOpacityWhenMoving !== 'undefined') obj.borderOpacityWhenMoving = objectUiDefaults.borderOpacityWhenMoving;
+    if (typeof objectUiDefaults.padding !== 'undefined') obj.padding = objectUiDefaults.padding;
+    if (typeof objectUiDefaults.cornerPadding !== 'undefined' && typeof obj.cornerPadding !== 'undefined') obj.cornerPadding = objectUiDefaults.cornerPadding;
+  }
+
+  applyObjectUiDefaults(fabric.Object.prototype);
+
+  const baseControlProfile = {
+    cornerSize: fabric.Object.prototype.cornerSize,
+    touchCornerSize: fabric.Object.prototype.touchCornerSize,
+    borderScaleFactor: fabric.Object.prototype.borderScaleFactor,
+  };
+  function getRetinaScale(){
+    if (typeof c.getRetinaScaling === 'function'){
+      const scaling = c.getRetinaScaling();
+      if (Number.isFinite(scaling) && scaling > 0){
+        return scaling;
+      }
+    }
+    if (typeof fabric.devicePixelRatio === 'number' && fabric.devicePixelRatio > 0){
+      return fabric.devicePixelRatio;
+    }
+    if (typeof window !== 'undefined' && typeof window.devicePixelRatio === 'number' && window.devicePixelRatio > 0){
+      return window.devicePixelRatio;
+    }
+    return 1;
+  }
+  function profileForKey(key){
+    const retina = Math.max(1, getRetinaScale());
+    const baseCorner = Number.isFinite(baseControlProfile.cornerSize) && baseControlProfile.cornerSize > 0
+      ? baseControlProfile.cornerSize
+      : 13;
+    const baseTouch = Number.isFinite(baseControlProfile.touchCornerSize) && baseControlProfile.touchCornerSize > 0
+      ? baseControlProfile.touchCornerSize
+      : Math.max(baseCorner * 2, 26);
+    const borderScaleFactor = Number.isFinite(baseControlProfile.borderScaleFactor) && baseControlProfile.borderScaleFactor > 0
+      ? baseControlProfile.borderScaleFactor
+      : 1;
+    const clampCorner = (cssPx, minCss)=>{
+      const desiredCss = Math.max(minCss, cssPx);
+      const raw = desiredCss / (retina || 1);
+      return Math.max(4, Math.round(raw));
+    };
+    if (key === 'mobile'){
+      const cornerSize = clampCorner(baseCorner * 0.95, 14);
+      const touchCornerSize = clampCorner(baseTouch, 30);
+      return {
+        cornerSize,
+        touchCornerSize: Math.max(touchCornerSize, cornerSize + 2),
+        borderScaleFactor,
+      };
+    }
+    const cornerSize = clampCorner(baseCorner, baseCorner);
+    const touchCornerSize = clampCorner(baseTouch, baseTouch);
+    return {
+      cornerSize,
+      touchCornerSize: Math.max(touchCornerSize, cornerSize + 2),
+      borderScaleFactor,
+    };
+  }
+  let activeControlSignature = '';
+  const controlMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
+    ? window.matchMedia('(max-width: 720px)')
+    : null;
+
+  function applyControlProfile(profile){
+    if (!profile) return;
+    const {cornerSize, touchCornerSize, borderScaleFactor} = profile;
+    fabric.Object.prototype.cornerSize = cornerSize;
+    fabric.Object.prototype.touchCornerSize = touchCornerSize;
+    fabric.Object.prototype.borderScaleFactor = borderScaleFactor;
+    applyObjectUiDefaults(fabric.Object.prototype);
+    designObjects().forEach(obj=>{
+      obj.cornerSize = cornerSize;
+      obj.touchCornerSize = touchCornerSize;
+      obj.borderScaleFactor = borderScaleFactor;
+      applyObjectUiDefaults(obj);
+      if (typeof obj.setCoords === 'function'){
+        obj.setCoords();
+      }
+    });
+    c.requestRenderAll();
+  }
+
+  function refreshControlProfile(){
+    const nextKey = controlMedia && controlMedia.matches ? 'mobile' : 'desktop';
+    const nextProfile = profileForKey(nextKey);
+    const signature = nextProfile
+      ? [nextKey, nextProfile.cornerSize, nextProfile.touchCornerSize, nextProfile.borderScaleFactor].join('|')
+      : '';
+    if (signature && signature === activeControlSignature) return;
+    activeControlSignature = signature;
+    applyControlProfile(nextProfile || profileForKey('desktop'));
+  }
+
+  refreshControlProfile();
+  designObjects().forEach(applyObjectUiDefaults);
+  if (controlMedia){
+    const mediaListener = () => refreshControlProfile();
+    if (typeof controlMedia.addEventListener === 'function'){
+      controlMedia.addEventListener('change', mediaListener);
+    } else if (typeof controlMedia.addListener === 'function'){
+      controlMedia.addListener(mediaListener);
+    }
+  }
+
   const defaultCanvasSize = {w:baseCanvasSize.w, h:baseCanvasSize.h};
   const fallbackArea = {
     x: Math.round(defaultCanvasSize.w * 0.15),
