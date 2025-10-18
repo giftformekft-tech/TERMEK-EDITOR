@@ -9,263 +9,71 @@
   };
   const settings = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
   const c = new fabric.Canvas('nb-canvas', {preserveObjectStacking:true, backgroundColor:'#fff'});
-  if (typeof c.allowTouchScrolling !== 'undefined'){
+  c.allowTouchScrolling = true;
+
+  function applyTouchAction(el){
+    if (!el || !el.style) return;
+    el.style.touchAction = 'manipulation';
+  }
+
+  applyTouchAction(c.wrapperEl);
+  applyTouchAction(c.upperCanvasEl);
+  applyTouchAction(c.lowerCanvasEl);
+
+  function isTouchLikeEvent(nativeEvent){
+    if (!nativeEvent || typeof nativeEvent !== 'object') return false;
+    if (typeof nativeEvent.pointerType === 'string' && nativeEvent.pointerType.toLowerCase() === 'touch'){
+      return true;
+    }
+    if (typeof nativeEvent.type === 'string' && nativeEvent.type.indexOf('touch') === 0){
+      return true;
+    }
+    if (typeof nativeEvent.touches !== 'undefined'){ // TouchEvent
+      return true;
+    }
+    return false;
+  }
+
+  let touchDragActive = false;
+  function restoreTouchScrolling(){
+    touchDragActive = false;
     c.allowTouchScrolling = true;
   }
-  const touchActionValue = 'manipulation';
-  if (c.upperCanvasEl && c.upperCanvasEl.style){
-    c.upperCanvasEl.style.touchAction = touchActionValue;
-  }
-  if (c.lowerCanvasEl && c.lowerCanvasEl.style){
-    c.lowerCanvasEl.style.touchAction = touchActionValue;
-  }
-  if (canvasEl && canvasEl.parentElement && canvasEl.parentElement.style){
-    canvasEl.parentElement.style.touchAction = touchActionValue;
-  }
 
-  const objectUiDefaults = {
-    cornerStyle: 'circle',
-    transparentCorners: false,
-    hasBorders: false,
-    borderColor: 'rgba(0,0,0,0)',
-    borderOpacityWhenMoving: 0,
-    padding: 0,
-    cornerPadding: 0
-  };
+  c.on('mouse:down', evt=>{
+    if (!evt || !evt.e || !isTouchLikeEvent(evt.e)) return;
+    touchDragActive = !!evt.target;
+    c.allowTouchScrolling = !touchDragActive;
+  });
 
-  function applyObjectUiDefaults(obj){
-    if (!obj || typeof obj !== 'object') return;
-    if (typeof objectUiDefaults.cornerStyle !== 'undefined') obj.cornerStyle = objectUiDefaults.cornerStyle;
-    if (typeof objectUiDefaults.transparentCorners !== 'undefined') obj.transparentCorners = objectUiDefaults.transparentCorners;
-    if (typeof objectUiDefaults.hasBorders !== 'undefined') obj.hasBorders = objectUiDefaults.hasBorders;
-    if (typeof objectUiDefaults.borderColor !== 'undefined') obj.borderColor = objectUiDefaults.borderColor;
-    if (typeof objectUiDefaults.borderOpacityWhenMoving !== 'undefined') obj.borderOpacityWhenMoving = objectUiDefaults.borderOpacityWhenMoving;
-    if (typeof objectUiDefaults.padding !== 'undefined') obj.padding = objectUiDefaults.padding;
-    if (typeof objectUiDefaults.cornerPadding !== 'undefined' && typeof obj.cornerPadding !== 'undefined') obj.cornerPadding = objectUiDefaults.cornerPadding;
-  }
+  c.on('mouse:up', ()=>{
+    restoreTouchScrolling();
+  });
 
-  applyObjectUiDefaults(fabric.Object.prototype);
+  c.on('mouse:out', ()=>{
+    restoreTouchScrolling();
+  });
 
-  const baseControlProfile = {
-    cornerSize: fabric.Object.prototype.cornerSize,
-    touchCornerSize: fabric.Object.prototype.touchCornerSize,
-    borderScaleFactor: fabric.Object.prototype.borderScaleFactor,
-  };
-  function getRetinaScale(){
-    if (typeof c.getRetinaScaling === 'function'){
-      const scaling = c.getRetinaScaling();
-      if (Number.isFinite(scaling) && scaling > 0){
-        return scaling;
-      }
+  c.on('selection:cleared', ()=>{
+    restoreTouchScrolling();
+  });
+
+  c.on('mouse:move', evt=>{
+    if (!evt || !evt.e || !isTouchLikeEvent(evt.e)) return;
+    if (!evt.target && !touchDragActive){
+      c.allowTouchScrolling = true;
     }
-    if (typeof fabric.devicePixelRatio === 'number' && fabric.devicePixelRatio > 0){
-      return fabric.devicePixelRatio;
+  });
+
+  c.on('touch:gesture', evt=>{
+    if (!evt || !evt.e) return;
+    if (!isTouchLikeEvent(evt.e)) return;
+    if (evt.self && evt.self.state === 'end'){
+      restoreTouchScrolling();
+    } else {
+      c.allowTouchScrolling = !touchDragActive;
     }
-    if (typeof window !== 'undefined' && typeof window.devicePixelRatio === 'number' && window.devicePixelRatio > 0){
-      return window.devicePixelRatio;
-    }
-    return 1;
-  }
-  function profileForKey(key){
-    const retina = Math.max(1, getRetinaScale());
-    const baseCorner = Number.isFinite(baseControlProfile.cornerSize) && baseControlProfile.cornerSize > 0
-      ? baseControlProfile.cornerSize
-      : 13;
-    const baseTouch = Number.isFinite(baseControlProfile.touchCornerSize) && baseControlProfile.touchCornerSize > 0
-      ? baseControlProfile.touchCornerSize
-      : Math.max(baseCorner * 2, 26);
-    const borderScaleFactor = Number.isFinite(baseControlProfile.borderScaleFactor) && baseControlProfile.borderScaleFactor > 0
-      ? baseControlProfile.borderScaleFactor
-      : 1;
-    const clampCorner = (cssPx, minCss)=>{
-      const desiredCss = Math.max(minCss, cssPx);
-      const raw = desiredCss / (retina || 1);
-      return Math.max(4, Math.round(raw));
-    };
-    if (key === 'mobile'){
-      const cornerSize = clampCorner(baseCorner * 1.5, 22);
-      const touchCornerSize = clampCorner(Math.max(baseTouch * 1.2, baseCorner * 3), 48);
-      return {
-        cornerSize,
-        touchCornerSize: Math.max(touchCornerSize, cornerSize + 2),
-        borderScaleFactor,
-      };
-    }
-    const cornerSize = clampCorner(baseCorner, baseCorner);
-    const touchCornerSize = clampCorner(baseTouch, baseTouch);
-    return {
-      cornerSize,
-      touchCornerSize: Math.max(touchCornerSize, cornerSize + 2),
-      borderScaleFactor,
-    };
-  }
-  let activeControlSignature = '';
-  const controlMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
-    ? window.matchMedia('(max-width: 720px)')
-    : null;
-
-  function applyControlProfile(profile){
-    if (!profile) return;
-    const {cornerSize, touchCornerSize, borderScaleFactor} = profile;
-    fabric.Object.prototype.cornerSize = cornerSize;
-    fabric.Object.prototype.touchCornerSize = touchCornerSize;
-    fabric.Object.prototype.borderScaleFactor = borderScaleFactor;
-    applyObjectUiDefaults(fabric.Object.prototype);
-    designObjects().forEach(obj=>{
-      obj.cornerSize = cornerSize;
-      obj.touchCornerSize = touchCornerSize;
-      obj.borderScaleFactor = borderScaleFactor;
-      applyObjectUiDefaults(obj);
-      if (typeof obj.setCoords === 'function'){
-        obj.setCoords();
-      }
-    });
-    c.requestRenderAll();
-  }
-
-  function refreshControlProfile(){
-    const nextKey = controlMedia && controlMedia.matches ? 'mobile' : 'desktop';
-    const nextProfile = profileForKey(nextKey);
-    const signature = nextProfile
-      ? [nextKey, nextProfile.cornerSize, nextProfile.touchCornerSize, nextProfile.borderScaleFactor].join('|')
-      : '';
-    if (signature && signature === activeControlSignature) return;
-    activeControlSignature = signature;
-    applyControlProfile(nextProfile || profileForKey('desktop'));
-  }
-
-  refreshControlProfile();
-  designObjects().forEach(applyObjectUiDefaults);
-  if (controlMedia){
-    const mediaListener = () => refreshControlProfile();
-    if (typeof controlMedia.addEventListener === 'function'){
-      controlMedia.addEventListener('change', mediaListener);
-    } else if (typeof controlMedia.addListener === 'function'){
-      controlMedia.addListener(mediaListener);
-    }
-  }
-
-  const objectUiDefaults = {
-    cornerStyle: 'circle',
-    transparentCorners: false,
-    hasBorders: false,
-    borderColor: 'rgba(0,0,0,0)',
-    borderOpacityWhenMoving: 0,
-    padding: 0,
-    cornerPadding: 0
-  };
-
-  function applyObjectUiDefaults(obj){
-    if (!obj || typeof obj !== 'object') return;
-    if (typeof objectUiDefaults.cornerStyle !== 'undefined') obj.cornerStyle = objectUiDefaults.cornerStyle;
-    if (typeof objectUiDefaults.transparentCorners !== 'undefined') obj.transparentCorners = objectUiDefaults.transparentCorners;
-    if (typeof objectUiDefaults.hasBorders !== 'undefined') obj.hasBorders = objectUiDefaults.hasBorders;
-    if (typeof objectUiDefaults.borderColor !== 'undefined') obj.borderColor = objectUiDefaults.borderColor;
-    if (typeof objectUiDefaults.borderOpacityWhenMoving !== 'undefined') obj.borderOpacityWhenMoving = objectUiDefaults.borderOpacityWhenMoving;
-    if (typeof objectUiDefaults.padding !== 'undefined') obj.padding = objectUiDefaults.padding;
-    if (typeof objectUiDefaults.cornerPadding !== 'undefined' && typeof obj.cornerPadding !== 'undefined') obj.cornerPadding = objectUiDefaults.cornerPadding;
-  }
-
-  applyObjectUiDefaults(fabric.Object.prototype);
-
-  const baseControlProfile = {
-    cornerSize: fabric.Object.prototype.cornerSize,
-    touchCornerSize: fabric.Object.prototype.touchCornerSize,
-    borderScaleFactor: fabric.Object.prototype.borderScaleFactor,
-  };
-  function getRetinaScale(){
-    if (typeof c.getRetinaScaling === 'function'){
-      const scaling = c.getRetinaScaling();
-      if (Number.isFinite(scaling) && scaling > 0){
-        return scaling;
-      }
-    }
-    if (typeof fabric.devicePixelRatio === 'number' && fabric.devicePixelRatio > 0){
-      return fabric.devicePixelRatio;
-    }
-    if (typeof window !== 'undefined' && typeof window.devicePixelRatio === 'number' && window.devicePixelRatio > 0){
-      return window.devicePixelRatio;
-    }
-    return 1;
-  }
-  function profileForKey(key){
-    const retina = Math.max(1, getRetinaScale());
-    const baseCorner = Number.isFinite(baseControlProfile.cornerSize) && baseControlProfile.cornerSize > 0
-      ? baseControlProfile.cornerSize
-      : 13;
-    const baseTouch = Number.isFinite(baseControlProfile.touchCornerSize) && baseControlProfile.touchCornerSize > 0
-      ? baseControlProfile.touchCornerSize
-      : Math.max(baseCorner * 2, 26);
-    const borderScaleFactor = Number.isFinite(baseControlProfile.borderScaleFactor) && baseControlProfile.borderScaleFactor > 0
-      ? baseControlProfile.borderScaleFactor
-      : 1;
-    const clampCorner = (cssPx, minCss)=>{
-      const desiredCss = Math.max(minCss, cssPx);
-      const raw = desiredCss / (retina || 1);
-      return Math.max(4, Math.round(raw));
-    };
-    if (key === 'mobile'){
-      const cornerSize = clampCorner(baseCorner * 0.95, 14);
-      const touchCornerSize = clampCorner(baseTouch, 30);
-      return {
-        cornerSize,
-        touchCornerSize: Math.max(touchCornerSize, cornerSize + 2),
-        borderScaleFactor,
-      };
-    }
-    const cornerSize = clampCorner(baseCorner, baseCorner);
-    const touchCornerSize = clampCorner(baseTouch, baseTouch);
-    return {
-      cornerSize,
-      touchCornerSize: Math.max(touchCornerSize, cornerSize + 2),
-      borderScaleFactor,
-    };
-  }
-  let activeControlSignature = '';
-  const controlMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
-    ? window.matchMedia('(max-width: 720px)')
-    : null;
-
-  function applyControlProfile(profile){
-    if (!profile) return;
-    const {cornerSize, touchCornerSize, borderScaleFactor} = profile;
-    fabric.Object.prototype.cornerSize = cornerSize;
-    fabric.Object.prototype.touchCornerSize = touchCornerSize;
-    fabric.Object.prototype.borderScaleFactor = borderScaleFactor;
-    applyObjectUiDefaults(fabric.Object.prototype);
-    designObjects().forEach(obj=>{
-      obj.cornerSize = cornerSize;
-      obj.touchCornerSize = touchCornerSize;
-      obj.borderScaleFactor = borderScaleFactor;
-      applyObjectUiDefaults(obj);
-      if (typeof obj.setCoords === 'function'){
-        obj.setCoords();
-      }
-    });
-    c.requestRenderAll();
-  }
-
-  function refreshControlProfile(){
-    const nextKey = controlMedia && controlMedia.matches ? 'mobile' : 'desktop';
-    const nextProfile = profileForKey(nextKey);
-    const signature = nextProfile
-      ? [nextKey, nextProfile.cornerSize, nextProfile.touchCornerSize, nextProfile.borderScaleFactor].join('|')
-      : '';
-    if (signature && signature === activeControlSignature) return;
-    activeControlSignature = signature;
-    applyControlProfile(nextProfile || profileForKey('desktop'));
-  }
-
-  refreshControlProfile();
-  designObjects().forEach(applyObjectUiDefaults);
-  if (controlMedia){
-    const mediaListener = () => refreshControlProfile();
-    if (typeof controlMedia.addEventListener === 'function'){
-      controlMedia.addEventListener('change', mediaListener);
-    } else if (typeof controlMedia.addListener === 'function'){
-      controlMedia.addListener(mediaListener);
-    }
-  }
+  });
 
   const objectUiDefaults = {
     cornerStyle: 'circle',
