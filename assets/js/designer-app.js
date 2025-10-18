@@ -324,6 +324,65 @@
   const canvasEmptyHintEl = document.getElementById('nb-canvas-empty-hint');
   const sideButtons = Array.from(document.querySelectorAll('[data-nb-side]'));
   const sideFabButton = document.getElementById('nb-side-toggle-mobile');
+  const mobileMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
+    ? window.matchMedia('(max-width: 768px)')
+    : null;
+  const mobileToolbar = document.getElementById('nb-mobile-toolbar');
+  const mobileStatusBar = document.getElementById('nb-mobile-status');
+  const mobileSelectionLabel = document.getElementById('nb-mobile-selection-label');
+  const mobileCompleteBtn = document.getElementById('nb-mobile-complete');
+  const mobileBulkBtn = document.getElementById('nb-mobile-bulk');
+  const mobileSheet = document.getElementById('nb-mobile-sheet');
+  const mobileSheetContent = document.getElementById('nb-mobile-sheet-content');
+  const mobileSheetTitle = document.getElementById('nb-mobile-sheet-title');
+  const mobileSheetClose = document.getElementById('nb-mobile-sheet-close');
+  const mobileSheetOverlay = document.getElementById('nb-mobile-sheet-overlay');
+  const mobileSheetHandle = document.getElementById('nb-mobile-sheet-handle');
+  const mobileQuickButtons = {};
+  Array.from(document.querySelectorAll('[data-nb-mobile-action]')).forEach(btn=>{
+    const key = btn.dataset.nbMobileAction;
+    if (!key) return;
+    mobileQuickButtons[key] = btn;
+  });
+  const mobileToolbarButtons = new Map();
+  if (mobileToolbar){
+    Array.from(mobileToolbar.querySelectorAll('[data-nb-sheet-target]')).forEach(btn=>{
+      const key = btn.dataset.nbSheetTarget;
+      if (!key) return;
+      mobileToolbarButtons.set(key, btn);
+    });
+  }
+  const sheetSources = new Map();
+  Array.from(document.querySelectorAll('[data-nb-sheet-source]')).forEach(node=>{
+    const key = node.dataset.nbSheetSource;
+    if (!key || sheetSources.has(key)) return;
+    const title = (node.dataset.nbSheetTitle || (node.getAttribute('aria-label') || '')).trim() || (function(){
+      const heading = node.querySelector('h2,h3');
+      return heading && heading.textContent ? heading.textContent.trim() : '';
+    })();
+    sheetSources.set(key, {
+      key,
+      node,
+      parent: node.parentNode,
+      nextSibling: node.nextSibling,
+      title
+    });
+  });
+  const sheetBundles = {
+    sides: ['sides','double'],
+    elements: ['elements'],
+    upload: ['upload'],
+    text: ['text'],
+    product: ['product','color','size','double'],
+    layers: ['layers']
+  };
+  const sheetState = {
+    activeKey: '',
+    expanded: false,
+    historyDepth: 0,
+    pendingClose: false
+  };
+  let sheetDragState = null;
 
   const loadedFontUrls = new Set();
   const designState = {savedDesignId:null, dirty:true};
@@ -470,6 +529,8 @@
       const sizesAvailable = hasSizeOptions();
       bulkModalTrigger.disabled = !ready || !sizesAvailable || busy;
     }
+    syncMobileCompleteState();
+    syncMobileBulkState();
   }
 
   function parseFontEntry(entry){
@@ -1577,6 +1638,16 @@
     return c.getObjects().filter(isDesignObject);
   }
 
+  function activeDesignObject(){
+    const obj = c.getActiveObject();
+    return isDesignObject(obj) ? obj : null;
+  }
+
+  function designObjectIndex(obj){
+    if (!isDesignObject(obj)) return -1;
+    return designObjects().indexOf(obj);
+  }
+
   function sideLabel(key){
     const entry = availableSides.find(s=>s.key === key);
     return entry ? entry.label : key;
@@ -1709,6 +1780,338 @@
     printSummaryEl.textContent = `Nyomtatási oldalak: ${used} / ${total}`;
   }
 
+  function sheetKeysForTarget(key){
+    if (!key) return [];
+    const bundle = sheetBundles[key];
+    if (Array.isArray(bundle) && bundle.length){
+      return bundle.filter(entry=>sheetSources.has(entry));
+    }
+    return sheetSources.has(key) ? [key] : [];
+  }
+
+  function restoreSheetSources(keys){
+    if (!Array.isArray(keys)) return;
+    keys.forEach(sheetKey=>{
+      const source = sheetSources.get(sheetKey);
+      if (!source || !source.node || !source.parent) return;
+      const parent = source.parent;
+      const sibling = source.nextSibling;
+      if (source.node.parentNode === parent) return;
+      if (sibling && sibling.parentNode === parent){
+        parent.insertBefore(source.node, sibling);
+      } else {
+        parent.appendChild(source.node);
+      }
+    });
+  }
+
+  function restoreAllSheetSources(){
+    sheetSources.forEach(source=>{
+      if (!source || !source.node || !source.parent) return;
+      if (source.node.parentNode === source.parent) return;
+      const sibling = source.nextSibling;
+      if (sibling && sibling.parentNode === source.parent){
+        source.parent.insertBefore(source.node, sibling);
+      } else {
+        source.parent.appendChild(source.node);
+      }
+    });
+  }
+
+  function updateToolbarActiveState(){
+    mobileToolbarButtons.forEach((btn, key)=>{
+      if (!btn) return;
+      const isActive = sheetState.activeKey === key;
+      if (isActive){
+        btn.classList.add('is-active');
+      } else {
+        btn.classList.remove('is-active');
+      }
+    });
+  }
+
+  function mobileUiEnabled(){
+    return !!(mobileMedia && typeof mobileMedia.matches === 'boolean' && mobileMedia.matches);
+  }
+
+  function syncMobileCompleteState(){
+    if (!mobileCompleteBtn) return;
+    if (!mobileUiEnabled()){
+      mobileCompleteBtn.setAttribute('hidden','');
+      return;
+    }
+    mobileCompleteBtn.removeAttribute('hidden');
+    if (addToCartBtn){
+      mobileCompleteBtn.disabled = !!addToCartBtn.disabled;
+    } else {
+      mobileCompleteBtn.disabled = true;
+    }
+  }
+
+  function syncMobileBulkState(){
+    if (!mobileBulkBtn) return;
+    if (!mobileUiEnabled()){
+      mobileBulkBtn.setAttribute('hidden','');
+      return;
+    }
+    mobileBulkBtn.removeAttribute('hidden');
+    const ready = hasCompleteSelection();
+    const sizesAvailable = hasSizeOptions();
+    const busy = saving || actionSubmitting;
+    mobileBulkBtn.disabled = !ready || !sizesAvailable || busy;
+  }
+
+  function updateMobileLayerBadge(){
+    const btn = mobileToolbarButtons.get('layers');
+    if (!btn) return;
+    const badge = btn.querySelector('.nb-mobile-icon-badge');
+    const count = designObjects().length;
+    if (badge){
+      if (count > 0){
+        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.removeAttribute('hidden');
+      } else {
+        badge.setAttribute('hidden','');
+      }
+    }
+    if (activeDesignObject()){
+      btn.classList.add('has-selection');
+    } else {
+      btn.classList.remove('has-selection');
+    }
+  }
+
+  function mobileSelectionLabelText(){
+    const obj = activeDesignObject();
+    if (!obj) return 'Nincs kiválasztott elem';
+    const label = layerLabel(obj) || '';
+    return label || 'Kijelölt elem';
+  }
+
+  function syncMobileSelectionUi(){
+    if (!mobileUiEnabled()) return;
+    if (mobileSelectionLabel){
+      mobileSelectionLabel.textContent = mobileSelectionLabelText();
+    }
+    const obj = activeDesignObject();
+    const hasSelection = !!obj;
+    const order = designObjects();
+    const index = hasSelection ? designObjectIndex(obj) : -1;
+    Object.keys(mobileQuickButtons).forEach(key=>{
+      const btn = mobileQuickButtons[key];
+      if (!btn) return;
+      let disabled = !hasSelection;
+      if (hasSelection){
+        if (key === 'forward'){
+          disabled = index === order.length - 1;
+        } else if (key === 'backward'){
+          disabled = index <= 0;
+        }
+        if (key === 'visibility'){
+          btn.textContent = obj.visible === false ? 'Mutat' : 'Elrejt';
+        }
+      }
+      btn.disabled = !!disabled;
+    });
+    updateMobileLayerBadge();
+  }
+
+  function closeMobileSheet(options){
+    const opts = options || {};
+    if (!mobileSheet || !sheetState.activeKey) return;
+    if (!opts.fromPopState && sheetState.historyDepth > 0 && typeof history !== 'undefined' && history.back){
+      sheetState.pendingClose = true;
+      history.back();
+      return;
+    }
+    const keys = sheetKeysForTarget(sheetState.activeKey);
+    restoreSheetSources(keys);
+    if (mobileSheetContent){
+      while (mobileSheetContent.firstChild){
+        const child = mobileSheetContent.firstChild;
+        mobileSheetContent.removeChild(child);
+      }
+    }
+    sheetState.activeKey = '';
+    sheetState.expanded = false;
+    sheetState.pendingClose = false;
+    if (opts.fromPopState && sheetState.historyDepth > 0){
+      sheetState.historyDepth = Math.max(0, sheetState.historyDepth - 1);
+    }
+    if (mobileSheetOverlay){
+      mobileSheetOverlay.setAttribute('hidden','');
+    }
+    mobileSheet.classList.remove('is-open','is-expanded','is-dragging');
+    mobileSheet.setAttribute('hidden','');
+    mobileSheet.setAttribute('aria-hidden','true');
+    mobileSheet.style.transform = '';
+    updateToolbarActiveState();
+  }
+
+  function openMobileSheet(key){
+    if (!mobileUiEnabled() || !mobileSheet || !mobileSheetContent) return;
+    if (!key) return;
+    if (sheetState.activeKey === key){
+      closeMobileSheet();
+      return;
+    }
+    const wasActive = !!sheetState.activeKey;
+    if (sheetState.activeKey){
+      const previousKeys = sheetKeysForTarget(sheetState.activeKey);
+      restoreSheetSources(previousKeys);
+      while (mobileSheetContent.firstChild){
+        mobileSheetContent.removeChild(mobileSheetContent.firstChild);
+      }
+    }
+    const keys = sheetKeysForTarget(key);
+    if (!keys.length){
+      sheetState.activeKey = '';
+      updateToolbarActiveState();
+      return;
+    }
+    const titles = [];
+    keys.forEach(sheetKey=>{
+      const source = sheetSources.get(sheetKey);
+      if (!source || !source.node) return;
+      source.parent = source.node.parentNode;
+      source.nextSibling = source.node.nextSibling;
+      if (source.title){
+        titles.push(source.title);
+      }
+      mobileSheetContent.appendChild(source.node);
+    });
+    if (mobileSheetTitle){
+      const label = titles.length ? titles.join(' • ') : '';
+      if (label){
+        mobileSheetTitle.textContent = label;
+      } else {
+        const btn = mobileToolbarButtons.get(key);
+        mobileSheetTitle.textContent = btn ? (btn.getAttribute('aria-label') || btn.textContent || '') : '';
+      }
+    }
+    if (!wasActive){
+      if (mobileSheetOverlay){
+        mobileSheetOverlay.removeAttribute('hidden');
+      }
+      mobileSheet.removeAttribute('hidden');
+      mobileSheet.setAttribute('aria-hidden','false');
+      mobileSheet.classList.add('is-open');
+      if (typeof history !== 'undefined' && history.pushState && sheetState.historyDepth === 0){
+        try {
+          history.pushState({__nb_sheet:true}, document.title, location.href);
+          sheetState.historyDepth = 1;
+        } catch(e){ /* ignore */ }
+      }
+    }
+    mobileSheet.classList.remove('is-expanded');
+    sheetState.expanded = false;
+    sheetState.pendingClose = false;
+    sheetState.activeKey = key;
+    updateToolbarActiveState();
+  }
+
+  function refreshMobileUi(){
+    const enabled = mobileUiEnabled();
+    if (mobileToolbar){
+      if (enabled){
+        mobileToolbar.removeAttribute('hidden');
+      } else {
+        mobileToolbar.setAttribute('hidden','');
+      }
+    }
+    if (mobileStatusBar){
+      if (enabled){
+        mobileStatusBar.removeAttribute('hidden');
+      } else {
+        mobileStatusBar.setAttribute('hidden','');
+      }
+    }
+    if (!enabled){
+      const previousDepth = sheetState.historyDepth;
+      closeMobileSheet({fromPopState:true});
+      restoreAllSheetSources();
+      if (previousDepth > 0 && typeof history !== 'undefined' && history.back){
+        sheetState.pendingClose = true;
+        history.back();
+      }
+    }
+    syncMobileSelectionUi();
+    syncMobileCompleteState();
+    syncMobileBulkState();
+  }
+
+  function toggleSheetExpansion(){
+    if (!mobileSheet || !sheetState.activeKey) return;
+    sheetState.expanded = !sheetState.expanded;
+    mobileSheet.classList.toggle('is-expanded', sheetState.expanded);
+  }
+
+  function beginSheetDrag(evt){
+    if (!mobileSheet || !mobileSheetHandle || !sheetState.activeKey) return;
+    if (!evt || typeof evt.clientY !== 'number'){
+      return toggleSheetExpansion();
+    }
+    sheetDragState = {
+      startY: evt.clientY,
+      lastY: evt.clientY,
+      moved: false
+    };
+    mobileSheet.classList.add('is-dragging');
+    if (typeof mobileSheetHandle.setPointerCapture === 'function' && evt.pointerId !== undefined){
+      try { mobileSheetHandle.setPointerCapture(evt.pointerId); } catch(e){ /* ignore */ }
+    }
+    window.addEventListener('pointermove', onSheetDragMove);
+    window.addEventListener('pointerup', endSheetDrag);
+    window.addEventListener('pointercancel', endSheetDrag);
+  }
+
+  function onSheetDragMove(evt){
+    if (!sheetDragState || !mobileSheet) return;
+    if (typeof evt.clientY !== 'number') return;
+    sheetDragState.lastY = evt.clientY;
+    const delta = sheetDragState.lastY - sheetDragState.startY;
+    if (Math.abs(delta) > 6){
+      sheetDragState.moved = true;
+    }
+    if (delta > 0){
+      mobileSheet.style.transform = `translateY(${delta}px)`;
+    } else {
+      mobileSheet.style.transform = 'translateY(0)';
+    }
+  }
+
+  function endSheetDrag(evt){
+    if (!sheetDragState || !mobileSheet) return;
+    if (typeof evt.clientY === 'number'){
+      sheetDragState.lastY = evt.clientY;
+    }
+    const delta = sheetDragState.lastY - sheetDragState.startY;
+    const moved = sheetDragState.moved;
+    sheetDragState = null;
+    mobileSheet.classList.remove('is-dragging');
+    mobileSheet.style.transform = '';
+    if (mobileSheetHandle && typeof mobileSheetHandle.releasePointerCapture === 'function' && evt.pointerId !== undefined){
+      try { mobileSheetHandle.releasePointerCapture(evt.pointerId); } catch(e){ /* ignore */ }
+    }
+    window.removeEventListener('pointermove', onSheetDragMove);
+    window.removeEventListener('pointerup', endSheetDrag);
+    window.removeEventListener('pointercancel', endSheetDrag);
+    if (!moved){
+      toggleSheetExpansion();
+      return;
+    }
+    if (delta > 120){
+      closeMobileSheet();
+      return;
+    }
+    if (delta < -80){
+      sheetState.expanded = true;
+      mobileSheet.classList.add('is-expanded');
+      return;
+    }
+    mobileSheet.classList.toggle('is-expanded', sheetState.expanded);
+  }
+
   function cloneSideJson(state){
     if (!state || !state.json){
       return {version: (c && c.version) || '5.0.0', objects: []};
@@ -1838,6 +2241,51 @@
     }
   }
 
+  function duplicateActiveObject(){
+    const obj = activeDesignObject();
+    if (!obj || typeof obj.clone !== 'function') return;
+    obj.clone(clone=>{
+      if (!clone) return;
+      applyObjectUiDefaults(clone);
+      ensureLayerId(clone);
+      clone.set({
+        left: (obj.left || 0) + 20,
+        top: (obj.top || 0) + 20
+      });
+      c.add(clone);
+      c.setActiveObject(clone);
+      c.requestRenderAll();
+      markDesignDirty();
+      syncLayerList();
+      syncMobileSelectionUi();
+    });
+  }
+
+  function removeActiveObject(){
+    const obj = activeDesignObject();
+    if (!obj) return;
+    c.remove(obj);
+    c.discardActiveObject();
+    c.requestRenderAll();
+    markDesignDirty();
+    syncLayerList();
+    syncMobileSelectionUi();
+  }
+
+  function toggleActiveVisibility(){
+    const obj = activeDesignObject();
+    if (!obj) return;
+    const next = obj.visible === false ? true : false;
+    obj.visible = next;
+    if (!next){
+      c.discardActiveObject();
+    }
+    c.requestRenderAll();
+    markDesignDirty();
+    syncLayerList();
+    syncMobileSelectionUi();
+  }
+
   function moveLayer(obj, delta){
     if (!isDesignObject(obj) || !Number.isInteger(delta) || !delta) return;
     const order = designObjects();
@@ -1853,6 +2301,7 @@
     markDesignDirty();
     syncLayerList();
     syncTextControls();
+    syncMobileSelectionUi();
   }
 
   function syncLayerList(){
@@ -1864,6 +2313,7 @@
       empty.className = 'nb-layer-empty';
       empty.textContent = 'Nincs feltöltött elem';
       layerListEl.appendChild(empty);
+      syncMobileSelectionUi();
       return;
     }
     const active = c.getActiveObject();
@@ -1921,6 +2371,7 @@
 
       layerListEl.appendChild(item);
     });
+    syncMobileSelectionUi();
   }
 
   function fitWithinArea(obj){
@@ -1998,6 +2449,7 @@
     updatePrintSummary();
     updatePriceDisplay();
     updateActionStates();
+    syncMobileSelectionUi();
   }
 
   function setMockupBgAndArea(){
@@ -2274,6 +2726,7 @@
   updateSideUiState();
   updateSideStatus();
   updatePrintSummary();
+  refreshMobileUi();
 
   sideButtons.forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -2287,6 +2740,81 @@
       if (!doubleSidedEnabled) return;
       const next = activeSideKey === 'front' ? 'back' : 'front';
       setActiveSide(next);
+    });
+  }
+
+  if (mobileMedia){
+    const mobileListener = ()=>{ refreshMobileUi(); };
+    if (typeof mobileMedia.addEventListener === 'function'){
+      mobileMedia.addEventListener('change', mobileListener);
+    } else if (typeof mobileMedia.addListener === 'function'){
+      mobileMedia.addListener(mobileListener);
+    }
+  }
+
+  if (mobileToolbarButtons.size){
+    mobileToolbarButtons.forEach((btn, key)=>{
+      if (!btn) return;
+      btn.addEventListener('click', ()=>{
+        if (!mobileUiEnabled()) return;
+        openMobileSheet(key);
+      });
+    });
+  }
+
+  if (mobileSheetClose){
+    mobileSheetClose.addEventListener('click', ()=>{
+      closeMobileSheet();
+    });
+  }
+
+  if (mobileSheetHandle){
+    mobileSheetHandle.addEventListener('pointerdown', beginSheetDrag);
+  }
+
+  Object.keys(mobileQuickButtons).forEach(key=>{
+    const btn = mobileQuickButtons[key];
+    if (!btn) return;
+    btn.addEventListener('click', ()=>{
+      if (btn.disabled) return;
+      switch(key){
+        case 'duplicate':
+          duplicateActiveObject();
+          break;
+        case 'delete':
+          removeActiveObject();
+          break;
+        case 'visibility':
+          toggleActiveVisibility();
+          break;
+        case 'forward':{
+          const obj = activeDesignObject();
+          if (obj) moveLayer(obj, 1);
+          break;
+        }
+        case 'backward':{
+          const obj = activeDesignObject();
+          if (obj) moveLayer(obj, -1);
+          break;
+        }
+      }
+    });
+  });
+
+  if (mobileCompleteBtn){
+    mobileCompleteBtn.addEventListener('click', ()=>{
+      if (!mobileUiEnabled()) return;
+      if (addToCartBtn && !addToCartBtn.disabled){
+        addToCartBtn.click();
+      }
+    });
+  }
+
+  if (mobileBulkBtn){
+    mobileBulkBtn.addEventListener('click', ()=>{
+      if (!mobileUiEnabled()) return;
+      if (mobileBulkBtn.disabled) return;
+      openBulkModal();
     });
   }
 
@@ -2342,9 +2870,9 @@
   c.on('object:rotating', e=>{ keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
   c.on('object:modified', e=>{ if (isDesignObject(e.target)){ markDesignDirty(); syncLayerList(); }});
   c.on('object:removed', e=>{ if (isDesignObject(e.target)){ markDesignDirty(); syncLayerList(); }});
-  c.on('selection:created', ()=>{ syncTextControls(); syncLayerList(); });
-  c.on('selection:updated', ()=>{ syncTextControls(); syncLayerList(); });
-  c.on('selection:cleared', ()=>{ syncTextControls(); syncLayerList(); });
+  c.on('selection:created', ()=>{ syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
+  c.on('selection:updated', ()=>{ syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
+  c.on('selection:cleared', ()=>{ syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('text:changed', e=>{ if (isDesignObject(e.target)) syncLayerList(); });
 
   if (fontFamilySel){
@@ -2443,6 +2971,10 @@
 
   document.addEventListener('keydown', evt=>{
     if (evt.key === 'Escape'){
+      if (mobileSheet && sheetState.activeKey){
+        closeMobileSheet();
+        return;
+      }
       if (bulkModal && !bulkModal.hidden){
         closeBulkModal();
         return;
@@ -2468,6 +3000,31 @@
 
   window.addEventListener('load', ()=>{
     setMockupBgAndArea();
+  });
+
+  if (typeof history !== 'undefined' && history.replaceState){
+    try {
+      history.replaceState({__nb_root:true}, document.title, location.href);
+    } catch(e){ /* ignore */ }
+  }
+
+  window.addEventListener('popstate', evt=>{
+    if (sheetState.historyDepth > 0 && sheetState.activeKey){
+      closeMobileSheet({fromPopState:true});
+      return;
+    }
+    if (sheetState.pendingClose){
+      sheetState.pendingClose = false;
+      return;
+    }
+    if (mobileUiEnabled()){
+      if (designState.dirty){
+        const leave = window.confirm('Kilépsz a tervezőből? A jelenlegi terv még nincs elmentve.');
+        if (!leave && typeof history !== 'undefined' && history.pushState){
+          history.pushState({__nb_root:true}, document.title, location.href);
+        }
+      }
+    }
   });
 
   syncLayerList();
