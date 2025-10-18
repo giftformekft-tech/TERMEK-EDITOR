@@ -2475,34 +2475,51 @@
 
   if (uploadInput){
     uploadInput.addEventListener('change', e=>{
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      const url = URL.createObjectURL(f);
-      fabric.Image.fromURL(url, img=>{
-        URL.revokeObjectURL(url);
-        const a = c.__nb_area || fallbackArea;
-        const maxW = a.w * 0.95;
-        const maxH = a.h * 0.95;
-        const scale = Math.min(1, maxW / img.width, maxH / img.height);
-        img.scale(scale);
-        img.set({
-          left: a.x + (a.w - img.getScaledWidth())/2,
-          top: a.y + (a.h - img.getScaledHeight())/2,
-          selectable: true,
-          cornerStyle: 'circle',
-          transparentCorners: false,
-          lockScalingFlip: true
-        });
-        applyObjectUiDefaults(img);
-        if (f && typeof f.name === 'string' && f.name){
-          const baseName = f.name.split(/[/\\]/).pop() || f.name;
-          img.__nb_layer_name = baseName.replace(/\.[^.]+$/, '') || 'Kép';
+      const file = e.target.files && e.target.files[0];
+      if (!file){
+        e.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = evt => {
+        const dataUrl = evt && evt.target && typeof evt.target.result === 'string'
+          ? evt.target.result
+          : '';
+        if (!dataUrl){
+          e.target.value = '';
+          return;
         }
-        c.add(img);
-        c.setActiveObject(img);
-        keepObjectInside(img);
-      });
-      e.target.value = '';
+        fabric.Image.fromURL(dataUrl, img=>{
+          const a = c.__nb_area || fallbackArea;
+          const maxW = a.w * 0.95;
+          const maxH = a.h * 0.95;
+          const scale = Math.min(1, maxW / img.width, maxH / img.height);
+          img.scale(scale);
+          img.set({
+            left: a.x + (a.w - img.getScaledWidth())/2,
+            top: a.y + (a.h - img.getScaledHeight())/2,
+            selectable: true,
+            cornerStyle: 'circle',
+            transparentCorners: false,
+            lockScalingFlip: true
+          });
+          applyObjectUiDefaults(img);
+          if (file && typeof file.name === 'string' && file.name){
+            const baseName = file.name.split(/[/\\]/).pop() || file.name;
+            img.__nb_layer_name = baseName.replace(/\.[^.]+$/, '') || 'Kép';
+          }
+          c.add(img);
+          c.setActiveObject(img);
+          keepObjectInside(img);
+        });
+        e.target.value = '';
+      };
+      reader.onerror = ()=>{
+        console.error('Nem sikerült beolvasni a képfájlt.');
+        e.target.value = '';
+      };
+      reader.readAsDataURL(file);
     });
   }
 
