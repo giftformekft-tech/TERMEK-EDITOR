@@ -36,6 +36,10 @@ function nb_calc_fee_for_design($design_id, $override_ctx = []){
   $size  = $price_ctx['size'] ?? '';
 
   $per = $global_per; $min = $global_min; $base = 0; $size_add = 0;
+  $printed_side_count = intval(get_post_meta($design_id,'printed_side_count',true));
+  if ($printed_side_count < 0){
+    $printed_side_count = 0;
+  }
 
   if (!empty($settings['catalog'][$pid])){
     $cfg = $settings['catalog'][$pid];
@@ -50,6 +54,17 @@ function nb_calc_fee_for_design($design_id, $override_ctx = []){
   }
 
   $fee = max($min, round($area_cm2 * $per)) + $base + $size_add;
+  if ($printed_side_count > 1){
+    $meta_double_fee = floatval(get_post_meta($design_id,'double_sided_fee',true));
+    if ($meta_double_fee > 0){
+      $fee += $meta_double_fee;
+    } else {
+      $global_double_fee = isset($settings['double_sided_fee']) ? floatval($settings['double_sided_fee']) : 0;
+      if ($global_double_fee > 0){
+        $fee += $global_double_fee;
+      }
+    }
+  }
   return max(0,$fee);
 }
 
@@ -128,6 +143,11 @@ add_action('woocommerce_checkout_create_order_line_item', function($item, $cart_
   if (!empty($values['print_url']))    $item->add_meta_data('print_url',$values['print_url']);
   if (!empty($values['print_width_px']))  $item->add_meta_data('print_width_px', intval($values['print_width_px']));
   if (!empty($values['print_height_px'])) $item->add_meta_data('print_height_px', intval($values['print_height_px']));
+  if (!empty($values['preview_back_url'])) $item->add_meta_data('preview_back_url',$values['preview_back_url']);
+  if (!empty($values['print_back_url']))   $item->add_meta_data('print_back_url',$values['print_back_url']);
+  if (!empty($values['print_back_width_px']))  $item->add_meta_data('print_back_width_px', intval($values['print_back_width_px']));
+  if (!empty($values['print_back_height_px'])) $item->add_meta_data('print_back_height_px', intval($values['print_back_height_px']));
+  if (!empty($values['nb_printed_side_count'])) $item->add_meta_data('nb_printed_side_count', intval($values['nb_printed_side_count']));
 
   $design_id = intval($values['nb_design_id'] ?? 0);
   if ($design_id && function_exists('nb_get_design_attribute_summary')){

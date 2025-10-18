@@ -177,6 +177,8 @@ function nb_admin_render(){
     } elseif ($tab==='pricing'){
       $settings['fee_per_cm2'] = isset($_POST['fee_per_cm2']) ? floatval($_POST['fee_per_cm2']) : 3;
       $settings['min_fee']     = isset($_POST['min_fee']) ? floatval($_POST['min_fee']) : 990;
+      $double_fee_raw = isset($_POST['double_sided_fee']) ? floatval($_POST['double_sided_fee']) : 0;
+      $settings['double_sided_fee'] = $double_fee_raw > 0 ? $double_fee_raw : 0;
       $bulkFrom = isset($_POST['bulk_from']) ? (array)$_POST['bulk_from'] : [];
       $bulkTo   = isset($_POST['bulk_to']) ? (array)$_POST['bulk_to'] : [];
       $bulkPct  = isset($_POST['bulk_discount']) ? (array)$_POST['bulk_discount'] : [];
@@ -328,6 +330,7 @@ function nb_admin_render(){
             $hash = md5($key);
             $catalog[$pid]['map'][$key] = [
               'mockup_index' => intval($_POST['mockup_'.$pid.'_'.$hash] ?? -1),
+              'mockup_back_index' => intval($_POST['mockup_back_'.$pid.'_'.$hash] ?? -1),
               'fee_per_cm2'  => $_POST['percm2_'.$pid.'_'.$hash] ?? '',
               'min_fee'      => $_POST['minfee_'.$pid.'_'.$hash] ?? '',
               'base_fee'     => $_POST['base_'.$pid.'_'.$hash] ?? '',
