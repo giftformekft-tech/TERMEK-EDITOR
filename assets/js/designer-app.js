@@ -311,6 +311,13 @@
   const uploadInput = document.getElementById('nb-upload');
   const addTextBtn = document.getElementById('nb-add-text');
   const layerListEl = document.getElementById('nb-layer-list');
+  const summaryCardEl = document.querySelector('.nb-summary-card');
+  if (summaryCardEl){
+    const straySummaryToggle = summaryCardEl.querySelector('.nb-double-sided');
+    if (straySummaryToggle){
+      straySummaryToggle.remove();
+    }
+  }
   const doubleSidedToggle = document.getElementById('nb-double-sided-toggle');
   const sideStatusEl = document.getElementById('nb-side-status');
   const printSummaryEl = document.getElementById('nb-print-summary');
