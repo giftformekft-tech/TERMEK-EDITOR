@@ -1694,6 +1694,15 @@
     const state = ensureSideState(key);
     const json = cloneSideJson(state);
     return new Promise(resolve=>{
+      const existing = c.getObjects ? c.getObjects().slice() : [];
+      existing.forEach(obj=>{
+        c.remove(obj);
+      });
+      c.__nb_area = null;
+      c.__nb_area_rect = null;
+      if (typeof c.discardActiveObject === 'function'){
+        c.discardActiveObject();
+      }
       c.loadFromJSON(json, ()=>{
         setMockupBgAndArea();
         designObjects().forEach(obj=>{
@@ -1944,6 +1953,7 @@
   }
 
   function markDesignDirty(){
+    if (sideLoading) return;
     designState.savedDesignId = null;
     designState.dirty = true;
     captureActiveSideState();
