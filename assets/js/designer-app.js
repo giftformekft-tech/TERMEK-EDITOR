@@ -2719,6 +2719,19 @@
 
   const TEXT_CURVE_MIN_FONT_SIZE = 12;
 
+  function curveCanvasContentWidth(){
+    if (c && typeof c.getWidth === 'function'){
+      const canvasWidth = c.getWidth();
+      if (Number.isFinite(canvasWidth) && canvasWidth > 0){
+        return Math.round(canvasWidth);
+      }
+    }
+    if (Number.isFinite(baseCanvasSize.w) && baseCanvasSize.w > 0){
+      return Math.round(baseCanvasSize.w);
+    }
+    return 0;
+  }
+
   function measureTextboxWidth(textbox){
     if (!textbox || textbox.type !== 'textbox') return 0;
     const widths = [];
@@ -2836,6 +2849,13 @@
     return fontSize;
   }
 
+  function ensureTextboxCurveWidth(textbox){
+    if (!textbox || textbox.type !== 'textbox') return null;
+    const maxWidth = curveCanvasContentWidth();
+    if (!Number.isFinite(maxWidth) || maxWidth <= 0) return null;
+    return shrinkTextboxFontToFit(textbox, maxWidth);
+  }
+
   function collapseTextboxMultilineForCurve(textbox){
     if (!textbox || textbox.type !== 'textbox') return;
     const textValue = typeof textbox.text === 'string' ? textbox.text : '';
@@ -2877,11 +2897,12 @@
     if (typeof textbox.initDimensions === 'function'){
       textbox.initDimensions();
     }
-    if (Number.isFinite(originalWidth)){
-      const adjustedSize = shrinkTextboxFontToFit(textbox, originalWidth);
-      if (Number.isFinite(adjustedSize)){
-        targetSize = adjustedSize;
-      }
+    let adjustedSize = ensureTextboxCurveWidth(textbox);
+    if (!Number.isFinite(adjustedSize) && Number.isFinite(originalWidth)){
+      adjustedSize = shrinkTextboxFontToFit(textbox, originalWidth);
+    }
+    if (Number.isFinite(adjustedSize)){
+      targetSize = adjustedSize;
     }
     textbox.dirty = true;
     if (typeof textbox.setCoords === 'function') textbox.setCoords();
@@ -2894,7 +2915,8 @@
     if (c && typeof c.requestRenderAll === 'function') c.requestRenderAll();
     const backup = textbox.__nb_curve_multilineBackup;
     if (backup && typeof backup === 'object'){
-      backup.flattenedSize = Math.round(targetSize);
+      const currentSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : targetSize;
+      backup.flattenedSize = Math.round(currentSize);
     }
   }
 
@@ -2965,6 +2987,7 @@
     const curveActive = cfg.enabled && Math.abs(cfg.amount) >= 1 && hasText;
     if (curveActive){
       collapseTextboxMultilineForCurve(textbox);
+      ensureTextboxCurveWidth(textbox);
       textValue = typeof textbox.text === 'string' ? textbox.text : '';
     } else {
       restoreTextboxMultilineFromCurve(textbox);
