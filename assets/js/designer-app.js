@@ -315,6 +315,9 @@
   const fontBoldToggle = document.getElementById('nb-font-bold');
   const fontItalicToggle = document.getElementById('nb-font-italic');
   const alignButtons = Array.from(document.querySelectorAll('[data-nb-align]'));
+  const textCurveToggle = document.getElementById('nb-text-curve-toggle');
+  const textCurveInput = document.getElementById('nb-text-curve');
+  const textCurveValue = document.getElementById('nb-text-curve-value');
   const clearButton = document.getElementById('nb-clear-design');
   const addToCartBtn = document.getElementById('nb-add-to-cart');
   const uploadInput = document.getElementById('nb-upload');
@@ -1714,7 +1717,7 @@
   }
 
   function sanitizeCanvasJSON(){
-    const raw = c.toJSON(['__nb_layer_id','__nb_layer_name']);
+    const raw = c.toJSON(['__nb_layer_id','__nb_layer_name','__nb_curve']);
     const clean = Object.assign({}, raw);
     clean.background = 'rgba(0,0,0,0)';
     clean.backgroundImage = null;
@@ -2170,6 +2173,7 @@
         designObjects().forEach(obj=>{
           applyObjectUiDefaults(obj);
           ensureLayerId(obj);
+          initializeTextboxCurve(obj);
         });
         c.discardActiveObject();
         captureActiveSideState();
@@ -2605,16 +2609,121 @@
     }
   }
 
+  const TEXT_CURVE_MIN = -100;
+  const TEXT_CURVE_MAX = 100;
+
+  function clampCurveAmount(value){
+    if (!Number.isFinite(value)) return 0;
+    const rounded = Math.round(value);
+    if (rounded > TEXT_CURVE_MAX) return TEXT_CURVE_MAX;
+    if (rounded < TEXT_CURVE_MIN) return TEXT_CURVE_MIN;
+    return rounded;
+  }
+
+  function defaultCurveState(){
+    return {enabled: false, amount: 0};
+  }
+
+  function ensureTextboxCurveState(textbox){
+    if (!textbox || textbox.type !== 'textbox') return defaultCurveState();
+    const raw = textbox.__nb_curve;
+    const normalized = {
+      enabled: !!(raw && typeof raw === 'object' && raw.enabled),
+      amount: clampCurveAmount(raw && typeof raw === 'object' ? raw.amount : 0)
+    };
+    textbox.__nb_curve = normalized;
+    if (typeof textbox.set === 'function'){
+      textbox.set('__nb_curve', normalized);
+    }
+    return normalized;
+  }
+
+  function formatCurveLabel(amount, enabled){
+    if (!enabled || Math.abs(amount) < 1){
+      return 'Egyenes';
+    }
+    const direction = amount > 0 ? 'Felfelé ív' : 'Lefelé ív';
+    return `${direction} (${Math.abs(amount)})`;
+  }
+
+  function ensureTextboxCurveBinding(textbox){
+    if (!textbox || textbox.type !== 'textbox') return;
+    if (textbox.__nb_curve_bound) return;
+    textbox.__nb_curve_bound = true;
+    textbox.on('changed', ()=>applyTextboxCurve(textbox));
+    textbox.on('modified', ()=>applyTextboxCurve(textbox));
+  }
+
+  function curveDefaultAmount(textbox){
+    if (!textbox || textbox.type !== 'textbox') return 35;
+    const width = Math.max(80, textbox.width || 0);
+    if (width >= 260) return 30;
+    if (width >= 200) return 35;
+    return 40;
+  }
+
+  function applyTextboxCurve(textbox, state){
+    if (!textbox || textbox.type !== 'textbox') return;
+    const cfg = state ? {enabled: !!state.enabled, amount: clampCurveAmount(state.amount)} : ensureTextboxCurveState(textbox);
+    if (!cfg.enabled || Math.abs(cfg.amount) < 1){
+      textbox.path = null;
+      textbox.pathStartOffset = 0;
+      textbox.pathSide = 'left';
+      textbox.pathAlign = 'center';
+      textbox.dirty = true;
+      if (typeof textbox.setCoords === 'function') textbox.setCoords();
+      return;
+    }
+    const width = Math.max(20, textbox.width || 0);
+    const amplitude = (cfg.amount / 100) * width * 0.8;
+    const curvePath = new fabric.Path(`M ${-width/2} 0 Q 0 ${-amplitude} ${width/2} 0`, {
+      visible: false,
+      evented: false
+    });
+    curvePath.pathOffset = new fabric.Point(0, 0);
+    textbox.path = curvePath;
+    textbox.pathStartOffset = 0;
+    textbox.pathAlign = 'center';
+    textbox.pathSide = cfg.amount >= 0 ? 'left' : 'right';
+    textbox.dirty = true;
+    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+  }
+
+  function storeTextboxCurveState(textbox, state){
+    if (!textbox || textbox.type !== 'textbox') return;
+    const cfg = state ? {enabled: !!state.enabled, amount: clampCurveAmount(state.amount)} : defaultCurveState();
+    textbox.__nb_curve = cfg;
+    if (typeof textbox.set === 'function'){
+      textbox.set('__nb_curve', cfg);
+    }
+    ensureTextboxCurveBinding(textbox);
+    applyTextboxCurve(textbox, cfg);
+  }
+
+  function initializeTextboxCurve(textbox){
+    if (!textbox || textbox.type !== 'textbox') return;
+    const cfg = ensureTextboxCurveState(textbox);
+    ensureTextboxCurveBinding(textbox);
+    applyTextboxCurve(textbox, cfg);
+  }
+
   function syncTextControls(){
     const textbox = activeTextbox();
     const hasTextbox = !!textbox;
-    const controls = [fontFamilySel, fontSizeInput, fontColorInput, fontBoldToggle, fontItalicToggle].concat(alignButtons);
+    if (textbox) initializeTextboxCurve(textbox);
+    const controls = [fontFamilySel, fontSizeInput, fontColorInput, fontBoldToggle, fontItalicToggle, textCurveToggle, textCurveInput].concat(alignButtons);
     controls.forEach(ctrl=>{ if (ctrl) ctrl.disabled = !hasTextbox; });
     if (!hasTextbox){
       setPressed(fontBoldToggle, false);
       setPressed(fontItalicToggle, false);
       alignButtons.forEach(btn=>setPressed(btn, false));
       if (fontSizeValue) fontSizeValue.textContent = (fontSizeInput ? fontSizeInput.value : '0') + ' px';
+      if (textCurveToggle) setPressed(textCurveToggle, false);
+      if (textCurveInput){
+        textCurveInput.value = '0';
+        textCurveInput.disabled = true;
+      }
+      if (textCurveValue) textCurveValue.textContent = 'Egyenes';
       return;
     }
     if (fontFamilySel){
@@ -2642,6 +2751,18 @@
     alignButtons.forEach(btn=>{
       setPressed(btn, textbox.textAlign === btn.dataset.nbAlign);
     });
+    const curveState = ensureTextboxCurveState(textbox);
+    if (textCurveToggle){
+      textCurveToggle.disabled = false;
+      setPressed(textCurveToggle, !!curveState.enabled);
+    }
+    if (textCurveInput){
+      textCurveInput.disabled = !(curveState.enabled && hasTextbox);
+      textCurveInput.value = clampCurveAmount(curveState.amount).toString();
+    }
+    if (textCurveValue){
+      textCurveValue.textContent = formatCurveLabel(curveState.amount, curveState.enabled && hasTextbox);
+    }
   }
 
   function currentFontFamily(){
@@ -2897,6 +3018,7 @@
       applyObjectUiDefaults(e.target);
       ensureLayerId(e.target);
       keepObjectInside(e.target);
+      initializeTextboxCurve(e.target);
       markDesignDirty();
       syncLayerList();
     }
@@ -2909,7 +3031,16 @@
   c.on('selection:created', ()=>{ syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('selection:updated', ()=>{ syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('selection:cleared', ()=>{ syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
-  c.on('text:changed', e=>{ if (isDesignObject(e.target)) syncLayerList(); });
+  c.on('text:changed', e=>{
+    if (!isDesignObject(e.target)) return;
+    initializeTextboxCurve(e.target);
+    applyTextboxCurve(e.target);
+    markDesignDirty();
+    if (typeof c.requestRenderAll === 'function'){
+      c.requestRenderAll();
+    }
+    syncLayerList();
+  });
 
   if (fontFamilySel){
     fontFamilySel.onchange = ()=>{
@@ -2956,6 +3087,39 @@
       applyToActiveText(obj=>{ obj.set('textAlign', value); });
     };
   });
+
+  if (textCurveToggle){
+    textCurveToggle.onclick = ()=>{
+      const next = textCurveToggle.getAttribute('aria-pressed') !== 'true';
+      setPressed(textCurveToggle, next);
+      applyToActiveText(obj=>{
+        const state = ensureTextboxCurveState(obj);
+        state.enabled = next;
+        if (next && Math.abs(state.amount) < 1){
+          state.amount = curveDefaultAmount(obj);
+        }
+        storeTextboxCurveState(obj, state);
+      });
+      syncTextControls();
+    };
+  }
+
+  if (textCurveInput){
+    textCurveInput.addEventListener('input', ()=>{
+      const raw = parseInt(textCurveInput.value, 10);
+      const value = clampCurveAmount(Number.isFinite(raw) ? raw : 0);
+      if (textCurveValue){
+        const enabled = textCurveToggle ? textCurveToggle.getAttribute('aria-pressed') === 'true' : false;
+        textCurveValue.textContent = formatCurveLabel(value, enabled);
+      }
+      applyToActiveText(obj=>{
+        const state = ensureTextboxCurveState(obj);
+        state.amount = value;
+        storeTextboxCurveState(obj, state);
+      });
+      syncTextControls();
+    });
+  }
 
   if (productModalTrigger){
     productModalTrigger.addEventListener('click', openProductModal);
@@ -3093,6 +3257,7 @@
         lockScalingFlip:true
       });
       applyObjectUiDefaults(t);
+      initializeTextboxCurve(t);
       c.add(t).setActiveObject(t);
       keepObjectInside(t);
       syncTextControls();
