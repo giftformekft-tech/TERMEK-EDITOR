@@ -2,19 +2,27 @@
   <div class="nb-designer-shell">
     <aside class="nb-column nb-column--actions">
       <div class="nb-action-card nb-action-card--product">
-        <button type="button" class="nb-hero-button" id="nb-product-modal-trigger">
-          <span class="nb-hero-icon">🛍️</span>
-          <span>Válassz terméket</span>
-        </button>
-        <button type="button" class="nb-hero-button nb-hero-button--secondary" id="nb-color-modal-trigger">
-          <span class="nb-hero-icon">🎨</span>
-          <span id="nb-color-modal-label">Válassz színt</span>
-        </button>
-        <div class="nb-card-body">
-          <div class="nb-size-group">
-            <span class="nb-field-label">Méret</span>
-            <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
+        <div class="nb-sheet-section" data-nb-sheet-source="product" data-nb-sheet-title="Terméktípus">
+          <button type="button" class="nb-hero-button" id="nb-product-modal-trigger">
+            <span class="nb-hero-icon">👕</span>
+            <span>Válassz terméket</span>
+          </button>
+        </div>
+        <div class="nb-sheet-section" data-nb-sheet-source="color" data-nb-sheet-title="Színválasztás">
+          <button type="button" class="nb-hero-button nb-hero-button--secondary" id="nb-color-modal-trigger">
+            <span class="nb-hero-icon">🎨</span>
+            <span id="nb-color-modal-label">Válassz színt</span>
+          </button>
+        </div>
+        <div class="nb-sheet-section" data-nb-sheet-source="size" data-nb-sheet-title="Méret és készlet">
+          <div class="nb-card-body">
+            <div class="nb-size-group">
+              <span class="nb-field-label">Méret</span>
+              <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
+            </div>
           </div>
+        </div>
+        <div class="nb-sheet-section" data-nb-sheet-source="double" data-nb-sheet-title="Kétoldalas nyomtatás">
           <div class="nb-double-sided" id="nb-double-sided">
             <label class="nb-double-sided-toggle">
               <input type="checkbox" id="nb-double-sided-toggle">
@@ -31,7 +39,7 @@
         </div>
       </div>
 
-      <div class="nb-action-card">
+      <div class="nb-action-card" data-nb-sheet-source="upload" data-nb-sheet-title="Saját képek">
         <label class="nb-hero-button nb-hero-button--upload">
           <span class="nb-hero-icon">⬆</span>
           <span>Tölts fel saját képet</span>
@@ -40,10 +48,17 @@
         <button type="button" id="nb-clear-design" class="nb-subtle-link">Terv ürítése</button>
       </div>
 
+      <div class="nb-action-card nb-action-card--saved" data-nb-sheet-source="elements" data-nb-sheet-title="Mentett minták">
+        <div class="nb-card-body">
+          <h3 class="nb-card-title">Mentett minták</h3>
+          <p class="nb-empty">Itt fognak megjelenni a kedvencek és a legutóbbi elemek.</p>
+        </div>
+      </div>
+
     </aside>
 
     <main class="nb-column nb-column--stage">
-      <div class="nb-stage-controls">
+      <div class="nb-stage-controls" data-nb-sheet-source="sides" data-nb-sheet-title="Előlap / Hátlap">
         <div class="nb-side-toggle" role="tablist" aria-label="Oldal választó">
           <button type="button" class="nb-side-button is-active" data-nb-side="front" aria-pressed="true">Előlap</button>
           <button type="button" class="nb-side-button" data-nb-side="back" aria-pressed="false">Hátlap</button>
@@ -61,7 +76,7 @@
     </main>
 
     <aside class="nb-column nb-column--summary">
-      <div class="nb-action-card">
+      <div class="nb-action-card" data-nb-sheet-source="text" data-nb-sheet-title="Szöveg">
         <button type="button" id="nb-add-text" class="nb-hero-button nb-hero-button--accent">
           <span class="nb-hero-icon">✎</span>
           <span>Írj saját feliratot</span>
@@ -93,7 +108,7 @@
           </div>
         </div>
       </div>
-      <div class="nb-action-card nb-action-card--layers">
+      <div class="nb-action-card nb-action-card--layers" data-nb-sheet-source="layers" data-nb-sheet-title="Rétegek">
         <div class="nb-card-header">
           <h3>Rétegek</h3>
         </div>
@@ -144,6 +159,60 @@
   <select id="nb-product" class="nb-hidden"></select>
   <select id="nb-color" class="nb-hidden"></select>
   <select id="nb-size" class="nb-hidden"></select>
+
+  <div class="nb-mobile-toolbar" id="nb-mobile-toolbar" hidden>
+    <div class="nb-mobile-toolbar-row">
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="sides" aria-label="Előlap / hátlap">
+        <span class="nb-mobile-icon-symbol">⇄½</span>
+        <span class="nb-mobile-icon-label">Oldalak</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="upload" aria-label="Feltöltés">
+        <span class="nb-mobile-icon-symbol">⬆</span>
+        <span class="nb-mobile-icon-label">Feltöltés</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="text" aria-label="Szöveg">
+        <span class="nb-mobile-icon-symbol">✎</span>
+        <span class="nb-mobile-icon-label">Szöveg</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="product" aria-label="Terméktípus">
+        <span class="nb-mobile-icon-symbol">👕</span>
+        <span class="nb-mobile-icon-label">Termék</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="layers" aria-label="Rétegek">
+        <span class="nb-mobile-icon-symbol">🧱</span>
+        <span class="nb-mobile-icon-label">Rétegek</span>
+        <span class="nb-mobile-icon-badge" hidden></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="nb-mobile-status" id="nb-mobile-status" hidden>
+    <div class="nb-mobile-status-info">
+      <span class="nb-mobile-selection" id="nb-mobile-selection-label">Nincs kiválasztott elem</span>
+      <div class="nb-mobile-quick-actions">
+        <button type="button" class="nb-mobile-quick" data-nb-mobile-action="duplicate" disabled>Dupláz</button>
+        <button type="button" class="nb-mobile-quick" data-nb-mobile-action="delete" disabled>Töröl</button>
+        <button type="button" class="nb-mobile-quick" data-nb-mobile-action="visibility" disabled>Elrejt</button>
+        <button type="button" class="nb-mobile-quick" data-nb-mobile-action="forward" disabled>Előre</button>
+        <button type="button" class="nb-mobile-quick" data-nb-mobile-action="backward" disabled>Hátra</button>
+      </div>
+    </div>
+    <div class="nb-mobile-status-actions">
+      <button type="button" class="nb-mobile-complete" id="nb-mobile-complete">Kosárba</button>
+      <div class="nb-mobile-total" id="nb-mobile-price-total" aria-live="polite">—</div>
+      <button type="button" class="nb-mobile-secondary" id="nb-mobile-bulk">Többet vennék</button>
+    </div>
+  </div>
+
+  <div class="nb-mobile-overlay" id="nb-mobile-sheet-overlay" hidden></div>
+  <div class="nb-mobile-sheet" id="nb-mobile-sheet" hidden aria-hidden="true" role="dialog" aria-modal="false">
+    <div class="nb-mobile-sheet-handle" id="nb-mobile-sheet-handle" aria-hidden="true"></div>
+    <div class="nb-mobile-sheet-header">
+      <h2 id="nb-mobile-sheet-title"></h2>
+      <button type="button" class="nb-mobile-sheet-close" id="nb-mobile-sheet-close" aria-label="Bezárás">×</button>
+    </div>
+    <div class="nb-mobile-sheet-content" id="nb-mobile-sheet-content"></div>
+  </div>
 
   <div class="nb-modal" id="nb-product-modal" hidden>
     <div class="nb-modal-backdrop" data-nb-close="product-modal"></div>
