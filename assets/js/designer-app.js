@@ -309,6 +309,7 @@
   const priceTotalEl = document.getElementById('nb-price-total');
   const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
   const fontFamilySel = document.getElementById('nb-font-family');
+  const DEFAULT_FONT_SIZE = 24;
   const fontSizeInput = document.getElementById('nb-font-size');
   const fontSizeValue = document.getElementById('nb-font-size-value');
   const fontColorInput = document.getElementById('nb-font-color');
@@ -2773,7 +2774,7 @@
     if (!textbox || textbox.type !== 'textbox') return;
     const textValue = typeof textbox.text === 'string' ? textbox.text : '';
     if (!textValue.length || textValue.indexOf('\n') === -1) return;
-    const originalFontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
+    const originalFontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : DEFAULT_FONT_SIZE;
     const originalWidth = measureTextboxWidth(textbox);
     const rawLines = textValue.split('\n');
     const condensed = rawLines.map(line=>line.trim()).filter(line=>line.length);
@@ -2859,7 +2860,7 @@
     textbox.dirty = true;
     if (typeof textbox.setCoords === 'function') textbox.setCoords();
     if (fontSizeInput){
-      const nextSize = Math.round(textbox.fontSize || updates.fontSize || backup.fontSize || 48);
+      const nextSize = Math.round(textbox.fontSize || updates.fontSize || backup.fontSize || DEFAULT_FONT_SIZE);
       fontSizeInput.value = nextSize;
       if (fontSizeValue) fontSizeValue.textContent = nextSize + ' px';
     }
@@ -2942,7 +2943,7 @@
     const nextStyles = cloneTextboxStyles(baseStyles);
     const lines = textValue.split('\n');
     if (lines.length > 1){
-      const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
+      const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : DEFAULT_FONT_SIZE;
       const lineHeight = Number.isFinite(textbox.lineHeight) ? textbox.lineHeight : 1.16;
       const step = Math.max(1, fontSize * lineHeight);
       const direction = cfg.amount >= 0 ? 1 : -1;
@@ -3024,7 +3025,7 @@
       }
     }
     if (fontSizeInput){
-      const size = Math.round(textbox.fontSize || parseInt(fontSizeInput.value,10) || 48);
+      const size = Math.round(textbox.fontSize || parseInt(fontSizeInput.value,10) || DEFAULT_FONT_SIZE);
       fontSizeInput.value = size;
       if (fontSizeValue) fontSizeValue.textContent = size + ' px';
     }
@@ -3055,7 +3056,7 @@
   }
 
   function currentFontSize(){
-    return fontSizeInput ? parseInt(fontSizeInput.value, 10) || 48 : 48;
+    return fontSizeInput ? parseInt(fontSizeInput.value, 10) || DEFAULT_FONT_SIZE : DEFAULT_FONT_SIZE;
   }
 
   function currentFontColor(){
