@@ -2719,23 +2719,75 @@
 
   const TEXT_CURVE_MIN_FONT_SIZE = 12;
 
+  function measureTextboxWidth(textbox){
+    if (!textbox || textbox.type !== 'textbox') return 0;
+    const widths = [];
+    const rawWidth = Number.isFinite(textbox.width) ? textbox.width : null;
+    if (Number.isFinite(rawWidth)) widths.push(rawWidth);
+    if (typeof textbox.getScaledWidth === 'function'){
+      const scaled = textbox.getScaledWidth();
+      if (Number.isFinite(scaled)) widths.push(scaled);
+    }
+    if (typeof textbox.calcTextWidth === 'function'){
+      const calc = textbox.calcTextWidth();
+      if (Number.isFinite(calc)) widths.push(calc);
+    }
+    if (!widths.length){
+      return 0;
+    }
+    return Math.max.apply(null, widths);
+  }
+
+  function shrinkTextboxFontToFit(textbox, maxWidth){
+    if (!textbox || textbox.type !== 'textbox') return null;
+    if (!Number.isFinite(maxWidth) || maxWidth <= 0) return null;
+    let fontSize = Number.isFinite(textbox.fontSize) ? Math.round(textbox.fontSize) : null;
+    if (!Number.isFinite(fontSize)) return null;
+    if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
+    let currentWidth = measureTextboxWidth(textbox);
+    if (!Number.isFinite(currentWidth) || currentWidth <= maxWidth) return fontSize;
+    const minSize = TEXT_CURVE_MIN_FONT_SIZE;
+    let iterations = 0;
+    while (currentWidth > maxWidth && fontSize > minSize && iterations < 25){
+      fontSize = Math.max(minSize, Math.round(fontSize * 0.9));
+      if (typeof textbox.set === 'function'){
+        textbox.set('fontSize', fontSize);
+      } else {
+        textbox.fontSize = fontSize;
+      }
+      if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
+      currentWidth = measureTextboxWidth(textbox);
+      iterations++;
+    }
+    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    textbox.dirty = true;
+    if (fontSizeInput){
+      fontSizeInput.value = fontSize;
+      if (fontSizeValue) fontSizeValue.textContent = fontSize + ' px';
+    }
+    if (c && typeof c.requestRenderAll === 'function') c.requestRenderAll();
+    return fontSize;
+  }
+
   function collapseTextboxMultilineForCurve(textbox){
     if (!textbox || textbox.type !== 'textbox') return;
     const textValue = typeof textbox.text === 'string' ? textbox.text : '';
     if (!textValue.length || textValue.indexOf('\n') === -1) return;
     const originalFontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
+    const originalWidth = measureTextboxWidth(textbox);
     const rawLines = textValue.split('\n');
     const condensed = rawLines.map(line=>line.trim()).filter(line=>line.length);
     const joined = (condensed.length ? condensed : rawLines).join(' ');
     const normalizedText = joined.replace(/\s{2,}/g, ' ').trim();
     if (!normalizedText.length) return;
     const lineCount = Math.max(1, condensed.length || rawLines.length);
-    const targetSize = Math.max(TEXT_CURVE_MIN_FONT_SIZE, Math.round(originalFontSize / lineCount));
+    let targetSize = Math.max(TEXT_CURVE_MIN_FONT_SIZE, Math.round(originalFontSize / lineCount));
     textbox.__nb_curve_multilineBackup = {
       text: textValue,
       fontSize: originalFontSize,
       flattened: normalizedText,
-      flattenedSize: targetSize
+      flattenedSize: targetSize,
+      originalWidth: Number.isFinite(originalWidth) ? originalWidth : null
     };
     const updates = {};
     if (textbox.text !== normalizedText){
@@ -2754,6 +2806,12 @@
     if (typeof textbox.initDimensions === 'function'){
       textbox.initDimensions();
     }
+    if (Number.isFinite(originalWidth)){
+      const adjustedSize = shrinkTextboxFontToFit(textbox, originalWidth);
+      if (Number.isFinite(adjustedSize)){
+        targetSize = adjustedSize;
+      }
+    }
     textbox.dirty = true;
     if (typeof textbox.setCoords === 'function') textbox.setCoords();
     if (fontSizeInput){
@@ -2762,6 +2820,10 @@
       if (fontSizeValue) fontSizeValue.textContent = nextSize + ' px';
     }
     if (c && typeof c.requestRenderAll === 'function') c.requestRenderAll();
+    const backup = textbox.__nb_curve_multilineBackup;
+    if (backup && typeof backup === 'object'){
+      backup.flattenedSize = Math.round(targetSize);
+    }
   }
 
   function restoreTextboxMultilineFromCurve(textbox){
@@ -2808,13 +2870,15 @@
   function applyTextboxCurve(textbox, state){
     if (!textbox || textbox.type !== 'textbox') return;
     const cfg = state ? {enabled: !!state.enabled, amount: clampCurveAmount(state.amount)} : ensureTextboxCurveState(textbox);
-    const textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    let textValue = typeof textbox.text === 'string' ? textbox.text : '';
     const hasText = !!(textValue && textValue.length);
     const curveActive = cfg.enabled && Math.abs(cfg.amount) >= 1 && hasText;
     if (curveActive){
       collapseTextboxMultilineForCurve(textbox);
+      textValue = typeof textbox.text === 'string' ? textbox.text : '';
     } else {
       restoreTextboxMultilineFromCurve(textbox);
+      textValue = typeof textbox.text === 'string' ? textbox.text : '';
     }
     const baseStyles = baseTextboxStyles(textbox);
     const assignStyles = styles=>{
@@ -2859,7 +2923,12 @@
       delete textbox.__nb_curve_baseStyles;
       return;
     }
-    const width = Math.max(20, textbox.width || 0);
+    if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
+    let width = measureTextboxWidth(textbox);
+    if (!Number.isFinite(width) || width <= 0){
+      width = Math.max(20, textbox.width || 0);
+    }
+    width = Math.max(20, width);
     const amplitude = (cfg.amount / 100) * width * 0.8;
     const curvePath = new fabric.Path(`M ${-width/2} 0 Q 0 ${-amplitude} ${width/2} 0`, {
       visible: false,
