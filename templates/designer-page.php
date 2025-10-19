@@ -199,6 +199,10 @@
     </div>
     <div class="nb-mobile-status-actions">
       <button type="button" class="nb-mobile-complete" id="nb-mobile-complete">Kosárba</button>
+      <div class="nb-mobile-total" id="nb-mobile-total">
+        <span class="nb-mobile-total-label">Végösszeg:</span>
+        <span class="nb-mobile-total-value" id="nb-price-total-mobile">—</span>
+      </div>
       <button type="button" class="nb-mobile-secondary" id="nb-mobile-bulk">Többet vennék</button>
     </div>
   </div>
