@@ -1874,7 +1874,25 @@
   }
 
   function mobileUiEnabled(){
-    return !!(mobileMedia && typeof mobileMedia.matches === 'boolean' && mobileMedia.matches);
+    if (mobileMedia && typeof mobileMedia.matches === 'boolean'){
+      return mobileMedia.matches;
+    }
+    if (typeof window !== 'undefined'){
+      let width = 0;
+      if (typeof window.innerWidth === 'number' && window.innerWidth > 0){
+        width = window.innerWidth;
+      } else if (typeof document !== 'undefined'){
+        const docEl = document.documentElement;
+        const body = document.body;
+        if (docEl && typeof docEl.clientWidth === 'number' && docEl.clientWidth > 0){
+          width = docEl.clientWidth;
+        } else if (body && typeof body.clientWidth === 'number' && body.clientWidth > 0){
+          width = body.clientWidth;
+        }
+      }
+      return width > 0 && width <= 768;
+    }
+    return false;
   }
 
   function syncMobileCompleteState(){
@@ -3060,6 +3078,7 @@
     resizeRaf = requestAnimationFrame(()=>{
       refreshControlProfile();
       setMockupBgAndArea();
+      refreshMobileUi();
     });
   });
 
