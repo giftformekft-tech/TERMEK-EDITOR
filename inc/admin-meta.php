@@ -1059,13 +1059,66 @@ if (! function_exists('nb_get_cart_item_preview_url')) {
     }
 
     foreach ($candidates as $candidate){
-      $candidate = esc_url($candidate);
-      if ($candidate !== ''){
+      $candidate = trim((string) $candidate);
+      if ($candidate === ''){
+        continue;
+      }
+
+      $sanitized = esc_url_raw($candidate);
+      if ($sanitized !== ''){
+        return $sanitized;
+      }
+
+      // Allow data URLs as a last resort in case previews are inlined.
+      if (strpos($candidate, 'data:') === 0){
         return $candidate;
       }
     }
 
     return '';
+  }
+}
+
+if (! function_exists('nb_generate_cart_item_preview_image')) {
+  function nb_generate_cart_item_preview_image($preview, $alt = ''){
+    $raw_preview = trim((string) $preview);
+    if ($raw_preview === ''){
+      return [];
+    }
+
+    $sanitized_preview = esc_url_raw($raw_preview);
+    if ($sanitized_preview === '' && strpos($raw_preview, 'data:') === 0){
+      $sanitized_preview = $raw_preview;
+    }
+
+    if ($sanitized_preview === ''){
+      return [];
+    }
+
+    $alt = is_string($alt) ? $alt : '';
+
+    $image_size = function_exists('wc_get_image_size') ? wc_get_image_size('woocommerce_thumbnail') : null;
+    $width = (is_array($image_size) && ! empty($image_size['width'])) ? intval($image_size['width']) : 0;
+    $height = (is_array($image_size) && ! empty($image_size['height'])) ? intval($image_size['height']) : 0;
+
+    $img = [
+      'id' => 0,
+      'src' => $sanitized_preview,
+      'thumbnail' => $sanitized_preview,
+      'srcset' => $sanitized_preview,
+      'sizes' => '',
+      'name' => $alt,
+      'alt' => $alt,
+    ];
+
+    if ($width > 0){
+      $img['width'] = $width;
+    }
+    if ($height > 0){
+      $img['height'] = $height;
+    }
+
+    return $img;
   }
 }
 
@@ -1081,21 +1134,23 @@ if (! function_exists('nb_render_cart_item_preview_thumbnail')) {
       $alt = $cart_item['data']->get_name();
     }
 
-    $width_attr = '';
-    $height_attr = '';
-    if (function_exists('wc_get_image_size')){
-      $image_size = wc_get_image_size('woocommerce_thumbnail');
-      if (is_array($image_size)){
-        if (! empty($image_size['width'])){
-          $width_attr = ' width="'.intval($image_size['width']).'"';
-        }
-        if (! empty($image_size['height'])){
-          $height_attr = ' height="'.intval($image_size['height']).'"';
-        }
-      }
+    $image_data = nb_generate_cart_item_preview_image($preview, $alt);
+    if (empty($image_data['src'])){
+      return $thumbnail;
     }
 
-    return '<img src="'.$preview.'" alt="'.esc_attr($alt).'" class="nb-cart-item-thumbnail attachment-woocommerce_thumbnail size-woocommerce_thumbnail" loading="lazy" decoding="async"'.$width_attr.$height_attr.' />';
+    $width_attr = '';
+    $height_attr = '';
+    if (! empty($image_data['width'])){
+      $width_attr = ' width="'.intval($image_data['width']).'"';
+    }
+    if (! empty($image_data['height'])){
+      $height_attr = ' height="'.intval($image_data['height']).'"';
+    }
+
+    $attributes = ' class="nb-cart-item-thumbnail attachment-woocommerce_thumbnail size-woocommerce_thumbnail" loading="lazy" decoding="async"';
+
+    return '<img src="'.$image_data['src'].'" alt="'.esc_attr($alt).'"'.$attributes.$width_attr.$height_attr.' />';
   }
 }
 
@@ -1149,35 +1204,21 @@ if (! function_exists('nb_update_store_api_cart_item_image')) {
       $alt = $stored_cart_item['data']->get_name();
     }
 
+    $image_data = nb_generate_cart_item_preview_image($preview, $alt);
+    if (empty($image_data)){
+      return $response;
+    }
+
     if (! empty($response['images']) && is_array($response['images'])){
       foreach ($response['images'] as $index => $image){
         if (! is_array($image)){
           continue;
         }
 
-        $response['images'][$index]['id'] = 0;
-        $response['images'][$index]['src'] = $preview;
-        $response['images'][$index]['thumbnail'] = $preview;
-        $response['images'][$index]['srcset'] = '';
-        $response['images'][$index]['sizes'] = '';
-
-        if ($alt !== ''){
-          $response['images'][$index]['name'] = $alt;
-          $response['images'][$index]['alt'] = $alt;
-        }
+        $response['images'][$index] = array_merge($image, $image_data);
       }
     } else {
-      $response['images'] = [
-        [
-          'id' => 0,
-          'src' => $preview,
-          'thumbnail' => $preview,
-          'srcset' => '',
-          'sizes' => '',
-          'name' => $alt,
-          'alt' => $alt,
-        ],
-      ];
+      $response['images'] = [$image_data];
     }
 
     if (! empty($response['images']) && is_array($response['images'])){
@@ -1189,6 +1230,14 @@ if (! function_exists('nb_update_store_api_cart_item_image')) {
         if (is_array($first_image)){
           $response['image'] = $first_image;
         }
+      }
+    }
+
+    if (! empty($image_data['src'])){
+      $image_src = (string) $image_data['src'];
+      $escaped_src = (strpos($image_src, 'data:') === 0) ? $image_src : esc_url($image_src);
+      if ($escaped_src !== ''){
+        $response['images_html'] = '<img src="'.$escaped_src.'" alt="'.esc_attr($image_data['alt']).'" class="nb-cart-item-thumbnail" loading="lazy" decoding="async" />';
       }
     }
 
