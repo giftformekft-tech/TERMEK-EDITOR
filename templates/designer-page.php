@@ -189,6 +189,20 @@
   <div class="nb-mobile-status" id="nb-mobile-status" hidden>
     <div class="nb-mobile-status-info">
       <span class="nb-mobile-selection" id="nb-mobile-selection-label">Nincs kiválasztott elem</span>
+      <div class="nb-mobile-price" id="nb-mobile-price" aria-live="polite">
+        <div class="nb-mobile-price-row">
+          <span>Alapár</span>
+          <span id="nb-mobile-price-base">—</span>
+        </div>
+        <div class="nb-mobile-price-row nb-mobile-price-row--surcharge" id="nb-mobile-price-surcharge-row" hidden>
+          <span>Kétoldalas felár</span>
+          <span id="nb-mobile-price-surcharge">+0 Ft</span>
+        </div>
+        <div class="nb-mobile-price-total">
+          <span>Végösszeg</span>
+          <span id="nb-mobile-price-total">—</span>
+        </div>
+      </div>
       <div class="nb-mobile-quick-actions">
         <button type="button" class="nb-mobile-quick" data-nb-mobile-action="duplicate" disabled>Dupláz</button>
         <button type="button" class="nb-mobile-quick" data-nb-mobile-action="delete" disabled>Töröl</button>
