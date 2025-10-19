@@ -307,6 +307,9 @@
   const priceSurchargeRow = document.getElementById('nb-price-surcharge-row');
   const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
   const priceTotalEl = document.getElementById('nb-price-total');
+  const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
+  const mobilePriceSurchargeRow = document.getElementById('nb-mobile-price-surcharge-row');
+  const mobilePriceSurchargeValueEl = document.getElementById('nb-mobile-price-surcharge');
   const fontFamilySel = document.getElementById('nb-font-family');
   const fontSizeInput = document.getElementById('nb-font-size');
   const fontSizeValue = document.getElementById('nb-font-size-value');
@@ -1330,12 +1333,22 @@
     const baseAmount = parsePriceValue(priceText);
     const surcharge = shouldApplyDoubleSidedSurcharge() ? doubleSidedFeeValue() : 0;
     const hasBase = (markup && markup.trim()) || (priceText && priceText.trim());
+    const totalTargets = [priceTotalEl, priceTotalMobileEl].filter(Boolean);
+    const surchargeTargets = [
+      {row: priceSurchargeRow, value: priceSurchargeValueEl},
+      {row: mobilePriceSurchargeRow, value: mobilePriceSurchargeValueEl}
+    ].filter(target=>target.row && target.value);
 
     if (!hasBase){
       priceDisplayEl.classList.add('nb-price-display--pending');
       if (priceBaseEl) priceBaseEl.textContent = '—';
-      if (priceSurchargeRow) priceSurchargeRow.hidden = true;
-      if (priceTotalEl) priceTotalEl.textContent = 'Ár nem elérhető.';
+      surchargeTargets.forEach(target=>{
+        target.row.hidden = true;
+        target.value.textContent = formatPrice(0);
+      });
+      totalTargets.forEach(el=>{
+        el.textContent = 'Ár nem elérhető.';
+      });
       return;
     }
 
@@ -1351,24 +1364,30 @@
       priceDisplayEl.innerHTML = markup;
     }
 
-    if (priceSurchargeRow && priceSurchargeValueEl){
+    surchargeTargets.forEach(target=>{
       if (surcharge > 0){
-        priceSurchargeRow.hidden = false;
-        priceSurchargeValueEl.textContent = `+${formatPrice(surcharge)}`;
+        target.row.hidden = false;
+        target.value.textContent = `+${formatPrice(surcharge)}`;
       } else {
-        priceSurchargeRow.hidden = true;
-        priceSurchargeValueEl.textContent = formatPrice(0);
+        target.row.hidden = true;
+        target.value.textContent = formatPrice(0);
       }
-    }
+    });
 
-    if (priceTotalEl){
+    if (totalTargets.length){
       if (Number.isFinite(baseAmount)){
         const total = baseAmount + (Number.isFinite(surcharge) ? surcharge : 0);
-        priceTotalEl.textContent = formatPrice(total);
+        totalTargets.forEach(el=>{
+          el.textContent = formatPrice(total);
+        });
       } else if (markup && markup !== priceText){
-        priceTotalEl.innerHTML = markup;
+        totalTargets.forEach(el=>{
+          el.innerHTML = markup;
+        });
       } else {
-        priceTotalEl.textContent = priceText || '—';
+        totalTargets.forEach(el=>{
+          el.textContent = priceText || '—';
+        });
       }
     }
   }
