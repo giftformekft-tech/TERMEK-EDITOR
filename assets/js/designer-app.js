@@ -2719,32 +2719,6 @@
 
   const TEXT_CURVE_MIN_FONT_SIZE = 12;
 
-  function curveCanvasContentWidth(){
-    if (c && typeof c.getWidth === 'function'){
-      const canvasWidth = c.getWidth();
-      if (Number.isFinite(canvasWidth) && canvasWidth > 0){
-        return Math.round(canvasWidth);
-      }
-    }
-    if (Number.isFinite(baseCanvasSize.w) && baseCanvasSize.w > 0){
-      return Math.round(baseCanvasSize.w);
-    }
-    return 0;
-  }
-
-  function curveCanvasContentHeight(){
-    if (c && typeof c.getHeight === 'function'){
-      const canvasHeight = c.getHeight();
-      if (Number.isFinite(canvasHeight) && canvasHeight > 0){
-        return Math.round(canvasHeight);
-      }
-    }
-    if (Number.isFinite(baseCanvasSize.h) && baseCanvasSize.h > 0){
-      return Math.round(baseCanvasSize.h);
-    }
-    return 0;
-  }
-
   function measureTextboxWidth(textbox){
     if (!textbox || textbox.type !== 'textbox') return 0;
     const widths = [];
@@ -2762,72 +2736,6 @@
       return 0;
     }
     return Math.max.apply(null, widths);
-  }
-
-  function fitTextboxBoundsToContent(textbox, options){
-    if (!textbox || textbox.type !== 'textbox') return;
-    const opts = options && typeof options === 'object' ? options : {};
-    const preserveCenter = opts.preserveCenter !== false;
-    const respectDynamicMin = !!opts.respectDynamicMin;
-    if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
-    const currentText = typeof textbox.text === 'string' ? textbox.text : '';
-    const charCount = currentText.length;
-    const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 0;
-    const baseWidth = typeof textbox.calcTextWidth === 'function'
-      ? textbox.calcTextWidth()
-      : (Number.isFinite(textbox.width) ? textbox.width : 0);
-    const paddingX = Number.isFinite(textbox.padding) ? textbox.padding * 2 : 0;
-    const charSpacingWidth = Number.isFinite(textbox.charSpacing) && fontSize
-      ? (textbox.charSpacing / 1000) * Math.max(0, charCount - 1) * fontSize
-      : 0;
-    const dynamicMin = respectDynamicMin && Number.isFinite(textbox.dynamicMinWidth) ? textbox.dynamicMinWidth : 0;
-    let targetWidth = Math.max(dynamicMin, baseWidth + paddingX + charSpacingWidth);
-    if (!Number.isFinite(targetWidth) || targetWidth <= 0){
-      targetWidth = Math.max(dynamicMin, Number.isFinite(textbox.width) ? textbox.width : 0, 20);
-    }
-    targetWidth = Math.max(20, Math.round(targetWidth));
-    let baseHeight = typeof textbox.calcTextHeight === 'function'
-      ? textbox.calcTextHeight()
-      : (Number.isFinite(textbox.height) ? textbox.height : 0);
-    const paddingY = Number.isFinite(textbox.padding) ? textbox.padding * 2 : 0;
-    const minHeight = Number.isFinite(textbox.minHeight) ? textbox.minHeight : 0;
-    let targetHeight = Math.max(baseHeight + paddingY, minHeight);
-    if (!Number.isFinite(targetHeight) || targetHeight <= 0){
-      targetHeight = Math.max(minHeight, baseHeight, 20);
-    }
-    targetHeight = Math.max(20, Math.round(targetHeight));
-    const updates = {};
-    if (Number.isFinite(targetWidth) && targetWidth > 0 && Math.round(textbox.width || 0) !== targetWidth){
-      updates.width = targetWidth;
-    }
-    if (Number.isFinite(targetHeight) && targetHeight > 0 && Math.round(textbox.height || 0) !== targetHeight){
-      updates.height = targetHeight;
-    }
-    if (!Object.keys(updates).length){
-      if (Number.isFinite(targetWidth)) textbox.dynamicMinWidth = targetWidth;
-      return;
-    }
-    const center = preserveCenter && typeof textbox.getCenterPoint === 'function'
-      ? textbox.getCenterPoint()
-      : null;
-    if (typeof textbox.set === 'function'){
-      textbox.set(updates);
-    } else {
-      if (Object.prototype.hasOwnProperty.call(updates, 'width')) textbox.width = updates.width;
-      if (Object.prototype.hasOwnProperty.call(updates, 'height')) textbox.height = updates.height;
-    }
-    if (Number.isFinite(targetWidth)){
-      textbox.dynamicMinWidth = targetWidth;
-      if (Number.isFinite(textbox.minWidth)) textbox.minWidth = Math.min(textbox.minWidth, targetWidth);
-    }
-    if (Number.isFinite(targetHeight) && Number.isFinite(textbox.minHeight)){
-      textbox.minHeight = Math.min(textbox.minHeight, targetHeight);
-    }
-    if (center && typeof textbox.setPositionByOrigin === 'function'){
-      textbox.setPositionByOrigin(center, 'center', 'center');
-    }
-    if (typeof textbox.setCoords === 'function') textbox.setCoords();
-    textbox.dirty = true;
   }
 
   function shrinkTextboxFontToFit(textbox, maxWidth){
@@ -2852,7 +2760,6 @@
       iterations++;
     }
     if (typeof textbox.setCoords === 'function') textbox.setCoords();
-    fitTextboxBoundsToContent(textbox);
     textbox.dirty = true;
     if (fontSizeInput){
       fontSizeInput.value = fontSize;
@@ -2862,55 +2769,12 @@
     return fontSize;
   }
 
-  function ensureTextboxCurveWidth(textbox){
-    if (!textbox || textbox.type !== 'textbox') return null;
-    const maxWidth = curveCanvasContentWidth();
-    if (!Number.isFinite(maxWidth) || maxWidth <= 0) return null;
-    return shrinkTextboxFontToFit(textbox, maxWidth);
-  }
-
-  function ensureTextboxCurveHeight(textbox, amount){
-    if (!textbox || textbox.type !== 'textbox') return null;
-    if (!Number.isFinite(amount) || amount === 0) return measureTextboxWidth(textbox);
-    let width = measureTextboxWidth(textbox);
-    if (!Number.isFinite(width) || width <= 0) return null;
-    const amountFactor = Math.abs(amount) / 100;
-    if (!Number.isFinite(amountFactor) || amountFactor <= 0) return width;
-    const canvasHeight = curveCanvasContentHeight();
-    if (!Number.isFinite(canvasHeight) || canvasHeight <= 0) return width;
-    const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
-    const safetyMargin = Math.max(10, Math.round(fontSize * 0.6));
-    const halfHeight = canvasHeight / 2;
-    const allowedSagitta = Math.max(5, halfHeight - safetyMargin);
-    if (!(allowedSagitta > 0)) return width;
-    const currentSagitta = width * amountFactor * 0.8;
-    if (currentSagitta <= allowedSagitta + 0.5) return width;
-    const maxWidth = allowedSagitta / (amountFactor * 0.8);
-    if (!Number.isFinite(maxWidth) || maxWidth <= 0) return width;
-    const resized = shrinkTextboxFontToFit(textbox, maxWidth);
-    if (Number.isFinite(resized)){
-      if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
-      fitTextboxBoundsToContent(textbox);
-      if (typeof textbox.setCoords === 'function') textbox.setCoords();
-      textbox.dirty = true;
-      width = measureTextboxWidth(textbox);
-      const backup = textbox.__nb_curve_multilineBackup;
-      if (backup && typeof backup === 'object'){
-        const currentSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : resized;
-        backup.flattenedSize = Math.round(currentSize);
-      }
-    }
-    return width;
-  }
-
   function collapseTextboxMultilineForCurve(textbox){
     if (!textbox || textbox.type !== 'textbox') return;
     const textValue = typeof textbox.text === 'string' ? textbox.text : '';
     if (!textValue.length || textValue.indexOf('\n') === -1) return;
     const originalFontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
     const originalWidth = measureTextboxWidth(textbox);
-    const originalDynamicMin = Number.isFinite(textbox.dynamicMinWidth) ? textbox.dynamicMinWidth : null;
-    const originalMinWidth = Number.isFinite(textbox.minWidth) ? textbox.minWidth : null;
     const rawLines = textValue.split('\n');
     const condensed = rawLines.map(line=>line.trim()).filter(line=>line.length);
     const joined = (condensed.length ? condensed : rawLines).join(' ');
@@ -2923,9 +2787,7 @@
       fontSize: originalFontSize,
       flattened: normalizedText,
       flattenedSize: targetSize,
-      originalWidth: Number.isFinite(originalWidth) ? originalWidth : null,
-      originalDynamicMin: Number.isFinite(originalDynamicMin) ? originalDynamicMin : null,
-      originalMinWidth: Number.isFinite(originalMinWidth) ? originalMinWidth : null
+      originalWidth: Number.isFinite(originalWidth) ? originalWidth : null
     };
     const updates = {};
     if (textbox.text !== normalizedText){
@@ -2944,12 +2806,11 @@
     if (typeof textbox.initDimensions === 'function'){
       textbox.initDimensions();
     }
-    let adjustedSize = ensureTextboxCurveWidth(textbox);
-    if (!Number.isFinite(adjustedSize) && Number.isFinite(originalWidth)){
-      adjustedSize = shrinkTextboxFontToFit(textbox, originalWidth);
-    }
-    if (Number.isFinite(adjustedSize)){
-      targetSize = adjustedSize;
+    if (Number.isFinite(originalWidth)){
+      const adjustedSize = shrinkTextboxFontToFit(textbox, originalWidth);
+      if (Number.isFinite(adjustedSize)){
+        targetSize = adjustedSize;
+      }
     }
     textbox.dirty = true;
     if (typeof textbox.setCoords === 'function') textbox.setCoords();
@@ -2958,12 +2819,10 @@
       fontSizeInput.value = nextSize;
       if (fontSizeValue) fontSizeValue.textContent = nextSize + ' px';
     }
-    fitTextboxBoundsToContent(textbox);
     if (c && typeof c.requestRenderAll === 'function') c.requestRenderAll();
     const backup = textbox.__nb_curve_multilineBackup;
     if (backup && typeof backup === 'object'){
-      const currentSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : targetSize;
-      backup.flattenedSize = Math.round(currentSize);
+      backup.flattenedSize = Math.round(targetSize);
     }
   }
 
@@ -2998,24 +2857,6 @@
       textbox.initDimensions();
     }
     textbox.dirty = true;
-    const center = typeof textbox.getCenterPoint === 'function' ? textbox.getCenterPoint() : null;
-    if (typeof textbox.setCoords === 'function') textbox.setCoords();
-    const widthUpdates = {};
-    if (Number.isFinite(backup.originalWidth) && backup.originalWidth > 0){
-      widthUpdates.width = backup.originalWidth;
-    }
-    if (Object.keys(widthUpdates).length){
-      if (typeof textbox.set === 'function'){
-        textbox.set(widthUpdates);
-      } else if (Object.prototype.hasOwnProperty.call(widthUpdates, 'width')){
-        textbox.width = widthUpdates.width;
-      }
-    }
-    if (Number.isFinite(backup.originalDynamicMin)) textbox.dynamicMinWidth = backup.originalDynamicMin;
-    if (Number.isFinite(backup.originalMinWidth)) textbox.minWidth = backup.originalMinWidth;
-    if (center && typeof textbox.setPositionByOrigin === 'function'){
-      textbox.setPositionByOrigin(center, 'center', 'center');
-    }
     if (typeof textbox.setCoords === 'function') textbox.setCoords();
     if (fontSizeInput){
       const nextSize = Math.round(textbox.fontSize || updates.fontSize || backup.fontSize || 48);
@@ -3029,14 +2870,11 @@
   function applyTextboxCurve(textbox, state){
     if (!textbox || textbox.type !== 'textbox') return;
     const cfg = state ? {enabled: !!state.enabled, amount: clampCurveAmount(state.amount)} : ensureTextboxCurveState(textbox);
-    const originalCenter = typeof textbox.getCenterPoint === 'function' ? textbox.getCenterPoint() : null;
     let textValue = typeof textbox.text === 'string' ? textbox.text : '';
     const hasText = !!(textValue && textValue.length);
     const curveActive = cfg.enabled && Math.abs(cfg.amount) >= 1 && hasText;
     if (curveActive){
       collapseTextboxMultilineForCurve(textbox);
-      ensureTextboxCurveWidth(textbox);
-      ensureTextboxCurveHeight(textbox, cfg.amount);
       textValue = typeof textbox.text === 'string' ? textbox.text : '';
     } else {
       restoreTextboxMultilineFromCurve(textbox);
@@ -3073,10 +2911,6 @@
       }
       textbox.dirty = true;
       if (typeof textbox.setCoords === 'function') textbox.setCoords();
-      if (originalCenter && typeof textbox.setPositionByOrigin === 'function'){
-        textbox.setPositionByOrigin(originalCenter, 'center', 'center');
-        if (typeof textbox.setCoords === 'function') textbox.setCoords();
-      }
     };
     if (!curveActive || !textbox.text || !textbox.text.length){
       assignStyles(baseStyles);
@@ -3090,43 +2924,19 @@
       return;
     }
     if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
-    fitTextboxBoundsToContent(textbox);
     let width = measureTextboxWidth(textbox);
     if (!Number.isFinite(width) || width <= 0){
       width = Math.max(20, textbox.width || 0);
     }
     width = Math.max(20, width);
     const amplitude = (cfg.amount / 100) * width * 0.8;
-    const sagitta = Math.abs(amplitude);
-    const halfWidth = width / 2;
-    let curvePath = null;
-    if (sagitta > 0){
-      const radius = (halfWidth * halfWidth + sagitta * sagitta) / (2 * sagitta);
-      if (Number.isFinite(radius) && radius > 0){
-        const sweepFlag = amplitude >= 0 ? 0 : 1;
-        const arcPath = `M ${-halfWidth} 0 A ${radius} ${radius} 0 0 ${sweepFlag} ${halfWidth} 0`;
-        curvePath = new fabric.Path(arcPath, {
-          visible: false,
-          evented: false
-        });
-        curvePath.pathOffset = new fabric.Point(0, 0);
-        curvePath.__nb_curve_radius = radius;
-        curvePath.__nb_curve_sagitta = amplitude;
-        curvePath.__nb_curve_centerY = amplitude >= 0 ? radius - sagitta : -(radius - sagitta);
-        if (!curvePath.segmentsInfo && fabric.util && typeof fabric.util.getPathSegmentsInfo === 'function'){
-          curvePath.segmentsInfo = fabric.util.getPathSegmentsInfo(curvePath.path);
-        }
-      }
-    }
-    if (!curvePath){
-      curvePath = new fabric.Path(`M ${-halfWidth} 0 Q 0 ${-amplitude} ${halfWidth} 0`, {
-        visible: false,
-        evented: false
-      });
-      curvePath.pathOffset = new fabric.Point(0, 0);
-      if (!curvePath.segmentsInfo && fabric.util && typeof fabric.util.getPathSegmentsInfo === 'function'){
-        curvePath.segmentsInfo = fabric.util.getPathSegmentsInfo(curvePath.path);
-      }
+    const curvePath = new fabric.Path(`M ${-width/2} 0 Q 0 ${-amplitude} ${width/2} 0`, {
+      visible: false,
+      evented: false
+    });
+    curvePath.pathOffset = new fabric.Point(0, 0);
+    if (!curvePath.segmentsInfo && fabric.util && typeof fabric.util.getPathSegmentsInfo === 'function'){
+      curvePath.segmentsInfo = fabric.util.getPathSegmentsInfo(curvePath.path);
     }
     assignPathProps(curvePath, cfg.amount >= 0 ? 'left' : 'right');
     const nextStyles = cloneTextboxStyles(baseStyles);
