@@ -307,6 +307,10 @@
   const priceSurchargeRow = document.getElementById('nb-price-surcharge-row');
   const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
   const priceTotalEl = document.getElementById('nb-price-total');
+  const mobilePriceWrap = document.getElementById('nb-mobile-price');
+  const mobilePriceBaseEl = document.getElementById('nb-mobile-price-base');
+  const mobilePriceSurchargeRow = document.getElementById('nb-mobile-price-surcharge-row');
+  const mobilePriceSurchargeValueEl = document.getElementById('nb-mobile-price-surcharge');
   const mobilePriceTotalEl = document.getElementById('nb-mobile-price-total');
   const fontFamilySel = document.getElementById('nb-font-family');
   const fontSizeInput = document.getElementById('nb-font-size');
@@ -1325,7 +1329,7 @@
   }
 
   function updatePriceDisplay(){
-    if (!priceDisplayEl && !mobilePriceTotalEl) return;
+    if (!priceDisplayEl && !mobilePriceWrap) return;
     const markup = currentProductPriceMarkup();
     const priceText = currentProductPriceText();
     const baseAmount = parsePriceValue(priceText);
@@ -1339,18 +1343,20 @@
       if (priceBaseEl) priceBaseEl.textContent = '—';
       if (priceSurchargeRow) priceSurchargeRow.hidden = true;
       if (priceTotalEl) priceTotalEl.textContent = 'Ár nem elérhető.';
-      if (mobilePriceTotalEl){
-        mobilePriceTotalEl.classList.add('is-pending');
-        mobilePriceTotalEl.textContent = '—';
+      if (mobilePriceWrap){
+        mobilePriceWrap.classList.add('is-pending');
       }
+      if (mobilePriceBaseEl) mobilePriceBaseEl.textContent = '—';
+      if (mobilePriceSurchargeRow) mobilePriceSurchargeRow.hidden = true;
+      if (mobilePriceTotalEl) mobilePriceTotalEl.textContent = 'Ár nem elérhető.';
       return;
     }
 
     if (priceDisplayEl){
       priceDisplayEl.classList.remove('nb-price-display--pending');
     }
-    if (mobilePriceTotalEl){
-      mobilePriceTotalEl.classList.remove('is-pending');
+    if (mobilePriceWrap){
+      mobilePriceWrap.classList.remove('is-pending');
     }
 
     if (priceBaseEl){
@@ -1362,6 +1368,14 @@
     } else if (markup){
       if (priceDisplayEl){
         priceDisplayEl.innerHTML = markup;
+      }
+    }
+
+    if (mobilePriceBaseEl){
+      if (markup && markup !== priceText){
+        mobilePriceBaseEl.innerHTML = markup;
+      } else {
+        mobilePriceBaseEl.textContent = priceText;
       }
     }
 
@@ -1874,25 +1888,7 @@
   }
 
   function mobileUiEnabled(){
-    if (mobileMedia && typeof mobileMedia.matches === 'boolean'){
-      return mobileMedia.matches;
-    }
-    if (typeof window !== 'undefined'){
-      let width = 0;
-      if (typeof window.innerWidth === 'number' && window.innerWidth > 0){
-        width = window.innerWidth;
-      } else if (typeof document !== 'undefined'){
-        const docEl = document.documentElement;
-        const body = document.body;
-        if (docEl && typeof docEl.clientWidth === 'number' && docEl.clientWidth > 0){
-          width = docEl.clientWidth;
-        } else if (body && typeof body.clientWidth === 'number' && body.clientWidth > 0){
-          width = body.clientWidth;
-        }
-      }
-      return width > 0 && width <= 768;
-    }
-    return false;
+    return !!(mobileMedia && typeof mobileMedia.matches === 'boolean' && mobileMedia.matches);
   }
 
   function syncMobileCompleteState(){
@@ -3078,7 +3074,6 @@
     resizeRaf = requestAnimationFrame(()=>{
       refreshControlProfile();
       setMockupBgAndArea();
-      refreshMobileUi();
     });
   });
 
