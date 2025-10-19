@@ -308,8 +308,6 @@
   const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
   const priceTotalEl = document.getElementById('nb-price-total');
   const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
-  const mobilePriceSurchargeRow = document.getElementById('nb-mobile-price-surcharge-row');
-  const mobilePriceSurchargeValueEl = document.getElementById('nb-mobile-price-surcharge');
   const fontFamilySel = document.getElementById('nb-font-family');
   const fontSizeInput = document.getElementById('nb-font-size');
   const fontSizeValue = document.getElementById('nb-font-size-value');
@@ -1317,12 +1315,11 @@
 
   function formatPrice(amount){
     if (!Number.isFinite(amount)) return '';
+    const rounded = Math.round(amount);
     try{
-      const useDigits = Math.abs(amount % 1) > 0 ? 2 : 0;
-      return new Intl.NumberFormat('hu-HU', {style:'currency', currency:'HUF', minimumFractionDigits:useDigits, maximumFractionDigits:Math.max(0, useDigits)}).format(amount);
+      return new Intl.NumberFormat('hu-HU', {style:'currency', currency:'HUF', minimumFractionDigits:0, maximumFractionDigits:0}).format(rounded);
     }catch(e){
-      const digits = Math.abs(amount % 1) > 0 ? 2 : 0;
-      return amount.toLocaleString('hu-HU', {minimumFractionDigits:digits, maximumFractionDigits:digits}) + ' Ft';
+      return rounded.toLocaleString('hu-HU', {minimumFractionDigits:0, maximumFractionDigits:0}) + ' Ft';
     }
   }
 
@@ -1338,17 +1335,6 @@
     if (priceSurchargeRow && priceSurchargeValueEl){
       surchargeTargets.push({row: priceSurchargeRow, value: priceSurchargeValueEl});
     }
-    if (
-      typeof mobilePriceSurchargeRow !== 'undefined' &&
-      typeof mobilePriceSurchargeValueEl !== 'undefined'
-    ){
-      const mobileRow = mobilePriceSurchargeRow;
-      const mobileValue = mobilePriceSurchargeValueEl;
-      if (mobileRow && mobileValue){
-        surchargeTargets.push({row: mobileRow, value: mobileValue});
-      }
-    }
-
     if (!hasBase){
       priceDisplayEl.classList.add('nb-price-display--pending');
       if (priceBaseEl) priceBaseEl.textContent = '—';

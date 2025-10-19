@@ -88,9 +88,6 @@
 .nb-mobile-total-line{display:flex;flex-direction:row;align-items:baseline;gap:6px;flex-wrap:nowrap}
 .nb-mobile-total-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0b1f3a;line-height:1.2;display:flex;align-items:baseline;gap:4px;white-space:nowrap}
 .nb-mobile-total-value{font-size:15px;font-weight:800;color:#047857;letter-spacing:.04em;line-height:1.2;white-space:nowrap}
-.nb-mobile-total-surcharge{display:flex;flex-direction:row;align-items:baseline;gap:4px;font-size:11px;font-weight:600;color:#0b1f3a;line-height:1.2}
-.nb-mobile-total-surcharge-label{letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
-.nb-mobile-total-surcharge-value{font-size:13px;font-weight:700;color:#047857;letter-spacing:.04em;line-height:1.2;white-space:nowrap}
 .nb-mobile-complete{border:none;background:#22c55e;color:#052e16;font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:12px 18px;border-radius:16px;cursor:pointer;transition:transform .2s ease,background .2s ease;width:100%}
 .nb-mobile-complete:hover{transform:translateY(-2px);background:#16a34a}
 .nb-mobile-complete:disabled{background:#d1d5db;color:#64748b;cursor:not-allowed;transform:none}
