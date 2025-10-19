@@ -307,6 +307,7 @@
   const priceSurchargeRow = document.getElementById('nb-price-surcharge-row');
   const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
   const priceTotalEl = document.getElementById('nb-price-total');
+  const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
   const fontFamilySel = document.getElementById('nb-font-family');
   const fontSizeInput = document.getElementById('nb-font-size');
   const fontSizeValue = document.getElementById('nb-font-size-value');
@@ -314,6 +315,9 @@
   const fontBoldToggle = document.getElementById('nb-font-bold');
   const fontItalicToggle = document.getElementById('nb-font-italic');
   const alignButtons = Array.from(document.querySelectorAll('[data-nb-align]'));
+  const textCurveToggle = document.getElementById('nb-text-curve-toggle');
+  const textCurveInput = document.getElementById('nb-text-curve');
+  const textCurveValue = document.getElementById('nb-text-curve-value');
   const clearButton = document.getElementById('nb-clear-design');
   const addToCartBtn = document.getElementById('nb-add-to-cart');
   const uploadInput = document.getElementById('nb-upload');
@@ -1314,12 +1318,11 @@
 
   function formatPrice(amount){
     if (!Number.isFinite(amount)) return '';
+    const rounded = Math.round(amount);
     try{
-      const useDigits = Math.abs(amount % 1) > 0 ? 2 : 0;
-      return new Intl.NumberFormat('hu-HU', {style:'currency', currency:'HUF', minimumFractionDigits:useDigits, maximumFractionDigits:Math.max(0, useDigits)}).format(amount);
+      return new Intl.NumberFormat('hu-HU', {style:'currency', currency:'HUF', minimumFractionDigits:0, maximumFractionDigits:0}).format(rounded);
     }catch(e){
-      const digits = Math.abs(amount % 1) > 0 ? 2 : 0;
-      return amount.toLocaleString('hu-HU', {minimumFractionDigits:digits, maximumFractionDigits:digits}) + ' Ft';
+      return rounded.toLocaleString('hu-HU', {minimumFractionDigits:0, maximumFractionDigits:0}) + ' Ft';
     }
   }
 
@@ -1330,12 +1333,21 @@
     const baseAmount = parsePriceValue(priceText);
     const surcharge = shouldApplyDoubleSidedSurcharge() ? doubleSidedFeeValue() : 0;
     const hasBase = (markup && markup.trim()) || (priceText && priceText.trim());
-
+    const totalTargets = [priceTotalEl, priceTotalMobileEl].filter(Boolean);
+    const surchargeTargets = [];
+    if (priceSurchargeRow && priceSurchargeValueEl){
+      surchargeTargets.push({row: priceSurchargeRow, value: priceSurchargeValueEl});
+    }
     if (!hasBase){
       priceDisplayEl.classList.add('nb-price-display--pending');
       if (priceBaseEl) priceBaseEl.textContent = '—';
-      if (priceSurchargeRow) priceSurchargeRow.hidden = true;
-      if (priceTotalEl) priceTotalEl.textContent = 'Ár nem elérhető.';
+      surchargeTargets.forEach(target=>{
+        target.row.hidden = true;
+        target.value.textContent = formatPrice(0);
+      });
+      totalTargets.forEach(el=>{
+        el.textContent = 'Ár nem elérhető.';
+      });
       return;
     }
 
@@ -1351,24 +1363,30 @@
       priceDisplayEl.innerHTML = markup;
     }
 
-    if (priceSurchargeRow && priceSurchargeValueEl){
+    surchargeTargets.forEach(target=>{
       if (surcharge > 0){
-        priceSurchargeRow.hidden = false;
-        priceSurchargeValueEl.textContent = `+${formatPrice(surcharge)}`;
+        target.row.hidden = false;
+        target.value.textContent = `+${formatPrice(surcharge)}`;
       } else {
-        priceSurchargeRow.hidden = true;
-        priceSurchargeValueEl.textContent = formatPrice(0);
+        target.row.hidden = true;
+        target.value.textContent = formatPrice(0);
       }
-    }
+    });
 
-    if (priceTotalEl){
+    if (totalTargets.length){
       if (Number.isFinite(baseAmount)){
         const total = baseAmount + (Number.isFinite(surcharge) ? surcharge : 0);
-        priceTotalEl.textContent = formatPrice(total);
+        totalTargets.forEach(el=>{
+          el.textContent = formatPrice(total);
+        });
       } else if (markup && markup !== priceText){
-        priceTotalEl.innerHTML = markup;
+        totalTargets.forEach(el=>{
+          el.innerHTML = markup;
+        });
       } else {
-        priceTotalEl.textContent = priceText || '—';
+        totalTargets.forEach(el=>{
+          el.textContent = priceText || '—';
+        });
       }
     }
   }
@@ -1699,7 +1717,7 @@
   }
 
   function sanitizeCanvasJSON(){
-    const raw = c.toJSON(['__nb_layer_id','__nb_layer_name']);
+    const raw = c.toJSON(['__nb_layer_id','__nb_layer_name','__nb_curve']);
     const clean = Object.assign({}, raw);
     clean.background = 'rgba(0,0,0,0)';
     clean.backgroundImage = null;
@@ -2155,6 +2173,7 @@
         designObjects().forEach(obj=>{
           applyObjectUiDefaults(obj);
           ensureLayerId(obj);
+          initializeTextboxCurve(obj);
         });
         c.discardActiveObject();
         captureActiveSideState();
@@ -2566,17 +2585,17 @@
   }
 
   function toHexColor(color){
-    if (!color) return '#000000';
+    if (!color) return '#ff0000';
     if (/^#[0-9a-f]{3,8}$/i.test(color)) return color;
     const tester = document.createElement('canvas');
     tester.width = tester.height = 1;
     const ctx = tester.getContext && tester.getContext('2d');
-    if (!ctx) return '#000000';
+    if (!ctx) return '#ff0000';
     try{
       ctx.fillStyle = color;
-      return ctx.fillStyle || '#000000';
+      return ctx.fillStyle || '#ff0000';
     }catch(e){
-      return '#000000';
+      return '#ff0000';
     }
   }
 
@@ -2590,16 +2609,242 @@
     }
   }
 
+  const TEXT_CURVE_MIN = -100;
+  const TEXT_CURVE_MAX = 100;
+
+  function clampCurveAmount(value){
+    if (!Number.isFinite(value)) return 0;
+    const rounded = Math.round(value);
+    if (rounded > TEXT_CURVE_MAX) return TEXT_CURVE_MAX;
+    if (rounded < TEXT_CURVE_MIN) return TEXT_CURVE_MIN;
+    return rounded;
+  }
+
+  function defaultCurveState(){
+    return {enabled: false, amount: 0};
+  }
+
+  function ensureTextboxCurveState(textbox){
+    if (!textbox || textbox.type !== 'textbox') return defaultCurveState();
+    const raw = textbox.__nb_curve;
+    const normalized = {
+      enabled: !!(raw && typeof raw === 'object' && raw.enabled),
+      amount: clampCurveAmount(raw && typeof raw === 'object' ? raw.amount : 0)
+    };
+    textbox.__nb_curve = normalized;
+    if (typeof textbox.set === 'function'){
+      textbox.set('__nb_curve', normalized);
+    }
+    return normalized;
+  }
+
+  function formatCurveLabel(amount, enabled){
+    if (!enabled || Math.abs(amount) < 1){
+      return 'Egyenes';
+    }
+    const direction = amount > 0 ? 'Felfelé ív' : 'Lefelé ív';
+    return `${direction} (${Math.abs(amount)})`;
+  }
+
+  function ensureTextboxCurveBinding(textbox){
+    if (!textbox || textbox.type !== 'textbox') return;
+    if (textbox.__nb_curve_bound) return;
+    textbox.__nb_curve_bound = true;
+    textbox.on('changed', ()=>applyTextboxCurve(textbox));
+    textbox.on('modified', ()=>applyTextboxCurve(textbox));
+  }
+
+  function curveDefaultAmount(textbox){
+    if (!textbox || textbox.type !== 'textbox') return 35;
+    const width = Math.max(80, textbox.width || 0);
+    if (width >= 260) return 30;
+    if (width >= 200) return 35;
+    return 40;
+  }
+
+  function cloneTextboxStyles(styles){
+    const clone = {};
+    if (!styles || typeof styles !== 'object') return clone;
+    Object.keys(styles).forEach(lineKey=>{
+      const srcLine = styles[lineKey];
+      if (!srcLine || typeof srcLine !== 'object') return;
+      const destLine = {};
+      Object.keys(srcLine).forEach(charKey=>{
+        const entry = srcLine[charKey];
+        destLine[charKey] = entry && typeof entry === 'object' ? Object.assign({}, entry) : {};
+      });
+      clone[lineKey] = destLine;
+    });
+    return clone;
+  }
+
+  function stripCurveDelta(styles){
+    if (!styles || typeof styles !== 'object') return {};
+    const cleaned = cloneTextboxStyles(styles);
+    Object.keys(cleaned).forEach(lineKey=>{
+      const line = cleaned[lineKey];
+      if (!line || typeof line !== 'object'){
+        delete cleaned[lineKey];
+        return;
+      }
+      Object.keys(line).forEach(charKey=>{
+        const entry = line[charKey];
+        if (!entry || typeof entry !== 'object'){
+          delete line[charKey];
+          return;
+        }
+        if (Object.prototype.hasOwnProperty.call(entry, 'deltaY')){
+          const next = Object.assign({}, entry);
+          delete next.deltaY;
+          if (Object.keys(next).length){
+            line[charKey] = next;
+          } else {
+            delete line[charKey];
+          }
+        }
+      });
+      if (!Object.keys(line).length){
+        delete cleaned[lineKey];
+      }
+    });
+    return cleaned;
+  }
+
+  function baseTextboxStyles(textbox){
+    if (!textbox || textbox.type !== 'textbox') return {};
+    const cleaned = stripCurveDelta(textbox.styles || {});
+    textbox.__nb_curve_baseStyles = cloneTextboxStyles(cleaned);
+    return cleaned;
+  }
+
+  function applyTextboxCurve(textbox, state){
+    if (!textbox || textbox.type !== 'textbox') return;
+    const cfg = state ? {enabled: !!state.enabled, amount: clampCurveAmount(state.amount)} : ensureTextboxCurveState(textbox);
+    const baseStyles = baseTextboxStyles(textbox);
+    const assignStyles = styles=>{
+      textbox.styles = styles;
+      if (typeof textbox.set === 'function'){
+        textbox.set('styles', textbox.styles);
+      }
+    };
+    const assignPathProps = (path, side)=>{
+      const props = {
+        path: path || null,
+        pathStartOffset: 0,
+        pathAlign: 'center',
+        pathSide: side || 'left'
+      };
+      if (typeof textbox.set === 'function'){
+        textbox.set(props);
+      } else {
+        textbox.path = props.path;
+        textbox.pathStartOffset = props.pathStartOffset;
+        textbox.pathAlign = props.pathAlign;
+        textbox.pathSide = props.pathSide;
+      }
+      if (props.path){
+        if (typeof fabric.util === 'object' && typeof fabric.util.getPathSegmentsInfo === 'function'){
+          textbox.pathInfo = props.path.segmentsInfo || fabric.util.getPathSegmentsInfo(props.path.path);
+        }
+      } else if (Object.prototype.hasOwnProperty.call(textbox, 'pathInfo')){
+        textbox.pathInfo = null;
+      }
+      textbox.dirty = true;
+      if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    };
+    if (!cfg.enabled || Math.abs(cfg.amount) < 1 || !textbox.text || !textbox.text.length){
+      assignStyles(baseStyles);
+      assignPathProps(null, 'left');
+      if (typeof textbox.set === 'function'){
+        textbox.set('textBaseline', 'alphabetic');
+      } else {
+        textbox.textBaseline = 'alphabetic';
+      }
+      delete textbox.__nb_curve_baseStyles;
+      return;
+    }
+    const width = Math.max(20, textbox.width || 0);
+    const amplitude = (cfg.amount / 100) * width * 0.8;
+    const curvePath = new fabric.Path(`M ${-width/2} 0 Q 0 ${-amplitude} ${width/2} 0`, {
+      visible: false,
+      evented: false
+    });
+    curvePath.pathOffset = new fabric.Point(0, 0);
+    if (!curvePath.segmentsInfo && fabric.util && typeof fabric.util.getPathSegmentsInfo === 'function'){
+      curvePath.segmentsInfo = fabric.util.getPathSegmentsInfo(curvePath.path);
+    }
+    assignPathProps(curvePath, cfg.amount >= 0 ? 'left' : 'right');
+    const nextStyles = cloneTextboxStyles(baseStyles);
+    const textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    const lines = textValue.split('\n');
+    if (lines.length > 1){
+      const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
+      const lineHeight = Number.isFinite(textbox.lineHeight) ? textbox.lineHeight : 1.16;
+      const step = Math.max(1, fontSize * lineHeight);
+      const direction = cfg.amount >= 0 ? 1 : -1;
+      lines.forEach((lineText, lineIndex)=>{
+        const offset = lineIndex * step * direction;
+        const key = lineIndex.toString();
+        const lineStyles = nextStyles[key] || {};
+        for (let i = 0; i < lineText.length; i++){ 
+          const entry = lineStyles.hasOwnProperty(i) ? Object.assign({}, lineStyles[i]) : {};
+          entry.deltaY = offset;
+          lineStyles[i] = entry;
+        }
+        Object.keys(lineStyles).forEach(charKey=>{
+          const entry = lineStyles[charKey];
+          if (!entry || typeof entry !== 'object'){
+            delete lineStyles[charKey];
+            return;
+          }
+          entry.deltaY = offset;
+        });
+        nextStyles[key] = lineStyles;
+      });
+    }
+    assignStyles(nextStyles);
+    if (typeof textbox.set === 'function'){
+      textbox.set('textBaseline', 'alphabetic');
+    } else {
+      textbox.textBaseline = 'alphabetic';
+    }
+  }
+
+  function storeTextboxCurveState(textbox, state){
+    if (!textbox || textbox.type !== 'textbox') return;
+    const cfg = state ? {enabled: !!state.enabled, amount: clampCurveAmount(state.amount)} : defaultCurveState();
+    textbox.__nb_curve = cfg;
+    if (typeof textbox.set === 'function'){
+      textbox.set('__nb_curve', cfg);
+    }
+    ensureTextboxCurveBinding(textbox);
+    applyTextboxCurve(textbox, cfg);
+  }
+
+  function initializeTextboxCurve(textbox){
+    if (!textbox || textbox.type !== 'textbox') return;
+    const cfg = ensureTextboxCurveState(textbox);
+    ensureTextboxCurveBinding(textbox);
+    applyTextboxCurve(textbox, cfg);
+  }
+
   function syncTextControls(){
     const textbox = activeTextbox();
     const hasTextbox = !!textbox;
-    const controls = [fontFamilySel, fontSizeInput, fontColorInput, fontBoldToggle, fontItalicToggle].concat(alignButtons);
+    if (textbox) initializeTextboxCurve(textbox);
+    const controls = [fontFamilySel, fontSizeInput, fontColorInput, fontBoldToggle, fontItalicToggle, textCurveToggle, textCurveInput].concat(alignButtons);
     controls.forEach(ctrl=>{ if (ctrl) ctrl.disabled = !hasTextbox; });
     if (!hasTextbox){
       setPressed(fontBoldToggle, false);
       setPressed(fontItalicToggle, false);
       alignButtons.forEach(btn=>setPressed(btn, false));
       if (fontSizeValue) fontSizeValue.textContent = (fontSizeInput ? fontSizeInput.value : '0') + ' px';
+      if (textCurveToggle) setPressed(textCurveToggle, false);
+      if (textCurveInput){
+        textCurveInput.value = '0';
+        textCurveInput.disabled = true;
+      }
+      if (textCurveValue) textCurveValue.textContent = 'Egyenes';
       return;
     }
     if (fontFamilySel){
@@ -2620,13 +2865,25 @@
       if (fontSizeValue) fontSizeValue.textContent = size + ' px';
     }
     if (fontColorInput){
-      fontColorInput.value = toHexColor(textbox.fill || '#000000');
+      fontColorInput.value = toHexColor(textbox.fill || '#ff0000');
     }
     setPressed(fontBoldToggle, (textbox.fontWeight || '').toString().toLowerCase() === 'bold' || parseInt(textbox.fontWeight,10) >= 600);
     setPressed(fontItalicToggle, (textbox.fontStyle || '').toString().toLowerCase() === 'italic');
     alignButtons.forEach(btn=>{
       setPressed(btn, textbox.textAlign === btn.dataset.nbAlign);
     });
+    const curveState = ensureTextboxCurveState(textbox);
+    if (textCurveToggle){
+      textCurveToggle.disabled = false;
+      setPressed(textCurveToggle, !!curveState.enabled);
+    }
+    if (textCurveInput){
+      textCurveInput.disabled = !(curveState.enabled && hasTextbox);
+      textCurveInput.value = clampCurveAmount(curveState.amount).toString();
+    }
+    if (textCurveValue){
+      textCurveValue.textContent = formatCurveLabel(curveState.amount, curveState.enabled && hasTextbox);
+    }
   }
 
   function currentFontFamily(){
@@ -2638,7 +2895,7 @@
   }
 
   function currentFontColor(){
-    return fontColorInput && fontColorInput.value ? fontColorInput.value : '#000000';
+    return fontColorInput && fontColorInput.value ? fontColorInput.value : '#ff0000';
   }
 
   function currentFontWeight(){
@@ -2882,6 +3139,7 @@
       applyObjectUiDefaults(e.target);
       ensureLayerId(e.target);
       keepObjectInside(e.target);
+      initializeTextboxCurve(e.target);
       markDesignDirty();
       syncLayerList();
     }
@@ -2894,7 +3152,16 @@
   c.on('selection:created', ()=>{ syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('selection:updated', ()=>{ syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('selection:cleared', ()=>{ syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
-  c.on('text:changed', e=>{ if (isDesignObject(e.target)) syncLayerList(); });
+  c.on('text:changed', e=>{
+    if (!isDesignObject(e.target)) return;
+    initializeTextboxCurve(e.target);
+    applyTextboxCurve(e.target);
+    markDesignDirty();
+    if (typeof c.requestRenderAll === 'function'){
+      c.requestRenderAll();
+    }
+    syncLayerList();
+  });
 
   if (fontFamilySel){
     fontFamilySel.onchange = ()=>{
@@ -2913,7 +3180,7 @@
 
   if (fontColorInput){
     fontColorInput.onchange = ()=>{
-      const color = fontColorInput.value || '#000000';
+      const color = fontColorInput.value || '#ff0000';
       applyToActiveText(obj=>{ obj.set('fill', color); });
     };
   }
@@ -2941,6 +3208,39 @@
       applyToActiveText(obj=>{ obj.set('textAlign', value); });
     };
   });
+
+  if (textCurveToggle){
+    textCurveToggle.onclick = ()=>{
+      const next = textCurveToggle.getAttribute('aria-pressed') !== 'true';
+      setPressed(textCurveToggle, next);
+      applyToActiveText(obj=>{
+        const state = ensureTextboxCurveState(obj);
+        state.enabled = next;
+        if (next && Math.abs(state.amount) < 1){
+          state.amount = curveDefaultAmount(obj);
+        }
+        storeTextboxCurveState(obj, state);
+      });
+      syncTextControls();
+    };
+  }
+
+  if (textCurveInput){
+    textCurveInput.addEventListener('input', ()=>{
+      const raw = parseInt(textCurveInput.value, 10);
+      const value = clampCurveAmount(Number.isFinite(raw) ? raw : 0);
+      if (textCurveValue){
+        const enabled = textCurveToggle ? textCurveToggle.getAttribute('aria-pressed') === 'true' : false;
+        textCurveValue.textContent = formatCurveLabel(value, enabled);
+      }
+      applyToActiveText(obj=>{
+        const state = ensureTextboxCurveState(obj);
+        state.amount = value;
+        storeTextboxCurveState(obj, state);
+      });
+      syncTextControls();
+    });
+  }
 
   if (productModalTrigger){
     productModalTrigger.addEventListener('click', openProductModal);
@@ -3078,6 +3378,7 @@
         lockScalingFlip:true
       });
       applyObjectUiDefaults(t);
+      initializeTextboxCurve(t);
       c.add(t).setActiveObject(t);
       keepObjectInside(t);
       syncTextControls();
