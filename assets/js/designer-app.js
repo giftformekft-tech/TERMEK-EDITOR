@@ -307,8 +307,6 @@
   const priceSurchargeRow = document.getElementById('nb-price-surcharge-row');
   const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
   const priceTotalEl = document.getElementById('nb-price-total');
-  const mobileFinalPriceWrap = document.getElementById('nb-mobile-final-price');
-  const mobileFinalPriceValueEl = mobileFinalPriceWrap ? mobileFinalPriceWrap.querySelector('span') : null;
   const fontFamilySel = document.getElementById('nb-font-family');
   const fontSizeInput = document.getElementById('nb-font-size');
   const fontSizeValue = document.getElementById('nb-font-size-value');
@@ -1326,7 +1324,7 @@
   }
 
   function updatePriceDisplay(){
-    if (!priceDisplayEl && !mobileFinalPriceValueEl) return;
+    if (!priceDisplayEl) return;
     const markup = currentProductPriceMarkup();
     const priceText = currentProductPriceText();
     const baseAmount = parsePriceValue(priceText);
@@ -1334,27 +1332,14 @@
     const hasBase = (markup && markup.trim()) || (priceText && priceText.trim());
 
     if (!hasBase){
-      if (priceDisplayEl){
-        priceDisplayEl.classList.add('nb-price-display--pending');
-      }
+      priceDisplayEl.classList.add('nb-price-display--pending');
       if (priceBaseEl) priceBaseEl.textContent = '—';
       if (priceSurchargeRow) priceSurchargeRow.hidden = true;
       if (priceTotalEl) priceTotalEl.textContent = 'Ár nem elérhető.';
-      if (mobileFinalPriceWrap){
-        mobileFinalPriceWrap.classList.add('is-pending');
-      }
-      if (mobileFinalPriceValueEl){
-        mobileFinalPriceValueEl.textContent = '—';
-      }
       return;
     }
 
-    if (priceDisplayEl){
-      priceDisplayEl.classList.remove('nb-price-display--pending');
-    }
-    if (mobileFinalPriceWrap){
-      mobileFinalPriceWrap.classList.remove('is-pending');
-    }
+    priceDisplayEl.classList.remove('nb-price-display--pending');
 
     if (priceBaseEl){
       if (markup && markup !== priceText){
@@ -1363,9 +1348,7 @@
         priceBaseEl.textContent = priceText;
       }
     } else if (markup){
-      if (priceDisplayEl){
-        priceDisplayEl.innerHTML = markup;
-      }
+      priceDisplayEl.innerHTML = markup;
     }
 
     if (priceSurchargeRow && priceSurchargeValueEl){
@@ -1386,17 +1369,6 @@
         priceTotalEl.innerHTML = markup;
       } else {
         priceTotalEl.textContent = priceText || '—';
-      }
-    }
-
-    if (mobileFinalPriceValueEl){
-      if (Number.isFinite(baseAmount)){
-        const total = baseAmount + (Number.isFinite(surcharge) ? surcharge : 0);
-        mobileFinalPriceValueEl.textContent = formatPrice(total);
-      } else if (markup && markup !== priceText){
-        mobileFinalPriceValueEl.innerHTML = markup;
-      } else {
-        mobileFinalPriceValueEl.textContent = priceText || '—';
       }
     }
   }

@@ -78,9 +78,6 @@
 .nb-mobile-status[hidden]{display:none!important}
 .nb-mobile-status-info{display:flex;flex-direction:column;gap:12px;flex:1;min-width:0}
 .nb-mobile-selection{font-weight:600;font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:#0b1f3a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nb-mobile-final-price{margin-top:6px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0b1f3a;text-align:center}
-.nb-mobile-final-price span{display:block;margin-top:4px;font-size:17px;line-height:1.1;font-weight:800;letter-spacing:0;text-transform:none}
-.nb-mobile-final-price.is-pending{opacity:.6}
 .nb-mobile-quick-actions{display:flex;flex-wrap:wrap;gap:8px}
 .nb-mobile-quick{border:none;background:rgba(11,31,58,.08);color:#0b1f3a;padding:6px 10px;border-radius:10px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;transition:background .2s ease,color .2s ease;min-width:64px}
 .nb-mobile-quick:disabled{opacity:.35;cursor:not-allowed}
