@@ -1099,6 +1099,103 @@ if (! function_exists('nb_render_cart_item_preview_thumbnail')) {
   }
 }
 
+if (! function_exists('nb_update_store_api_cart_item_image')) {
+  function nb_update_store_api_cart_item_image($response, $cart_item, $request){
+    if (! is_array($response)){
+      return $response;
+    }
+
+    if (empty($response['key'])){
+      return $response;
+    }
+
+    $stored_cart_item = null;
+
+    if (is_object($cart_item)){
+      if (is_callable([$cart_item, 'get_cart_item'])){
+        $stored_cart_item = $cart_item->get_cart_item();
+      } elseif (is_callable([$cart_item, 'get_item'])){
+        $stored_cart_item = $cart_item->get_item();
+      } elseif (is_callable([$cart_item, 'to_legacy_cart_item'])){
+        $stored_cart_item = $cart_item->to_legacy_cart_item();
+      }
+    } elseif (is_array($cart_item)){
+      $stored_cart_item = $cart_item;
+    }
+
+    if (! is_array($stored_cart_item)){
+      if (! function_exists('WC')){
+        return $response;
+      }
+
+      $cart = WC()->cart;
+      if (! $cart || ! is_a($cart, 'WC_Cart') || ! is_callable([$cart, 'get_cart_item'])){
+        return $response;
+      }
+
+      $stored_cart_item = $cart->get_cart_item($response['key']);
+      if (! is_array($stored_cart_item)){
+        return $response;
+      }
+    }
+
+    $preview = nb_get_cart_item_preview_url($stored_cart_item);
+    if ($preview === ''){
+      return $response;
+    }
+
+    $alt = '';
+    if (! empty($stored_cart_item['data']) && is_object($stored_cart_item['data']) && is_a($stored_cart_item['data'], 'WC_Product')){
+      $alt = $stored_cart_item['data']->get_name();
+    }
+
+    if (! empty($response['images']) && is_array($response['images'])){
+      foreach ($response['images'] as $index => $image){
+        if (! is_array($image)){
+          continue;
+        }
+
+        $response['images'][$index]['id'] = 0;
+        $response['images'][$index]['src'] = $preview;
+        $response['images'][$index]['thumbnail'] = $preview;
+        $response['images'][$index]['srcset'] = '';
+        $response['images'][$index]['sizes'] = '';
+
+        if ($alt !== ''){
+          $response['images'][$index]['name'] = $alt;
+          $response['images'][$index]['alt'] = $alt;
+        }
+      }
+    } else {
+      $response['images'] = [
+        [
+          'id' => 0,
+          'src' => $preview,
+          'thumbnail' => $preview,
+          'srcset' => '',
+          'sizes' => '',
+          'name' => $alt,
+          'alt' => $alt,
+        ],
+      ];
+    }
+
+    if (! empty($response['images']) && is_array($response['images'])){
+      $first_key = function_exists('array_key_first') ? array_key_first($response['images']) : null;
+      if ($first_key !== null && isset($response['images'][$first_key]) && is_array($response['images'][$first_key])){
+        $response['image'] = $response['images'][$first_key];
+      } else {
+        $first_image = reset($response['images']);
+        if (is_array($first_image)){
+          $response['image'] = $first_image;
+        }
+      }
+    }
+
+    return $response;
+  }
+}
+
 add_action('after_setup_theme', function(){
   $priority = PHP_INT_MAX;
 
@@ -1106,6 +1203,8 @@ add_action('after_setup_theme', function(){
   add_filter('woocommerce_widget_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', $priority, 3);
   add_filter('woocommerce_checkout_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', $priority, 3);
 }, 100);
+
+add_filter('woocommerce_store_api_cart_item', 'nb_update_store_api_cart_item_image', 10, 3);
 
 add_action('admin_head', function(){
   if (! function_exists('get_current_screen')){
