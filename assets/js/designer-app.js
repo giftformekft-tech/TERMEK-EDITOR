@@ -2717,9 +2717,105 @@
     return cleaned;
   }
 
+  const TEXT_CURVE_MIN_FONT_SIZE = 12;
+
+  function collapseTextboxMultilineForCurve(textbox){
+    if (!textbox || textbox.type !== 'textbox') return;
+    const textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    if (!textValue.length || textValue.indexOf('\n') === -1) return;
+    const originalFontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
+    const rawLines = textValue.split('\n');
+    const condensed = rawLines.map(line=>line.trim()).filter(line=>line.length);
+    const joined = (condensed.length ? condensed : rawLines).join(' ');
+    const normalizedText = joined.replace(/\s{2,}/g, ' ').trim();
+    if (!normalizedText.length) return;
+    const lineCount = Math.max(1, condensed.length || rawLines.length);
+    const targetSize = Math.max(TEXT_CURVE_MIN_FONT_SIZE, Math.round(originalFontSize / lineCount));
+    textbox.__nb_curve_multilineBackup = {
+      text: textValue,
+      fontSize: originalFontSize,
+      flattened: normalizedText,
+      flattenedSize: targetSize
+    };
+    const updates = {};
+    if (textbox.text !== normalizedText){
+      updates.text = normalizedText;
+    }
+    if (!Number.isFinite(textbox.fontSize) || Math.round(textbox.fontSize) !== targetSize){
+      updates.fontSize = targetSize;
+    }
+    if (!Object.keys(updates).length) return;
+    if (typeof textbox.set === 'function'){
+      textbox.set(updates);
+    } else {
+      if (Object.prototype.hasOwnProperty.call(updates, 'text')) textbox.text = updates.text;
+      if (Object.prototype.hasOwnProperty.call(updates, 'fontSize')) textbox.fontSize = updates.fontSize;
+    }
+    if (typeof textbox.initDimensions === 'function'){
+      textbox.initDimensions();
+    }
+    textbox.dirty = true;
+    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    if (fontSizeInput){
+      const nextSize = Math.round(textbox.fontSize || targetSize);
+      fontSizeInput.value = nextSize;
+      if (fontSizeValue) fontSizeValue.textContent = nextSize + ' px';
+    }
+    if (c && typeof c.requestRenderAll === 'function') c.requestRenderAll();
+  }
+
+  function restoreTextboxMultilineFromCurve(textbox){
+    if (!textbox || textbox.type !== 'textbox') return;
+    const backup = textbox.__nb_curve_multilineBackup;
+    if (!backup || typeof backup !== 'object') return;
+    const updates = {};
+    const currentText = typeof textbox.text === 'string' ? textbox.text : '';
+    const matchesFlattened = typeof backup.flattened === 'string' && currentText === backup.flattened;
+    if (matchesFlattened && typeof backup.text === 'string'){
+      updates.text = backup.text;
+    }
+    if (matchesFlattened && Number.isFinite(backup.fontSize)){
+      const currentSize = Number.isFinite(textbox.fontSize) ? Math.round(textbox.fontSize) : null;
+      const flattenedSize = Number.isFinite(backup.flattenedSize) ? Math.round(backup.flattenedSize) : null;
+      if (currentSize === flattenedSize || currentSize === null){
+        updates.fontSize = backup.fontSize;
+      }
+    }
+    if (!Object.keys(updates).length){
+      delete textbox.__nb_curve_multilineBackup;
+      return;
+    }
+    if (typeof textbox.set === 'function'){
+      textbox.set(updates);
+    } else {
+      if (Object.prototype.hasOwnProperty.call(updates, 'text') && typeof updates.text === 'string') textbox.text = updates.text;
+      if (Object.prototype.hasOwnProperty.call(updates, 'fontSize') && Number.isFinite(updates.fontSize)) textbox.fontSize = updates.fontSize;
+    }
+    if (typeof textbox.initDimensions === 'function'){
+      textbox.initDimensions();
+    }
+    textbox.dirty = true;
+    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    if (fontSizeInput){
+      const nextSize = Math.round(textbox.fontSize || updates.fontSize || backup.fontSize || 48);
+      fontSizeInput.value = nextSize;
+      if (fontSizeValue) fontSizeValue.textContent = nextSize + ' px';
+    }
+    if (c && typeof c.requestRenderAll === 'function') c.requestRenderAll();
+    delete textbox.__nb_curve_multilineBackup;
+  }
+
   function applyTextboxCurve(textbox, state){
     if (!textbox || textbox.type !== 'textbox') return;
     const cfg = state ? {enabled: !!state.enabled, amount: clampCurveAmount(state.amount)} : ensureTextboxCurveState(textbox);
+    const textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    const hasText = !!(textValue && textValue.length);
+    const curveActive = cfg.enabled && Math.abs(cfg.amount) >= 1 && hasText;
+    if (curveActive){
+      collapseTextboxMultilineForCurve(textbox);
+    } else {
+      restoreTextboxMultilineFromCurve(textbox);
+    }
     const baseStyles = baseTextboxStyles(textbox);
     const assignStyles = styles=>{
       textbox.styles = styles;
@@ -2752,7 +2848,7 @@
       textbox.dirty = true;
       if (typeof textbox.setCoords === 'function') textbox.setCoords();
     };
-    if (!cfg.enabled || Math.abs(cfg.amount) < 1 || !textbox.text || !textbox.text.length){
+    if (!curveActive || !textbox.text || !textbox.text.length){
       assignStyles(baseStyles);
       assignPathProps(null, 'left');
       if (typeof textbox.set === 'function'){
