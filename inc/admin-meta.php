@@ -1030,36 +1030,230 @@ add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, 
   echo '</div>';
 }, 10, 4);
 
-add_filter('woocommerce_cart_item_thumbnail', function($thumbnail, $cart_item, $cart_item_key){
-  if (! is_array($cart_item)){
-    return $thumbnail;
-  }
+if (! function_exists('nb_get_cart_item_preview_url')) {
+  function nb_get_cart_item_preview_url($cart_item){
+    if (! is_array($cart_item)){
+      return '';
+    }
 
-  $preview = '';
-  if (! empty($cart_item['preview_url'])){
-    $preview = (string) $cart_item['preview_url'];
-  } elseif (! empty($cart_item['nb_design_id'])){
-    $design_id = intval($cart_item['nb_design_id']);
-    if ($design_id){
-      $saved_preview = get_post_meta($design_id, 'preview_url', true);
-      if (is_string($saved_preview) && $saved_preview !== ''){
-        $preview = $saved_preview;
+    $candidates = [];
+    if (! empty($cart_item['preview_url'])){
+      $candidates[] = (string) $cart_item['preview_url'];
+    }
+    if (! empty($cart_item['preview_back_url'])){
+      $candidates[] = (string) $cart_item['preview_back_url'];
+    }
+
+    if (! empty($cart_item['nb_design_id'])){
+      $design_id = intval($cart_item['nb_design_id']);
+      if ($design_id){
+        $saved_preview = get_post_meta($design_id, 'preview_url', true);
+        if (is_string($saved_preview) && $saved_preview !== ''){
+          $candidates[] = $saved_preview;
+        }
+        $saved_preview_back = get_post_meta($design_id, 'preview_back_url', true);
+        if (is_string($saved_preview_back) && $saved_preview_back !== ''){
+          $candidates[] = $saved_preview_back;
+        }
       }
     }
-  }
 
-  $preview = esc_url($preview);
-  if ($preview === ''){
-    return $thumbnail;
-  }
+    foreach ($candidates as $candidate){
+      $candidate = trim((string) $candidate);
+      if ($candidate === ''){
+        continue;
+      }
 
-  $alt = '';
-  if (! empty($cart_item['data']) && is_object($cart_item['data']) && is_a($cart_item['data'], 'WC_Product')){
-    $alt = $cart_item['data']->get_name();
-  }
+      $sanitized = esc_url_raw($candidate);
+      if ($sanitized !== ''){
+        return $sanitized;
+      }
 
-  return '<img src="'.$preview.'" alt="'.esc_attr($alt).'" class="nb-cart-item-thumbnail attachment-woocommerce_thumbnail size-woocommerce_thumbnail" loading="lazy" />';
-}, 10, 3);
+      // Allow data URLs as a last resort in case previews are inlined.
+      if (strpos($candidate, 'data:') === 0){
+        return $candidate;
+      }
+    }
+
+    return '';
+  }
+}
+
+if (! function_exists('nb_generate_cart_item_preview_image')) {
+  function nb_generate_cart_item_preview_image($preview, $alt = ''){
+    $raw_preview = trim((string) $preview);
+    if ($raw_preview === ''){
+      return [];
+    }
+
+    $sanitized_preview = esc_url_raw($raw_preview);
+    if ($sanitized_preview === '' && strpos($raw_preview, 'data:') === 0){
+      $sanitized_preview = $raw_preview;
+    }
+
+    if ($sanitized_preview === ''){
+      return [];
+    }
+
+    $alt = is_string($alt) ? $alt : '';
+
+    $image_size = function_exists('wc_get_image_size') ? wc_get_image_size('woocommerce_thumbnail') : null;
+    $width = (is_array($image_size) && ! empty($image_size['width'])) ? intval($image_size['width']) : 0;
+    $height = (is_array($image_size) && ! empty($image_size['height'])) ? intval($image_size['height']) : 0;
+
+    $img = [
+      'id' => 0,
+      'src' => $sanitized_preview,
+      'thumbnail' => $sanitized_preview,
+      'srcset' => $sanitized_preview,
+      'sizes' => '',
+      'name' => $alt,
+      'alt' => $alt,
+    ];
+
+    if ($width > 0){
+      $img['width'] = $width;
+    }
+    if ($height > 0){
+      $img['height'] = $height;
+    }
+
+    return $img;
+  }
+}
+
+if (! function_exists('nb_render_cart_item_preview_thumbnail')) {
+  function nb_render_cart_item_preview_thumbnail($thumbnail, $cart_item, $cart_item_key = ''){
+    $preview = nb_get_cart_item_preview_url($cart_item);
+    if ($preview === ''){
+      return $thumbnail;
+    }
+
+    $alt = '';
+    if (! empty($cart_item['data']) && is_object($cart_item['data']) && is_a($cart_item['data'], 'WC_Product')){
+      $alt = $cart_item['data']->get_name();
+    }
+
+    $image_data = nb_generate_cart_item_preview_image($preview, $alt);
+    if (empty($image_data['src'])){
+      return $thumbnail;
+    }
+
+    $width_attr = '';
+    $height_attr = '';
+    if (! empty($image_data['width'])){
+      $width_attr = ' width="'.intval($image_data['width']).'"';
+    }
+    if (! empty($image_data['height'])){
+      $height_attr = ' height="'.intval($image_data['height']).'"';
+    }
+
+    $attributes = ' class="nb-cart-item-thumbnail attachment-woocommerce_thumbnail size-woocommerce_thumbnail" loading="lazy" decoding="async"';
+
+    return '<img src="'.$image_data['src'].'" alt="'.esc_attr($alt).'"'.$attributes.$width_attr.$height_attr.' />';
+  }
+}
+
+if (! function_exists('nb_update_store_api_cart_item_image')) {
+  function nb_update_store_api_cart_item_image($response, $cart_item, $request){
+    if (! is_array($response)){
+      return $response;
+    }
+
+    if (empty($response['key'])){
+      return $response;
+    }
+
+    $stored_cart_item = null;
+
+    if (is_object($cart_item)){
+      if (is_callable([$cart_item, 'get_cart_item'])){
+        $stored_cart_item = $cart_item->get_cart_item();
+      } elseif (is_callable([$cart_item, 'get_item'])){
+        $stored_cart_item = $cart_item->get_item();
+      } elseif (is_callable([$cart_item, 'to_legacy_cart_item'])){
+        $stored_cart_item = $cart_item->to_legacy_cart_item();
+      }
+    } elseif (is_array($cart_item)){
+      $stored_cart_item = $cart_item;
+    }
+
+    if (! is_array($stored_cart_item)){
+      if (! function_exists('WC')){
+        return $response;
+      }
+
+      $cart = WC()->cart;
+      if (! $cart || ! is_a($cart, 'WC_Cart') || ! is_callable([$cart, 'get_cart_item'])){
+        return $response;
+      }
+
+      $stored_cart_item = $cart->get_cart_item($response['key']);
+      if (! is_array($stored_cart_item)){
+        return $response;
+      }
+    }
+
+    $preview = nb_get_cart_item_preview_url($stored_cart_item);
+    if ($preview === ''){
+      return $response;
+    }
+
+    $alt = '';
+    if (! empty($stored_cart_item['data']) && is_object($stored_cart_item['data']) && is_a($stored_cart_item['data'], 'WC_Product')){
+      $alt = $stored_cart_item['data']->get_name();
+    }
+
+    $image_data = nb_generate_cart_item_preview_image($preview, $alt);
+    if (empty($image_data)){
+      return $response;
+    }
+
+    if (! empty($response['images']) && is_array($response['images'])){
+      foreach ($response['images'] as $index => $image){
+        if (! is_array($image)){
+          continue;
+        }
+
+        $response['images'][$index] = array_merge($image, $image_data);
+      }
+    } else {
+      $response['images'] = [$image_data];
+    }
+
+    if (! empty($response['images']) && is_array($response['images'])){
+      $first_key = function_exists('array_key_first') ? array_key_first($response['images']) : null;
+      if ($first_key !== null && isset($response['images'][$first_key]) && is_array($response['images'][$first_key])){
+        $response['image'] = $response['images'][$first_key];
+      } else {
+        $first_image = reset($response['images']);
+        if (is_array($first_image)){
+          $response['image'] = $first_image;
+        }
+      }
+    }
+
+    if (! empty($image_data['src'])){
+      $image_src = (string) $image_data['src'];
+      $escaped_src = (strpos($image_src, 'data:') === 0) ? $image_src : esc_url($image_src);
+      if ($escaped_src !== ''){
+        $response['images_html'] = '<img src="'.$escaped_src.'" alt="'.esc_attr($image_data['alt']).'" class="nb-cart-item-thumbnail" loading="lazy" decoding="async" />';
+      }
+    }
+
+    return $response;
+  }
+}
+
+add_action('after_setup_theme', function(){
+  $priority = PHP_INT_MAX;
+
+  add_filter('woocommerce_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', $priority, 3);
+  add_filter('woocommerce_widget_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', $priority, 3);
+  add_filter('woocommerce_checkout_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', $priority, 3);
+}, 100);
+
+add_filter('woocommerce_store_api_cart_item', 'nb_update_store_api_cart_item_image', 10, 3);
 
 add_action('admin_head', function(){
   if (! function_exists('get_current_screen')){
