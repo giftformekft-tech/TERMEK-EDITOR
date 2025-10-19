@@ -1377,6 +1377,9 @@
     }
 
     if (mobilePriceEl){
+      const desktopTotalText = priceTotalEl
+        ? ((priceTotalEl.textContent || priceTotalEl.innerText || '').trim())
+        : '';
       if (!mobileUiEnabled() || !hasBase){
         mobilePriceEl.textContent = '';
         mobilePriceEl.setAttribute('hidden', '');
@@ -1384,9 +1387,12 @@
         let mobileDisplay = '';
         if (totalAmount !== null){
           mobileDisplay = formatPrice(totalAmount);
-        } else if (priceText && priceText.trim()){ // plain text price fallback
+        }
+        if (!mobileDisplay && desktopTotalText){
+          mobileDisplay = desktopTotalText;
+        } else if (!mobileDisplay && priceText && priceText.trim()){ // plain text price fallback
           mobileDisplay = priceText.trim();
-        } else if (markup && markup.trim()){ // strip markup tags for display
+        } else if (!mobileDisplay && markup && markup.trim()){ // strip markup tags for display
           const tmp = document.createElement('div');
           tmp.innerHTML = markup;
           mobileDisplay = (tmp.textContent || tmp.innerText || '').trim();
