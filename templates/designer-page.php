@@ -106,6 +106,16 @@
               <button type="button" class="nb-toggle" data-nb-align="right" aria-pressed="false">⟹</button>
             </div>
           </div>
+          <div class="nb-field nb-field--curve">
+            <span>Ívesség</span>
+            <div class="nb-curve-controls">
+              <button type="button" class="nb-toggle nb-curve-toggle" id="nb-text-curve-toggle" aria-pressed="false">Íves felirat</button>
+              <div class="nb-range nb-curve-range">
+                <input type="range" id="nb-text-curve" min="-100" max="100" value="0" disabled>
+                <span id="nb-text-curve-value">Egyenes</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="nb-action-card nb-action-card--layers" data-nb-sheet-source="layers" data-nb-sheet-title="Rétegek">
@@ -199,6 +209,12 @@
     </div>
     <div class="nb-mobile-status-actions">
       <button type="button" class="nb-mobile-complete" id="nb-mobile-complete">Kosárba</button>
+      <div class="nb-mobile-total" id="nb-mobile-total">
+        <div class="nb-mobile-total-line">
+          <span class="nb-mobile-total-label">Végösszeg:</span>
+          <span class="nb-mobile-total-value" id="nb-price-total-mobile">—</span>
+        </div>
+      </div>
       <button type="button" class="nb-mobile-secondary" id="nb-mobile-bulk">Többet vennék</button>
     </div>
   </div>
