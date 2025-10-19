@@ -81,21 +81,20 @@ add_action('woocommerce_cart_calculate_fees', function($cart){
       }
       $total_fee += nb_calc_fee_for_design($item['nb_design_id'], $override);
     }
-    if (!empty($item['nb_bulk_group_id']) && !empty($item['nb_bulk_discount'])){
+    if (!empty($item['nb_bulk_group_id'])){
       $group_id = (string)$item['nb_bulk_group_id'];
       if ($group_id !== ''){
         if (!isset($discount_groups[$group_id])){
           $discount_groups[$group_id] = [
-            'percent' => floatval($item['nb_bulk_discount']),
-            'base'    => 0,
+            'base'     => 0,
+            'quantity' => 0,
           ];
-        } elseif (floatval($item['nb_bulk_discount']) > $discount_groups[$group_id]['percent']){
-          $discount_groups[$group_id]['percent'] = floatval($item['nb_bulk_discount']);
         }
         $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
         if ($quantity < 1){
           $quantity = 1;
         }
+        $discount_groups[$group_id]['quantity'] += $quantity;
         $line_total = 0;
         if (!empty($item['data']) && is_a($item['data'], 'WC_Product')){
           if (function_exists('wc_get_price_excluding_tax')){
@@ -112,8 +111,16 @@ add_action('woocommerce_cart_calculate_fees', function($cart){
     $cart->add_fee(__('Egyedi nyomat','nb'), $total_fee, true);
   }
   if (!empty($discount_groups)){
+    $settings = get_option('nb_settings', []);
+    if (!is_array($settings)){
+      $settings = [];
+    }
     foreach ($discount_groups as $group){
-      $percent = floatval($group['percent']);
+      $quantity = isset($group['quantity']) ? intval($group['quantity']) : 0;
+      $percent = 0;
+      if ($quantity > 0 && function_exists('nb_find_bulk_discount_for_quantity')){
+        $percent = nb_find_bulk_discount_for_quantity($quantity, $settings);
+      }
       $base = floatval($group['base']);
       if ($percent <= 0 || $base <= 0){
         continue;
