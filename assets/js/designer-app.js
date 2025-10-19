@@ -1334,10 +1334,20 @@
     const surcharge = shouldApplyDoubleSidedSurcharge() ? doubleSidedFeeValue() : 0;
     const hasBase = (markup && markup.trim()) || (priceText && priceText.trim());
     const totalTargets = [priceTotalEl, priceTotalMobileEl].filter(Boolean);
-    const surchargeTargets = [
-      {row: priceSurchargeRow, value: priceSurchargeValueEl},
-      {row: mobilePriceSurchargeRow, value: mobilePriceSurchargeValueEl}
-    ].filter(target=>target.row && target.value);
+    const surchargeTargets = [];
+    if (priceSurchargeRow && priceSurchargeValueEl){
+      surchargeTargets.push({row: priceSurchargeRow, value: priceSurchargeValueEl});
+    }
+    if (
+      typeof mobilePriceSurchargeRow !== 'undefined' &&
+      typeof mobilePriceSurchargeValueEl !== 'undefined'
+    ){
+      const mobileRow = mobilePriceSurchargeRow;
+      const mobileValue = mobilePriceSurchargeValueEl;
+      if (mobileRow && mobileValue){
+        surchargeTargets.push({row: mobileRow, value: mobileValue});
+      }
+    }
 
     if (!hasBase){
       priceDisplayEl.classList.add('nb-price-display--pending');
