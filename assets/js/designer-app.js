@@ -2871,7 +2871,6 @@
     }
     assignPathProps(curvePath, cfg.amount >= 0 ? 'left' : 'right');
     const nextStyles = cloneTextboxStyles(baseStyles);
-    const textValue = typeof textbox.text === 'string' ? textbox.text : '';
     const lines = textValue.split('\n');
     if (lines.length > 1){
       const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
