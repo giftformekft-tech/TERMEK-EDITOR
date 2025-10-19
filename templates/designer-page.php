@@ -95,7 +95,7 @@
           </label>
           <label class="nb-field nb-field--color">
             <span>Betűszín</span>
-            <input type="color" id="nb-font-color" value="#000000">
+            <input type="color" id="nb-font-color" value="#ff0000">
           </label>
           <div class="nb-text-style">
             <button type="button" class="nb-toggle" id="nb-font-bold" aria-pressed="false">B</button>

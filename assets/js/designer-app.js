@@ -2585,17 +2585,17 @@
   }
 
   function toHexColor(color){
-    if (!color) return '#000000';
+    if (!color) return '#ff0000';
     if (/^#[0-9a-f]{3,8}$/i.test(color)) return color;
     const tester = document.createElement('canvas');
     tester.width = tester.height = 1;
     const ctx = tester.getContext && tester.getContext('2d');
-    if (!ctx) return '#000000';
+    if (!ctx) return '#ff0000';
     try{
       ctx.fillStyle = color;
-      return ctx.fillStyle || '#000000';
+      return ctx.fillStyle || '#ff0000';
     }catch(e){
-      return '#000000';
+      return '#ff0000';
     }
   }
 
@@ -2662,9 +2662,71 @@
     return 40;
   }
 
+  function cloneTextboxStyles(styles){
+    const clone = {};
+    if (!styles || typeof styles !== 'object') return clone;
+    Object.keys(styles).forEach(lineKey=>{
+      const srcLine = styles[lineKey];
+      if (!srcLine || typeof srcLine !== 'object') return;
+      const destLine = {};
+      Object.keys(srcLine).forEach(charKey=>{
+        const entry = srcLine[charKey];
+        destLine[charKey] = entry && typeof entry === 'object' ? Object.assign({}, entry) : {};
+      });
+      clone[lineKey] = destLine;
+    });
+    return clone;
+  }
+
+  function stripCurveDelta(styles){
+    if (!styles || typeof styles !== 'object') return {};
+    const cleaned = cloneTextboxStyles(styles);
+    Object.keys(cleaned).forEach(lineKey=>{
+      const line = cleaned[lineKey];
+      if (!line || typeof line !== 'object'){
+        delete cleaned[lineKey];
+        return;
+      }
+      Object.keys(line).forEach(charKey=>{
+        const entry = line[charKey];
+        if (!entry || typeof entry !== 'object'){
+          delete line[charKey];
+          return;
+        }
+        if (Object.prototype.hasOwnProperty.call(entry, 'deltaY')){
+          const next = Object.assign({}, entry);
+          delete next.deltaY;
+          if (Object.keys(next).length){
+            line[charKey] = next;
+          } else {
+            delete line[charKey];
+          }
+        }
+      });
+      if (!Object.keys(line).length){
+        delete cleaned[lineKey];
+      }
+    });
+    return cleaned;
+  }
+
+  function baseTextboxStyles(textbox){
+    if (!textbox || textbox.type !== 'textbox') return {};
+    const cleaned = stripCurveDelta(textbox.styles || {});
+    textbox.__nb_curve_baseStyles = cloneTextboxStyles(cleaned);
+    return cleaned;
+  }
+
   function applyTextboxCurve(textbox, state){
     if (!textbox || textbox.type !== 'textbox') return;
     const cfg = state ? {enabled: !!state.enabled, amount: clampCurveAmount(state.amount)} : ensureTextboxCurveState(textbox);
+    const baseStyles = baseTextboxStyles(textbox);
+    const assignStyles = styles=>{
+      textbox.styles = styles;
+      if (typeof textbox.set === 'function'){
+        textbox.set('styles', textbox.styles);
+      }
+    };
     const assignPathProps = (path, side)=>{
       const props = {
         path: path || null,
@@ -2691,12 +2753,14 @@
       if (typeof textbox.setCoords === 'function') textbox.setCoords();
     };
     if (!cfg.enabled || Math.abs(cfg.amount) < 1 || !textbox.text || !textbox.text.length){
+      assignStyles(baseStyles);
       assignPathProps(null, 'left');
       if (typeof textbox.set === 'function'){
         textbox.set('textBaseline', 'alphabetic');
       } else {
         textbox.textBaseline = 'alphabetic';
       }
+      delete textbox.__nb_curve_baseStyles;
       return;
     }
     const width = Math.max(20, textbox.width || 0);
@@ -2710,6 +2774,35 @@
       curvePath.segmentsInfo = fabric.util.getPathSegmentsInfo(curvePath.path);
     }
     assignPathProps(curvePath, cfg.amount >= 0 ? 'left' : 'right');
+    const nextStyles = cloneTextboxStyles(baseStyles);
+    const textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    const lines = textValue.split('\n');
+    if (lines.length > 1){
+      const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
+      const lineHeight = Number.isFinite(textbox.lineHeight) ? textbox.lineHeight : 1.16;
+      const step = Math.max(1, fontSize * lineHeight);
+      const direction = cfg.amount >= 0 ? 1 : -1;
+      lines.forEach((lineText, lineIndex)=>{
+        const offset = lineIndex * step * direction;
+        const key = lineIndex.toString();
+        const lineStyles = nextStyles[key] || {};
+        for (let i = 0; i < lineText.length; i++){ 
+          const entry = lineStyles.hasOwnProperty(i) ? Object.assign({}, lineStyles[i]) : {};
+          entry.deltaY = offset;
+          lineStyles[i] = entry;
+        }
+        Object.keys(lineStyles).forEach(charKey=>{
+          const entry = lineStyles[charKey];
+          if (!entry || typeof entry !== 'object'){
+            delete lineStyles[charKey];
+            return;
+          }
+          entry.deltaY = offset;
+        });
+        nextStyles[key] = lineStyles;
+      });
+    }
+    assignStyles(nextStyles);
     if (typeof textbox.set === 'function'){
       textbox.set('textBaseline', 'alphabetic');
     } else {
@@ -2772,7 +2865,7 @@
       if (fontSizeValue) fontSizeValue.textContent = size + ' px';
     }
     if (fontColorInput){
-      fontColorInput.value = toHexColor(textbox.fill || '#000000');
+      fontColorInput.value = toHexColor(textbox.fill || '#ff0000');
     }
     setPressed(fontBoldToggle, (textbox.fontWeight || '').toString().toLowerCase() === 'bold' || parseInt(textbox.fontWeight,10) >= 600);
     setPressed(fontItalicToggle, (textbox.fontStyle || '').toString().toLowerCase() === 'italic');
@@ -2802,7 +2895,7 @@
   }
 
   function currentFontColor(){
-    return fontColorInput && fontColorInput.value ? fontColorInput.value : '#000000';
+    return fontColorInput && fontColorInput.value ? fontColorInput.value : '#ff0000';
   }
 
   function currentFontWeight(){
@@ -3087,7 +3180,7 @@
 
   if (fontColorInput){
     fontColorInput.onchange = ()=>{
-      const color = fontColorInput.value || '#000000';
+      const color = fontColorInput.value || '#ff0000';
       applyToActiveText(obj=>{ obj.set('fill', color); });
     };
   }
