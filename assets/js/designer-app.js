@@ -340,6 +340,7 @@
   const mobileSelectionLabel = document.getElementById('nb-mobile-selection-label');
   const mobileCompleteBtn = document.getElementById('nb-mobile-complete');
   const mobileBulkBtn = document.getElementById('nb-mobile-bulk');
+  const mobilePriceEl = document.getElementById('nb-mobile-price');
   const mobileSheet = document.getElementById('nb-mobile-sheet');
   const mobileSheetContent = document.getElementById('nb-mobile-sheet-content');
   const mobileSheetTitle = document.getElementById('nb-mobile-sheet-title');
@@ -1361,14 +1362,48 @@
       }
     }
 
+    const totalAmount = Number.isFinite(baseAmount)
+      ? baseAmount + (Number.isFinite(surcharge) ? surcharge : 0)
+      : null;
+
     if (priceTotalEl){
-      if (Number.isFinite(baseAmount)){
-        const total = baseAmount + (Number.isFinite(surcharge) ? surcharge : 0);
-        priceTotalEl.textContent = formatPrice(total);
+      if (totalAmount !== null){
+        priceTotalEl.textContent = formatPrice(totalAmount);
       } else if (markup && markup !== priceText){
         priceTotalEl.innerHTML = markup;
       } else {
         priceTotalEl.textContent = priceText || '—';
+      }
+    }
+
+    if (mobilePriceEl){
+      const desktopTotalText = priceTotalEl
+        ? ((priceTotalEl.textContent || priceTotalEl.innerText || '').trim())
+        : '';
+      if (!mobileUiEnabled() || !hasBase){
+        mobilePriceEl.textContent = '';
+        mobilePriceEl.setAttribute('hidden', '');
+      } else {
+        let mobileDisplay = '';
+        if (totalAmount !== null){
+          mobileDisplay = formatPrice(totalAmount);
+        }
+        if (!mobileDisplay && desktopTotalText){
+          mobileDisplay = desktopTotalText;
+        } else if (!mobileDisplay && priceText && priceText.trim()){ // plain text price fallback
+          mobileDisplay = priceText.trim();
+        } else if (!mobileDisplay && markup && markup.trim()){ // strip markup tags for display
+          const tmp = document.createElement('div');
+          tmp.innerHTML = markup;
+          mobileDisplay = (tmp.textContent || tmp.innerText || '').trim();
+        }
+        if (mobileDisplay){
+          mobilePriceEl.textContent = mobileDisplay;
+          mobilePriceEl.removeAttribute('hidden');
+        } else {
+          mobilePriceEl.textContent = '';
+          mobilePriceEl.setAttribute('hidden', '');
+        }
       }
     }
   }
@@ -2046,6 +2081,7 @@
     syncMobileSelectionUi();
     syncMobileCompleteState();
     syncMobileBulkState();
+    updatePriceDisplay();
   }
 
   function toggleSheetExpansion(){
