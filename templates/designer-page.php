@@ -89,8 +89,8 @@
           <label class="nb-field">
             <span>Betűméret</span>
             <div class="nb-range">
-              <input type="range" id="nb-font-size" min="12" max="120" value="48">
-              <span id="nb-font-size-value">48 px</span>
+              <input type="range" id="nb-font-size" min="12" max="120" value="24">
+              <span id="nb-font-size-value">24 px</span>
             </div>
           </label>
           <label class="nb-field nb-field--color">
