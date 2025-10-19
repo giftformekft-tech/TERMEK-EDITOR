@@ -1375,6 +1375,16 @@
       }
     }
 
+    if (mobilePriceSurchargeRow && mobilePriceSurchargeValueEl){
+      if (surcharge > 0){
+        mobilePriceSurchargeRow.hidden = false;
+        mobilePriceSurchargeValueEl.textContent = `+${formatPrice(surcharge)}`;
+      } else {
+        mobilePriceSurchargeRow.hidden = true;
+        mobilePriceSurchargeValueEl.textContent = formatPrice(0);
+      }
+    }
+
     if (priceTotalEl){
       if (Number.isFinite(baseAmount)){
         const total = baseAmount + (Number.isFinite(surcharge) ? surcharge : 0);
