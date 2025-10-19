@@ -307,10 +307,6 @@
   const priceSurchargeRow = document.getElementById('nb-price-surcharge-row');
   const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
   const priceTotalEl = document.getElementById('nb-price-total');
-  const mobilePriceWrap = document.getElementById('nb-mobile-price');
-  const mobilePriceBaseEl = document.getElementById('nb-mobile-price-base');
-  const mobilePriceSurchargeRow = document.getElementById('nb-mobile-price-surcharge-row');
-  const mobilePriceSurchargeValueEl = document.getElementById('nb-mobile-price-surcharge');
   const mobilePriceTotalEl = document.getElementById('nb-mobile-price-total');
   const fontFamilySel = document.getElementById('nb-font-family');
   const fontSizeInput = document.getElementById('nb-font-size');
@@ -1329,7 +1325,7 @@
   }
 
   function updatePriceDisplay(){
-    if (!priceDisplayEl && !mobilePriceWrap) return;
+    if (!priceDisplayEl && !mobilePriceTotalEl) return;
     const markup = currentProductPriceMarkup();
     const priceText = currentProductPriceText();
     const baseAmount = parsePriceValue(priceText);
@@ -1343,20 +1339,18 @@
       if (priceBaseEl) priceBaseEl.textContent = '—';
       if (priceSurchargeRow) priceSurchargeRow.hidden = true;
       if (priceTotalEl) priceTotalEl.textContent = 'Ár nem elérhető.';
-      if (mobilePriceWrap){
-        mobilePriceWrap.classList.add('is-pending');
+      if (mobilePriceTotalEl){
+        mobilePriceTotalEl.classList.add('is-pending');
+        mobilePriceTotalEl.textContent = '—';
       }
-      if (mobilePriceBaseEl) mobilePriceBaseEl.textContent = '—';
-      if (mobilePriceSurchargeRow) mobilePriceSurchargeRow.hidden = true;
-      if (mobilePriceTotalEl) mobilePriceTotalEl.textContent = 'Ár nem elérhető.';
       return;
     }
 
     if (priceDisplayEl){
       priceDisplayEl.classList.remove('nb-price-display--pending');
     }
-    if (mobilePriceWrap){
-      mobilePriceWrap.classList.remove('is-pending');
+    if (mobilePriceTotalEl){
+      mobilePriceTotalEl.classList.remove('is-pending');
     }
 
     if (priceBaseEl){
@@ -1368,14 +1362,6 @@
     } else if (markup){
       if (priceDisplayEl){
         priceDisplayEl.innerHTML = markup;
-      }
-    }
-
-    if (mobilePriceBaseEl){
-      if (markup && markup !== priceText){
-        mobilePriceBaseEl.innerHTML = markup;
-      } else {
-        mobilePriceBaseEl.textContent = priceText;
       }
     }
 
