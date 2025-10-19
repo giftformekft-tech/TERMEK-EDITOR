@@ -90,8 +90,6 @@
 .nb-mobile-secondary{border:none;background:rgba(11,31,58,.08);color:#0b1f3a;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:10px 16px;border-radius:14px;cursor:pointer;transition:transform .2s ease,background .2s ease;width:100%}
 .nb-mobile-secondary:hover{transform:translateY(-2px);background:rgba(11,31,58,.16)}
 .nb-mobile-secondary:disabled{background:rgba(148,163,184,.24);color:#94a3b8;cursor:not-allowed;transform:none}
-.nb-mobile-price{display:flex;align-items:center;justify-content:center;padding:8px 12px;border-radius:12px;background:rgba(11,31,58,.08);color:#0b1f3a;font-size:17px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1;margin:2px 0 4px}
-.nb-mobile-price[hidden]{display:none!important}
 
 .nb-mobile-overlay{position:fixed;inset:0;background:rgba(11,31,58,.24);backdrop-filter:blur(2px);z-index:880;pointer-events:none}
 .nb-mobile-overlay[hidden]{display:none!important}
