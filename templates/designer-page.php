@@ -199,6 +199,7 @@
     </div>
     <div class="nb-mobile-status-actions">
       <button type="button" class="nb-mobile-complete" id="nb-mobile-complete">Kosárba</button>
+      <div class="nb-mobile-price" id="nb-mobile-price" hidden></div>
       <button type="button" class="nb-mobile-secondary" id="nb-mobile-bulk">Többet vennék</button>
     </div>
   </div>
