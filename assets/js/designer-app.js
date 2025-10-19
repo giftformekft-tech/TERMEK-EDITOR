@@ -34,6 +34,14 @@
     return false;
   }
 
+  function isEditableTarget(target){
+    if (!target || typeof target !== 'object') return false;
+    if (target.isContentEditable) return true;
+    if (target.ownerDocument && target.ownerDocument.designMode === 'on') return true;
+    const tag = target.tagName ? target.tagName.toLowerCase() : '';
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button';
+  }
+
   let touchDragActive = false;
   function restoreTouchScrolling(){
     touchDragActive = false;
@@ -2261,11 +2269,14 @@
     });
   }
 
-  function removeActiveObject(){
-    const obj = activeDesignObject();
+  function removeActiveObject(target){
+    const obj = target && isDesignObject(target) ? target : activeDesignObject();
     if (!obj) return;
+    const wasActive = c.getActiveObject() === obj;
     c.remove(obj);
-    c.discardActiveObject();
+    if (wasActive){
+      c.discardActiveObject();
+    }
     c.requestRenderAll();
     markDesignDirty();
     syncLayerList();
@@ -2365,8 +2376,18 @@
         moveLayer(obj, -1);
       });
 
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'nb-layer-delete';
+      deleteBtn.setAttribute('aria-label', 'Törlés');
+      deleteBtn.innerHTML = '✕';
+      deleteBtn.addEventListener('click', ()=>{
+        removeActiveObject(obj);
+      });
+
       controls.appendChild(upBtn);
       controls.appendChild(downBtn);
+      controls.appendChild(deleteBtn);
       item.appendChild(controls);
 
       layerListEl.appendChild(item);
@@ -2970,7 +2991,8 @@
   }
 
   document.addEventListener('keydown', evt=>{
-    if (evt.key === 'Escape'){
+    const key = evt.key;
+    if (key === 'Escape'){
       if (mobileSheet && sheetState.activeKey){
         closeMobileSheet();
         return;
@@ -2985,6 +3007,14 @@
       }
       if (productModal && !productModal.hidden){
         closeProductModal();
+      }
+      return;
+    }
+    if ((key === 'Delete' || key === 'Backspace') && !isEditableTarget(evt.target)){
+      const active = activeDesignObject();
+      if (active){
+        evt.preventDefault();
+        removeActiveObject(active);
       }
     }
   });

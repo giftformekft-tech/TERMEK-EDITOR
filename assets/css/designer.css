@@ -159,6 +159,8 @@
 .nb-layer-controls button{border:1px solid rgba(148,163,184,.4);background:#f8fafc;color:#1e293b;border-radius:10px;padding:6px 8px;font-size:12px;cursor:pointer;transition:all .2s ease}
 .nb-layer-controls button:hover:not([disabled]){background:#e0e7ff;border-color:#2563eb;color:#1e3a8a}
 .nb-layer-controls button[disabled]{opacity:.45;cursor:not-allowed}
+.nb-layer-controls button.nb-layer-delete{background:#fef2f2;color:#991b1b;border-color:rgba(248,113,113,.6)}
+.nb-layer-controls button.nb-layer-delete:hover:not([disabled]){background:#fee2e2;border-color:#ef4444;color:#7f1d1d}
 .nb-layer-empty{font-size:12px;color:#6b7280}
 
 body.nb-modal-open{overflow:hidden}
