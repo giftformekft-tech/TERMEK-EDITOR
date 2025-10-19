@@ -307,6 +307,7 @@
   const priceSurchargeRow = document.getElementById('nb-price-surcharge-row');
   const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
   const priceTotalEl = document.getElementById('nb-price-total');
+  const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
   const fontFamilySel = document.getElementById('nb-font-family');
   const fontSizeInput = document.getElementById('nb-font-size');
   const fontSizeValue = document.getElementById('nb-font-size-value');
@@ -1330,12 +1331,15 @@
     const baseAmount = parsePriceValue(priceText);
     const surcharge = shouldApplyDoubleSidedSurcharge() ? doubleSidedFeeValue() : 0;
     const hasBase = (markup && markup.trim()) || (priceText && priceText.trim());
+    const totalTargets = [priceTotalEl, priceTotalMobileEl].filter(Boolean);
 
     if (!hasBase){
       priceDisplayEl.classList.add('nb-price-display--pending');
       if (priceBaseEl) priceBaseEl.textContent = '—';
       if (priceSurchargeRow) priceSurchargeRow.hidden = true;
-      if (priceTotalEl) priceTotalEl.textContent = 'Ár nem elérhető.';
+      totalTargets.forEach(el=>{
+        el.textContent = 'Ár nem elérhető.';
+      });
       return;
     }
 
@@ -1361,14 +1365,20 @@
       }
     }
 
-    if (priceTotalEl){
+    if (totalTargets.length){
       if (Number.isFinite(baseAmount)){
         const total = baseAmount + (Number.isFinite(surcharge) ? surcharge : 0);
-        priceTotalEl.textContent = formatPrice(total);
+        totalTargets.forEach(el=>{
+          el.textContent = formatPrice(total);
+        });
       } else if (markup && markup !== priceText){
-        priceTotalEl.innerHTML = markup;
+        totalTargets.forEach(el=>{
+          el.innerHTML = markup;
+        });
       } else {
-        priceTotalEl.textContent = priceText || '—';
+        totalTargets.forEach(el=>{
+          el.textContent = priceText || '—';
+        });
       }
     }
   }
