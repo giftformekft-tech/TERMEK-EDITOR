@@ -2665,13 +2665,38 @@
   function applyTextboxCurve(textbox, state){
     if (!textbox || textbox.type !== 'textbox') return;
     const cfg = state ? {enabled: !!state.enabled, amount: clampCurveAmount(state.amount)} : ensureTextboxCurveState(textbox);
-    if (!cfg.enabled || Math.abs(cfg.amount) < 1){
-      textbox.path = null;
-      textbox.pathStartOffset = 0;
-      textbox.pathSide = 'left';
-      textbox.pathAlign = 'center';
+    const assignPathProps = (path, side)=>{
+      const props = {
+        path: path || null,
+        pathStartOffset: 0,
+        pathAlign: 'center',
+        pathSide: side || 'left'
+      };
+      if (typeof textbox.set === 'function'){
+        textbox.set(props);
+      } else {
+        textbox.path = props.path;
+        textbox.pathStartOffset = props.pathStartOffset;
+        textbox.pathAlign = props.pathAlign;
+        textbox.pathSide = props.pathSide;
+      }
+      if (props.path){
+        if (typeof fabric.util === 'object' && typeof fabric.util.getPathSegmentsInfo === 'function'){
+          textbox.pathInfo = props.path.segmentsInfo || fabric.util.getPathSegmentsInfo(props.path.path);
+        }
+      } else if (Object.prototype.hasOwnProperty.call(textbox, 'pathInfo')){
+        textbox.pathInfo = null;
+      }
       textbox.dirty = true;
       if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    };
+    if (!cfg.enabled || Math.abs(cfg.amount) < 1 || !textbox.text || !textbox.text.length){
+      assignPathProps(null, 'left');
+      if (typeof textbox.set === 'function'){
+        textbox.set('textBaseline', 'alphabetic');
+      } else {
+        textbox.textBaseline = 'alphabetic';
+      }
       return;
     }
     const width = Math.max(20, textbox.width || 0);
@@ -2681,12 +2706,15 @@
       evented: false
     });
     curvePath.pathOffset = new fabric.Point(0, 0);
-    textbox.path = curvePath;
-    textbox.pathStartOffset = 0;
-    textbox.pathAlign = 'center';
-    textbox.pathSide = cfg.amount >= 0 ? 'left' : 'right';
-    textbox.dirty = true;
-    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    if (!curvePath.segmentsInfo && fabric.util && typeof fabric.util.getPathSegmentsInfo === 'function'){
+      curvePath.segmentsInfo = fabric.util.getPathSegmentsInfo(curvePath.path);
+    }
+    assignPathProps(curvePath, cfg.amount >= 0 ? 'left' : 'right');
+    if (typeof textbox.set === 'function'){
+      textbox.set('textBaseline', 'alphabetic');
+    } else {
+      textbox.textBaseline = 'alphabetic';
+    }
   }
 
   function storeTextboxCurveState(textbox, state){
