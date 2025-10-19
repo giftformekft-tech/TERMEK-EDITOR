@@ -1099,9 +1099,9 @@ if (! function_exists('nb_render_cart_item_preview_thumbnail')) {
   }
 }
 
-add_filter('woocommerce_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', 10, 3);
-add_filter('woocommerce_widget_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', 10, 3);
-add_filter('woocommerce_checkout_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', 10, 3);
+add_filter('woocommerce_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', 999, 3);
+add_filter('woocommerce_widget_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', 999, 3);
+add_filter('woocommerce_checkout_cart_item_thumbnail', 'nb_render_cart_item_preview_thumbnail', 999, 3);
 
 add_action('admin_head', function(){
   if (! function_exists('get_current_screen')){
