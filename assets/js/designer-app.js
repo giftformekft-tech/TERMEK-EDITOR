@@ -2738,6 +2738,72 @@
     return Math.max.apply(null, widths);
   }
 
+  function fitTextboxBoundsToContent(textbox, options){
+    if (!textbox || textbox.type !== 'textbox') return;
+    const opts = options && typeof options === 'object' ? options : {};
+    const preserveCenter = opts.preserveCenter !== false;
+    const respectDynamicMin = !!opts.respectDynamicMin;
+    if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
+    const currentText = typeof textbox.text === 'string' ? textbox.text : '';
+    const charCount = currentText.length;
+    const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 0;
+    const baseWidth = typeof textbox.calcTextWidth === 'function'
+      ? textbox.calcTextWidth()
+      : (Number.isFinite(textbox.width) ? textbox.width : 0);
+    const paddingX = Number.isFinite(textbox.padding) ? textbox.padding * 2 : 0;
+    const charSpacingWidth = Number.isFinite(textbox.charSpacing) && fontSize
+      ? (textbox.charSpacing / 1000) * Math.max(0, charCount - 1) * fontSize
+      : 0;
+    const dynamicMin = respectDynamicMin && Number.isFinite(textbox.dynamicMinWidth) ? textbox.dynamicMinWidth : 0;
+    let targetWidth = Math.max(dynamicMin, baseWidth + paddingX + charSpacingWidth);
+    if (!Number.isFinite(targetWidth) || targetWidth <= 0){
+      targetWidth = Math.max(dynamicMin, Number.isFinite(textbox.width) ? textbox.width : 0, 20);
+    }
+    targetWidth = Math.max(20, Math.round(targetWidth));
+    let baseHeight = typeof textbox.calcTextHeight === 'function'
+      ? textbox.calcTextHeight()
+      : (Number.isFinite(textbox.height) ? textbox.height : 0);
+    const paddingY = Number.isFinite(textbox.padding) ? textbox.padding * 2 : 0;
+    const minHeight = Number.isFinite(textbox.minHeight) ? textbox.minHeight : 0;
+    let targetHeight = Math.max(baseHeight + paddingY, minHeight);
+    if (!Number.isFinite(targetHeight) || targetHeight <= 0){
+      targetHeight = Math.max(minHeight, baseHeight, 20);
+    }
+    targetHeight = Math.max(20, Math.round(targetHeight));
+    const updates = {};
+    if (Number.isFinite(targetWidth) && targetWidth > 0 && Math.round(textbox.width || 0) !== targetWidth){
+      updates.width = targetWidth;
+    }
+    if (Number.isFinite(targetHeight) && targetHeight > 0 && Math.round(textbox.height || 0) !== targetHeight){
+      updates.height = targetHeight;
+    }
+    if (!Object.keys(updates).length){
+      if (Number.isFinite(targetWidth)) textbox.dynamicMinWidth = targetWidth;
+      return;
+    }
+    const center = preserveCenter && typeof textbox.getCenterPoint === 'function'
+      ? textbox.getCenterPoint()
+      : null;
+    if (typeof textbox.set === 'function'){
+      textbox.set(updates);
+    } else {
+      if (Object.prototype.hasOwnProperty.call(updates, 'width')) textbox.width = updates.width;
+      if (Object.prototype.hasOwnProperty.call(updates, 'height')) textbox.height = updates.height;
+    }
+    if (Number.isFinite(targetWidth)){
+      textbox.dynamicMinWidth = targetWidth;
+      if (Number.isFinite(textbox.minWidth)) textbox.minWidth = Math.min(textbox.minWidth, targetWidth);
+    }
+    if (Number.isFinite(targetHeight) && Number.isFinite(textbox.minHeight)){
+      textbox.minHeight = Math.min(textbox.minHeight, targetHeight);
+    }
+    if (center && typeof textbox.setPositionByOrigin === 'function'){
+      textbox.setPositionByOrigin(center, 'center', 'center');
+    }
+    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    textbox.dirty = true;
+  }
+
   function shrinkTextboxFontToFit(textbox, maxWidth){
     if (!textbox || textbox.type !== 'textbox') return null;
     if (!Number.isFinite(maxWidth) || maxWidth <= 0) return null;
@@ -2760,6 +2826,7 @@
       iterations++;
     }
     if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    fitTextboxBoundsToContent(textbox);
     textbox.dirty = true;
     if (fontSizeInput){
       fontSizeInput.value = fontSize;
@@ -2775,6 +2842,8 @@
     if (!textValue.length || textValue.indexOf('\n') === -1) return;
     const originalFontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : 48;
     const originalWidth = measureTextboxWidth(textbox);
+    const originalDynamicMin = Number.isFinite(textbox.dynamicMinWidth) ? textbox.dynamicMinWidth : null;
+    const originalMinWidth = Number.isFinite(textbox.minWidth) ? textbox.minWidth : null;
     const rawLines = textValue.split('\n');
     const condensed = rawLines.map(line=>line.trim()).filter(line=>line.length);
     const joined = (condensed.length ? condensed : rawLines).join(' ');
@@ -2787,7 +2856,9 @@
       fontSize: originalFontSize,
       flattened: normalizedText,
       flattenedSize: targetSize,
-      originalWidth: Number.isFinite(originalWidth) ? originalWidth : null
+      originalWidth: Number.isFinite(originalWidth) ? originalWidth : null,
+      originalDynamicMin: Number.isFinite(originalDynamicMin) ? originalDynamicMin : null,
+      originalMinWidth: Number.isFinite(originalMinWidth) ? originalMinWidth : null
     };
     const updates = {};
     if (textbox.text !== normalizedText){
@@ -2819,6 +2890,7 @@
       fontSizeInput.value = nextSize;
       if (fontSizeValue) fontSizeValue.textContent = nextSize + ' px';
     }
+    fitTextboxBoundsToContent(textbox);
     if (c && typeof c.requestRenderAll === 'function') c.requestRenderAll();
     const backup = textbox.__nb_curve_multilineBackup;
     if (backup && typeof backup === 'object'){
@@ -2857,6 +2929,24 @@
       textbox.initDimensions();
     }
     textbox.dirty = true;
+    const center = typeof textbox.getCenterPoint === 'function' ? textbox.getCenterPoint() : null;
+    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    const widthUpdates = {};
+    if (Number.isFinite(backup.originalWidth) && backup.originalWidth > 0){
+      widthUpdates.width = backup.originalWidth;
+    }
+    if (Object.keys(widthUpdates).length){
+      if (typeof textbox.set === 'function'){
+        textbox.set(widthUpdates);
+      } else if (Object.prototype.hasOwnProperty.call(widthUpdates, 'width')){
+        textbox.width = widthUpdates.width;
+      }
+    }
+    if (Number.isFinite(backup.originalDynamicMin)) textbox.dynamicMinWidth = backup.originalDynamicMin;
+    if (Number.isFinite(backup.originalMinWidth)) textbox.minWidth = backup.originalMinWidth;
+    if (center && typeof textbox.setPositionByOrigin === 'function'){
+      textbox.setPositionByOrigin(center, 'center', 'center');
+    }
     if (typeof textbox.setCoords === 'function') textbox.setCoords();
     if (fontSizeInput){
       const nextSize = Math.round(textbox.fontSize || updates.fontSize || backup.fontSize || 48);
@@ -2924,6 +3014,7 @@
       return;
     }
     if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
+    fitTextboxBoundsToContent(textbox);
     let width = measureTextboxWidth(textbox);
     if (!Number.isFinite(width) || width <= 0){
       width = Math.max(20, textbox.width || 0);
