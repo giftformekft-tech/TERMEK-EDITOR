@@ -4073,6 +4073,7 @@
     if (!layers.front && !layers.back && layers) {
       sideStates.front.json = layers;
       sideStates.front.hasContent = true;
+      alert('Template mode activated! Layers: ' + JSON.stringify(layers).substring(0, 100));
     }
 
     // Switch to front and load
