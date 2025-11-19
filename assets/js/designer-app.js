@@ -3908,6 +3908,21 @@
       }
     };
   }
+
+  // --- Generic Modal Close ---
+  document.addEventListener('click', (e) => {
+    const closeTrigger = e.target.closest('[data-nb-close]');
+    if (!closeTrigger) return;
+    const key = closeTrigger.dataset.nbClose;
+    if (!key) return;
+    const modalId = 'nb-' + key;
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.setAttribute('hidden', '');
+      e.preventDefault();
+    }
+  });
+
   // --- Template System ---
   const templatesModal = document.getElementById('nb-templates-modal');
   const templatesTrigger = document.getElementById('nb-templates-trigger');

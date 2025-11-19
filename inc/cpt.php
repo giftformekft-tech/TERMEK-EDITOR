@@ -6,6 +6,7 @@ add_action('init', function(){
     'label' => 'Terméktervek',
     'public' => false,
     'show_ui' => true,
+    'show_in_menu' => 'nb-designer',
     'menu_icon' => 'dashicons-art',
     'supports' => ['title'],
   ]);
