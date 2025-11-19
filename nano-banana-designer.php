@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Nano Banana – Terméktervező
  * Description: Terméktervező külön menüvel. Terméktípus (pl. póló/pulóver) + szín + méret, típus–szín → mockup és ár. A feltöltött képek nem mehetnek ki a print-area-ból.
- * Version: 1.5.0
+ * Version: 1.5.5
  * Author: Nano Banana
  * Requires Plugins: woocommerce
  * License: GPLv2 or later
