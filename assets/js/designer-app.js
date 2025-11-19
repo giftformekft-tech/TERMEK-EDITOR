@@ -2884,13 +2884,15 @@
     let textValue = typeof textbox.text === 'string' ? textbox.text : '';
     const hasText = !!(textValue && textValue.length);
     const curveActive = cfg.enabled && Math.abs(cfg.amount) >= 1 && hasText;
-    if (curveActive) {
-      collapseTextboxMultilineForCurve(textbox);
-      textValue = typeof textbox.text === 'string' ? textbox.text : '';
-    } else {
-      restoreTextboxMultilineFromCurve(textbox);
-      textValue = typeof textbox.text === 'string' ? textbox.text : '';
-    }
+    // Remove collapse/restore logic to support true multi-line curved text
+    // if (curveActive) {
+    //   collapseTextboxMultilineForCurve(textbox);
+    //   textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    // } else {
+    //   restoreTextboxMultilineFromCurve(textbox);
+    //   textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    // }
+
     const baseStyles = baseTextboxStyles(textbox);
     const assignStyles = styles => {
       textbox.styles = styles;
@@ -2972,7 +2974,8 @@
       const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : DEFAULT_FONT_SIZE;
       const lineHeight = Number.isFinite(textbox.lineHeight) ? textbox.lineHeight : 1.16;
       const step = Math.max(1, fontSize * lineHeight);
-      const direction = cfg.amount >= 0 ? 1 : -1;
+      // Always shift down for subsequent lines to prevent overlap/inversion
+      const direction = 1;
       lines.forEach((lineText, lineIndex) => {
         const offset = lineIndex * step * direction;
         const key = lineIndex.toString();
