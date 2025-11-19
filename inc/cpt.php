@@ -1,41 +1,49 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
+// Register nb_design CPT (User Saved Designs)
 add_action('init', function(){
-  register_post_type('nb_design', [
+  register_post_type('nb_design', array(
     'label' => 'Mentett Tervek',
     'public' => false,
     'show_ui' => true,
     'show_in_menu' => 'nb-designer',
     'menu_icon' => 'dashicons-art',
-    'supports' => ['title', 'author'],
-    'capabilities' => [
-      'create_posts' => 'do_not_allow', // Users create via frontend API only
-    ],
+    'supports' => array('title', 'author'),
+    'capabilities' => array(
+      'create_posts' => 'do_not_allow',
+    ),
     'map_meta_cap' => true,
-  ]);
+  ));
 
-  register_post_type('nb_template', [
+  register_post_type('nb_template', array(
     'label' => 'Sablonok',
     'public' => false,
     'show_ui' => true,
     'show_in_menu' => 'nb-designer',
     'menu_icon' => 'dashicons-layout',
-    'supports' => ['title', 'thumbnail'],
-  ]);
+    'supports' => array('title', 'thumbnail'),
+  ));
 
-  register_taxonomy('nb_template_cat', ['nb_template'], [
+  register_taxonomy('nb_template_cat', array('nb_template'), array(
     'label' => 'Sablon Kategóriák',
     'hierarchical' => true,
     'show_ui' => true,
     'show_admin_column' => true,
     'query_var' => true,
-    'rewrite' => ['slug' => 'template-cat'],
-  ]);
+    'rewrite' => array('slug' => 'template-cat'),
+  ));
 });
 
-function nb_design_meta_box_callback($post){
+// Meta box for preview
+add_action('add_meta_boxes', function(){
+  add_meta_box('nb_design_meta', 'Beállítások', 'nb_design_meta_box_content', 'nb_design', 'side', 'high');
+  add_meta_box('nb_template_meta', 'Beállítások', 'nb_design_meta_box_content', 'nb_template', 'side', 'high');
+});
+
+function nb_design_meta_box_content($post){
   $preview = get_post_meta($post->ID, 'preview_url', true);
+  
   if($post->post_type === 'nb_design'){
     echo '<p><em>Ez egy felhasználói mentés.</em></p>';
   }
@@ -48,24 +56,9 @@ function nb_design_meta_box_callback($post){
   }
 }
 
-add_action('add_meta_boxes', function(){
-  add_meta_box('nb_design_meta', 'Beállítások', 'nb_design_meta_box_callback', 'nb_design', 'side', 'high');
-  add_meta_box('nb_template_meta', 'Beállítások', 'nb_design_meta_box_callback', 'nb_template', 'side', 'high');
-});
-
-add_action('save_post', function($post_id){
-  if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
-  if (!current_user_can('edit_post', $post_id)) return;
-  
-  if (isset($_POST['nb_is_template'])){
-    update_post_meta($post_id, 'is_template', '1');
-  } else {
-    delete_post_meta($post_id, 'is_template');
-  }
-});
-
+// Custom columns for nb_template list
 add_filter('manage_nb_template_posts_columns', function($columns){
-  $new = [];
+  $new = array();
   foreach($columns as $key => $title){
     if ($key === 'title') {
       $new['nb_preview'] = 'Előnézet';
