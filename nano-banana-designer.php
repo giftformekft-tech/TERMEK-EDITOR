@@ -11,7 +11,7 @@ if ( ! defined('ABSPATH') ) exit;
 
 define('NB_DESIGNER_PATH', plugin_dir_path(__FILE__));
 define('NB_DESIGNER_URL', plugin_dir_url(__FILE__));
-define('NB_DESIGNER_VERSION', '1.5.4');
+define('NB_DESIGNER_VERSION', '1.5.5');
 
 require_once NB_DESIGNER_PATH.'inc/helpers.php';
 require_once NB_DESIGNER_PATH.'inc/cpt.php';

@@ -2955,6 +2955,13 @@
       const textWidth = tempText.calcTextWidth();
       if (textWidth > width) {
         width = textWidth + 50; // Add buffer
+        // IMPORTANT: Update the actual textbox width to prevent soft-wrapping!
+        // Soft-wrapping causes lines to render on top of each other because we only calculate offsets for hard newlines.
+        if (typeof textbox.set === 'function') {
+          textbox.set('width', width);
+        } else {
+          textbox.width = width;
+        }
       }
     }
 
