@@ -270,28 +270,6 @@
     </div>
   </div>
 
-  <div class="nb-modal" id="nb-bulk-modal" hidden>
-    <div class="nb-modal-backdrop" data-nb-close="bulk-modal"></div>
-    <div class="nb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-bulk-modal-title">
-      <div class="nb-modal-header">
-        <h2 id="nb-bulk-modal-title">Több méretben</h2>
-        <button type="button" class="nb-modal-close" data-nb-close="bulk-modal" aria-label="Bezárás">×</button>
-      </div>
-        <button type="button" class="nb-mobile-quick" data-nb-mobile-action="forward" disabled>Előre</button>
-        <button type="button" class="nb-mobile-quick" data-nb-mobile-action="backward" disabled>Hátra</button>
-      </div>
-    </div>
-    <div class="nb-mobile-status-actions">
-      <button type="button" class="nb-mobile-complete" id="nb-mobile-complete">Kosárba</button>
-      <div class="nb-mobile-total" id="nb-mobile-total">
-        <div class="nb-mobile-total-line">
-          <span class="nb-mobile-total-label">Végösszeg:</span>
-          <span class="nb-mobile-total-value" id="nb-price-total-mobile">—</span>
-        </div>
-      </div>
-      <button type="button" class="nb-mobile-secondary" id="nb-mobile-bulk">Többet vennék</button>
-    </div>
-  </div>
 
   <div class="nb-mobile-overlay" id="nb-mobile-sheet-overlay" hidden></div>
   <div class="nb-mobile-sheet" id="nb-mobile-sheet" hidden aria-hidden="true" role="dialog" aria-modal="false">

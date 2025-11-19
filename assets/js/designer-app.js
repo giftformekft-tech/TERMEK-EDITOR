@@ -4053,19 +4053,20 @@
     sideStates.back = { json: null, preview: null, hasContent: false, undoStack: [], redoStack: [] };
 
     const layers = data.layers;
-    if (layers.front) {
+    // Check if layers has explicit front/back properties (saved designs)
+    if (layers && layers.front) {
       sideStates.front.json = layers.front;
       sideStates.front.hasContent = true;
     }
-    if (layers.back) {
+    if (layers && layers.back) {
       sideStates.back.json = layers.back;
       sideStates.back.hasContent = true;
-    } else {
-      // If legacy format or single side
-      if (!layers.front && !layers.back && typeof layers === 'object') {
-        sideStates.front.json = layers;
-        sideStates.front.hasContent = true;
-      }
+    }
+
+    // If no explicit front/back, treat the entire layers as front side (templates, legacy)
+    if (!layers.front && !layers.back && layers) {
+      sideStates.front.json = layers;
+      sideStates.front.hasContent = true;
     }
 
     // Switch to front and load
