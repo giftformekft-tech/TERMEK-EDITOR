@@ -277,6 +277,16 @@ function nb_admin_render(){
           foreach ($palette as $candidate){
             if (strcasecmp($candidate, $color) === 0){
               $match = $candidate;
+              break;
+            }
+          }
+          if ($match !== null){
+            $colors[] = $match;
+          }
+        }
+        $typeColors[$key] = $colors;
+      }
+      $settings['type_colors'] = $typeColors;
     } elseif ($tab==='variants'){
       $catalog = $settings['catalog'] ?? [];
       $pids = array_map('intval', $_POST['var_pid'] ?? []);
