@@ -34,25 +34,23 @@ add_action('init', function(){
   ]);
 });
 
-add_action('add_meta_boxes', function(){
-  $callback = function($post){
-    $preview = get_post_meta($post->ID, 'preview_url', true);
-    ?>
-    <?php if($post->post_type === 'nb_design'): ?>
-      <p><em>Ez egy felhasználói mentés.</em></p>
-    <?php endif; ?>
-    
-    <?php if($preview): ?>
-      <p><strong>Előnézet:</strong></p>
-      <img src="<?php echo esc_url($preview); ?>" style="max-width:100%;height:auto;border:1px solid #ddd;">
-    <?php else: ?>
-      <p>Nincs előnézet.</p>
-    <?php endif; ?>
-    <?php
-  };
+function nb_design_meta_box_callback($post){
+  $preview = get_post_meta($post->ID, 'preview_url', true);
+  if($post->post_type === 'nb_design'){
+    echo '<p><em>Ez egy felhasználói mentés.</em></p>';
+  }
   
-  add_meta_box('nb_design_meta', 'Beállítások', $callback, 'nb_design', 'side', 'high');
-  add_meta_box('nb_template_meta', 'Beállítások', $callback, 'nb_template', 'side', 'high');
+  if($preview){
+    echo '<p><strong>Előnézet:</strong></p>';
+    echo '<img src="'.esc_url($preview).'" style="max-width:100%;height:auto;border:1px solid #ddd;">';
+  } else {
+    echo '<p>Nincs előnézet.</p>';
+  }
+}
+
+add_action('add_meta_boxes', function(){
+  add_meta_box('nb_design_meta', 'Beállítások', 'nb_design_meta_box_callback', 'nb_design', 'side', 'high');
+  add_meta_box('nb_template_meta', 'Beállítások', 'nb_design_meta_box_callback', 'nb_template', 'side', 'high');
 });
 
 add_action('save_post', function($post_id){
