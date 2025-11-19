@@ -646,7 +646,7 @@ add_action('rest_api_init', function(){
       $id = intval($req->get_param('id'));
       if (!$id) return new WP_Error('no_id','Hiányzó ID', ['status'=>400]);
       $post = get_post($id);
-      if (!$post || $post->post_type !== 'nb_design') return new WP_Error('not_found','Nem található', ['status'=>404]);
+      if (!$post || !in_array($post->post_type, ['nb_design', 'nb_template'])) return new WP_Error('not_found','Nem található', ['status'=>404]);
       
       // Ha nem publikus sablon és nem a sajátunk, akkor hiba?
       // Egyelőre engedjük meg a betöltést, ha tudjuk az ID-t (share link logika).

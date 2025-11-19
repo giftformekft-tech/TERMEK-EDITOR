@@ -35,7 +35,7 @@ add_action('init', function(){
 });
 
 add_action('add_meta_boxes', function(){
-  add_meta_box('nb_design_meta', 'Beállítások', function($post){
+  $callback = function($post){
     $preview = get_post_meta($post->ID, 'preview_url', true);
     ?>
     <?php if($post->post_type === 'nb_design'): ?>
@@ -49,7 +49,10 @@ add_action('add_meta_boxes', function(){
       <p>Nincs előnézet.</p>
     <?php endif; ?>
     <?php
-  }, ['nb_design', 'nb_template'], 'side', 'high');
+  };
+  
+  add_meta_box('nb_design_meta', 'Beállítások', $callback, 'nb_design', 'side', 'high');
+  add_meta_box('nb_template_meta', 'Beállítások', $callback, 'nb_template', 'side', 'high');
 });
 
 add_action('save_post', function($post_id){
