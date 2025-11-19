@@ -2940,6 +2940,22 @@
       width = Math.max(20, textbox.width || 0);
     }
     width = Math.max(20, width);
+
+    // Fix for overlapping text: Ensure path width is at least the full text width (unwrapped)
+    if (typeof fabric !== 'undefined' && fabric.Text) {
+      const tempText = new fabric.Text(textValue, {
+        fontSize: textbox.fontSize,
+        fontFamily: textbox.fontFamily,
+        fontWeight: textbox.fontWeight,
+        fontStyle: textbox.fontStyle,
+        charSpacing: textbox.charSpacing
+      });
+      const textWidth = tempText.calcTextWidth();
+      if (textWidth > width) {
+        width = textWidth + 50; // Add buffer
+      }
+    }
+
     const amplitude = (cfg.amount / 100) * width * 0.8;
     const curvePath = new fabric.Path(`M ${-width / 2} 0 Q 0 ${-amplitude} ${width / 2} 0`, {
       visible: false,
