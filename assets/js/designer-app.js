@@ -4044,9 +4044,12 @@
         headers: { 'X-WP-Nonce': NB_DESIGNER.nonce }
       });
       const data = await res.json();
+      alert('API Response:\ndata: ' + JSON.stringify(data).substring(0, 200) + '\ndata.layers exists: ' + !!(data && data.layers));
       if (data && data.layers) {
         await loadDesign(data);
         if (templatesModal) templatesModal.setAttribute('hidden', '');
+      } else {
+        alert('ERROR: data.layers is missing!');
       }
     } catch (e) {
       alert('Hiba a sablon betöltésekor.');
