@@ -387,18 +387,27 @@ function nb_template_uploader_render(){
             $width = $image_info ? $image_info[0] : 800;
             $height = $image_info ? $image_info[1] : 600;
             
-            // Create layers_json with a single image object
+            // Create layers_json with a single image object (matching Fabric.js Image format)
             $layers = array(
               array(
                 'type' => 'image',
-                'src' => $uploaded_file['url'],
-                'left' => 0,
-                'top' => 0,
-                'scaleX' => 1,
-                'scaleY' => 1,
+                'version' => '5.0.0',
+                'originX' => 'left',
+                'originY' => 'top',
+                'left' => 100,
+                'top' => 100,
                 'width' => $width,
                 'height' => $height,
-                'angle' => 0
+                'scaleX' => 1,
+                'scaleY' => 1,
+                'angle' => 0,
+                'src' => $uploaded_file['url'],
+                'crossOrigin' => 'anonymous',
+                'selectable' => true,
+                'evented' => true,
+                'cornerStyle' => 'circle',
+                'transparentCorners' => false,
+                'lockScalingFlip' => true
               )
             );
             
