@@ -277,23 +277,6 @@ function nb_admin_render(){
           foreach ($palette as $candidate){
             if (strcasecmp($candidate, $color) === 0){
               $match = $candidate;
-              break;
-            }
-          }
-          $normalized = $match ?? $color;
-          if (!in_array($normalized, $colors, true)) $colors[] = $normalized;
-        }
-        $typeColors[$key] = $colors;
-      }
-      $settings['type_colors'] = $typeColors;
-      $catalog = $settings['catalog'] ?? [];
-      foreach ($settings['products'] ?? [] as $pid){
-        if (!isset($catalog[$pid])){
-          $catalog[$pid] = ['title'=>get_the_title($pid),'types'=>[],'colors'=>[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
-        }
-        nb_sync_product_color_configuration($catalog[$pid], $settings);
-      }
-      $settings['catalog'] = $catalog;
     } elseif ($tab==='variants'){
       $catalog = $settings['catalog'] ?? [];
       $pids = array_map('intval', $_POST['var_pid'] ?? []);
