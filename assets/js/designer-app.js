@@ -2195,6 +2195,7 @@
         }
         resolve();
       }, (o, obj) => {
+        console.log('loadFromJSON: Object loaded:', obj);
         applyObjectUiDefaults(obj);
       });
     });
