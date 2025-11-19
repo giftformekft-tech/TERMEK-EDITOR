@@ -4059,6 +4059,7 @@
     sideStates.back = { json: null, preview: null, hasContent: false, undoStack: [], redoStack: [] };
 
     const layers = data.layers;
+    alert('loadDesign called! layers type: ' + (Array.isArray(layers) ? 'array' : typeof layers) + '\nlayers.front: ' + (layers ? layers.front : 'N/A') + '\nlayers.back: ' + (layers ? layers.back : 'N/A'));
     // Check if layers has explicit front/back properties (saved designs)
     if (layers && layers.front) {
       sideStates.front.json = layers.front;
