@@ -2144,7 +2144,13 @@
       return { version: (c && c.version) || '5.0.0', objects: [] };
     }
     try {
-      return JSON.parse(JSON.stringify(state.json));
+      const parsed = JSON.parse(JSON.stringify(state.json));
+      // If it's an array (from templates), wrap it in a proper Fabric.js canvas state
+      if (Array.isArray(parsed)) {
+        return { version: (c && c.version) || '5.0.0', objects: parsed };
+      }
+      // Otherwise it's already a full canvas state object
+      return parsed;
     } catch (e) {
       return { version: (c && c.version) || '5.0.0', objects: [] };
     }
