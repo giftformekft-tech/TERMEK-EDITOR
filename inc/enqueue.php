@@ -3,7 +3,7 @@ if ( ! defined('ABSPATH') ) exit;
 
 add_action('wp_enqueue_scripts', function(){
   if ( is_page() && has_shortcode(get_post()->post_content ?? '', 'nb_designer') ) {
-    $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.4.75';
+    $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.4.76';
     wp_enqueue_style('nb-designer', NB_DESIGNER_URL.'assets/css/designer.css', [], $version);
     wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
     wp_enqueue_script('nb-designer', NB_DESIGNER_URL.'assets/js/designer-app.js', ['fabric','jquery'], $version, true);
