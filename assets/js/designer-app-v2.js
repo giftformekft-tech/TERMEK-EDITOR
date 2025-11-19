@@ -310,9 +310,14 @@
   const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
   const fontFamilySel = document.getElementById('nb-font-family');
   const DEFAULT_FONT_SIZE = 24;
+  const DEFAULT_STROKE_WIDTH = 0;
+  const DEFAULT_STROKE_COLOR = '#000000';
   const fontSizeInput = document.getElementById('nb-font-size');
   const fontSizeValue = document.getElementById('nb-font-size-value');
   const fontColorInput = document.getElementById('nb-font-color');
+  const fontStrokeColorInput = document.getElementById('nb-font-stroke-color');
+  const fontStrokeWidthInput = document.getElementById('nb-font-stroke-width');
+  const fontStrokeWidthValue = document.getElementById('nb-font-stroke-width-value');
   const fontBoldToggle = document.getElementById('nb-font-bold');
   const fontItalicToggle = document.getElementById('nb-font-italic');
   const alignButtons = Array.from(document.querySelectorAll('[data-nb-align]'));
@@ -384,7 +389,7 @@
   const sheetBundles = {
     sides: ['sides', 'double'],
     elements: ['elements'],
-    upload: ['upload'],
+    upload: ['upload', 'templates'],
     text: ['text'],
     product: ['product', 'color', 'size', 'double'],
     layers: ['layers']
@@ -2610,6 +2615,12 @@
     }
   }
 
+  function formatStrokeWidth(value) {
+    const num = Number.isFinite(value) ? value : 0;
+    const rounded = Math.round(num * 10) / 10;
+    return `${rounded} px`;
+  }
+
   function setPressed(btn, state) {
     if (!btn) return;
     btn.setAttribute('aria-pressed', state ? 'true' : 'false');
@@ -3007,13 +3018,26 @@
     const textbox = activeTextbox();
     const hasTextbox = !!textbox;
     if (textbox) initializeTextboxCurve(textbox);
-    const controls = [fontFamilySel, fontSizeInput, fontColorInput, fontBoldToggle, fontItalicToggle, textCurveToggle, textCurveInput].concat(alignButtons);
+    const controls = [
+      fontFamilySel,
+      fontSizeInput,
+      fontColorInput,
+      fontStrokeColorInput,
+      fontStrokeWidthInput,
+      fontBoldToggle,
+      fontItalicToggle,
+      textCurveToggle,
+      textCurveInput
+    ].concat(alignButtons);
     controls.forEach(ctrl => { if (ctrl) ctrl.disabled = !hasTextbox; });
     if (!hasTextbox) {
       setPressed(fontBoldToggle, false);
       setPressed(fontItalicToggle, false);
       alignButtons.forEach(btn => setPressed(btn, false));
       if (fontSizeValue) fontSizeValue.textContent = (fontSizeInput ? fontSizeInput.value : '0') + ' px';
+      if (fontStrokeWidthInput) fontStrokeWidthInput.value = DEFAULT_STROKE_WIDTH;
+      if (fontStrokeWidthValue) fontStrokeWidthValue.textContent = formatStrokeWidth(DEFAULT_STROKE_WIDTH);
+      if (fontStrokeColorInput) fontStrokeColorInput.value = DEFAULT_STROKE_COLOR;
       if (textCurveToggle) setPressed(textCurveToggle, false);
       if (textCurveInput) {
         textCurveInput.value = '0';
@@ -3041,6 +3065,14 @@
     }
     if (fontColorInput) {
       fontColorInput.value = toHexColor(textbox.fill || '#ff0000');
+    }
+    if (fontStrokeColorInput) {
+      fontStrokeColorInput.value = toHexColor(textbox.stroke || DEFAULT_STROKE_COLOR);
+    }
+    if (fontStrokeWidthInput) {
+      const width = Number.isFinite(textbox.strokeWidth) ? textbox.strokeWidth : DEFAULT_STROKE_WIDTH;
+      fontStrokeWidthInput.value = width;
+      if (fontStrokeWidthValue) fontStrokeWidthValue.textContent = formatStrokeWidth(width);
     }
     setPressed(fontBoldToggle, (textbox.fontWeight || '').toString().toLowerCase() === 'bold' || parseInt(textbox.fontWeight, 10) >= 600);
     setPressed(fontItalicToggle, (textbox.fontStyle || '').toString().toLowerCase() === 'italic');
@@ -3071,6 +3103,14 @@
 
   function currentFontColor() {
     return fontColorInput && fontColorInput.value ? fontColorInput.value : '#ff0000';
+  }
+
+  function currentFontStrokeColor() {
+    return fontStrokeColorInput && fontStrokeColorInput.value ? fontStrokeColorInput.value : DEFAULT_STROKE_COLOR;
+  }
+
+  function currentFontStrokeWidth() {
+    return fontStrokeWidthInput ? parseFloat(fontStrokeWidthInput.value) || DEFAULT_STROKE_WIDTH : DEFAULT_STROKE_WIDTH;
   }
 
   function currentFontWeight() {
@@ -3360,6 +3400,29 @@
     };
   }
 
+  if (fontStrokeColorInput) {
+    fontStrokeColorInput.onchange = () => {
+      const color = fontStrokeColorInput.value || DEFAULT_STROKE_COLOR;
+      applyToActiveText(obj => {
+        obj.set('stroke', color);
+        obj.set('paintFirst', 'stroke');
+        obj.set('strokeUniform', true);
+      });
+    };
+  }
+
+  if (fontStrokeWidthInput) {
+    fontStrokeWidthInput.addEventListener('input', () => {
+      const width = parseFloat(fontStrokeWidthInput.value) || 0;
+      if (fontStrokeWidthValue) fontStrokeWidthValue.textContent = formatStrokeWidth(width);
+      applyToActiveText(obj => {
+        obj.set('strokeWidth', width);
+        obj.set('paintFirst', 'stroke');
+        obj.set('strokeUniform', true);
+      });
+    });
+  }
+
   if (fontBoldToggle) {
     fontBoldToggle.onclick = () => {
       const next = fontBoldToggle.getAttribute('aria-pressed') !== 'true';
@@ -3540,6 +3603,10 @@
       const textboxWidth = Math.max(80, a.w - 40);
       const t = new fabric.Textbox('Írd ide a feliratot', {
         fill: currentFontColor(),
+        stroke: currentFontStrokeColor(),
+        strokeWidth: currentFontStrokeWidth(),
+        strokeUniform: true,
+        paintFirst: 'stroke',
         fontSize: currentFontSize(),
         width: textboxWidth,
         left: a.x + (a.w - textboxWidth) / 2,
