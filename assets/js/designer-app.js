@@ -4042,7 +4042,6 @@
   }
 
   async function loadTemplate(id) {
-    if (!confirm('A jelenlegi munkád elveszik. Biztosan betöltöd a sablont?')) return;
     try {
       const res = await fetch(NB_DESIGNER.rest + 'load-design?id=' + id, {
         headers: { 'X-WP-Nonce': NB_DESIGNER.nonce }
