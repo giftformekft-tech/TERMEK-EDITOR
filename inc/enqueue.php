@@ -10,12 +10,8 @@ add_action('wp_enqueue_scripts', function(){
     $stored = get_option('nb_settings', []);
     $settings = is_array($stored) ? $stored : [];
     $cleaned = nb_clean_settings_unicode($settings);
-    if (wp_json_encode($cleaned) !== wp_json_encode($settings)){
-      $settings = $cleaned;
-      update_option('nb_settings', $settings);
-    } else {
-      $settings = $cleaned;
-    }
+    // Clean settings but do not save on frontend load
+    $settings = $cleaned;
     if (!empty($settings['catalog']) && is_array($settings['catalog'])){
       foreach($settings['catalog'] as $pid=>&$cfg){
         if (empty($cfg['title'])) $cfg['title'] = get_the_title($pid);

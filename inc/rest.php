@@ -346,9 +346,18 @@ if ( ! function_exists('nb_rest_cart_single_add') ) {
 }
 
 add_action('rest_api_init', function(){
+  $permission_callback = function($req){
+    $nonce = $req->get_header('X-WP-Nonce');
+    if ( ! $nonce ) $nonce = $req->get_param('_wpnonce');
+    if ( ! wp_verify_nonce($nonce, 'wp_rest') ) {
+      return new WP_Error('rest_forbidden', 'Érvénytelen biztonsági token.', ['status' => 403]);
+    }
+    return true;
+  };
+
   register_rest_route('nb/v1','/save', [
     'methods'  => 'POST',
-    'permission_callback' => '__return_true',
+    'permission_callback' => $permission_callback,
     'callback' => function($req){
       $png = $req->get_param('png_base64');
       $print_png = $req->get_param('print_png_base64');
@@ -414,9 +423,11 @@ add_action('rest_api_init', function(){
       }
       $printed_sides = isset($meta['printed_sides']) ? $meta['printed_sides'] : [];
 
+      $post_author = get_current_user_id();
       $post_id = wp_insert_post([
         'post_type'=>'nb_design','post_status'=>'publish',
         'post_title'=>'Design #'.time(),
+        'post_author' => $post_author,
         'meta_input'=>[
           'preview_url'     => esc_url_raw($upload['url']),
           'print_url'       => esc_url_raw($print_upload['url']),
@@ -449,7 +460,8 @@ add_action('rest_api_init', function(){
   ]);
 
   register_rest_route('nb/v1','/add-to-cart', [
-    'methods'=>'POST','permission_callback'=>'__return_true',
+    'methods'=>'POST',
+    'permission_callback'=>$permission_callback,
     'callback'=>function($req){
       $design_id = intval($req->get_param('design_id'));
       if (! $design_id) {
@@ -567,6 +579,58 @@ add_action('rest_api_init', function(){
       }
 
       return new WP_Error('cart','Nem sikerült kosárba tenni', ['status'=>500]);
+    }
+  ]);
+
+  register_rest_route('nb/v1','/templates', [
+    'methods'=>'GET',
+    'permission_callback'=>'__return_true',
+    'callback'=>function(){
+      $args = [
+        'post_type' => 'nb_design',
+        'post_status' => 'publish',
+        'meta_key' => 'is_template',
+        'meta_value' => '1',
+        'posts_per_page' => 50
+      ];
+      $query = new WP_Query($args);
+      $templates = [];
+      foreach($query->posts as $p){
+        $preview = get_post_meta($p->ID, 'preview_url', true);
+        $templates[] = [
+          'id' => $p->ID,
+          'title' => $p->post_title,
+          'preview_url' => $preview
+        ];
+      }
+      return $templates;
+    }
+  ]);
+
+  register_rest_route('nb/v1','/load-design', [
+    'methods'=>'GET',
+    'permission_callback'=>'__return_true',
+    'callback'=>function($req){
+      $id = intval($req->get_param('id'));
+      if (!$id) return new WP_Error('no_id','Hiányzó ID', ['status'=>400]);
+      $post = get_post($id);
+      if (!$post || $post->post_type !== 'nb_design') return new WP_Error('not_found','Nem található', ['status'=>404]);
+      
+      // Ha nem publikus sablon és nem a sajátunk, akkor hiba?
+      // Egyelőre engedjük meg a betöltést, ha tudjuk az ID-t (share link logika).
+      
+      $layers = get_post_meta($id, 'layers_json', true);
+      $meta = [
+        'product_id' => get_post_meta($id, 'product_id', true),
+        'attributes_json' => json_decode(get_post_meta($id, 'attributes_json', true)),
+        'price_ctx' => json_decode(get_post_meta($id, 'price_ctx', true)),
+      ];
+      
+      return [
+        'id' => $id,
+        'layers' => json_decode($layers),
+        'meta' => $meta
+      ];
     }
   ]);
 

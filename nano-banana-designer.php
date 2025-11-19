@@ -21,6 +21,7 @@ require_once NB_DESIGNER_PATH.'inc/shortcode.php';
 require_once NB_DESIGNER_PATH.'inc/cart-fees.php';
 require_once NB_DESIGNER_PATH.'inc/admin-meta.php';
 require_once NB_DESIGNER_PATH.'inc/admin-menu.php';
+require_once NB_DESIGNER_PATH.'inc/account-integration.php';
 
 /** Aktiváláskor alap oldal és opciók */
 register_activation_hook(__FILE__, function(){
