@@ -2952,7 +2952,36 @@
         fontStyle: textbox.fontStyle,
         charSpacing: textbox.charSpacing
       });
-      const textWidth = tempText.calcTextWidth();
+      let textWidth = tempText.calcTextWidth();
+
+      // Auto-scale font size if text is too wide for the canvas
+      if (c && c.width) {
+        const maxWidth = c.width * 0.9; // 90% of canvas width
+        let currentFontSize = textbox.fontSize;
+        const minFontSize = 10;
+
+        while (textWidth > maxWidth && currentFontSize > minFontSize) {
+          currentFontSize -= 1;
+          tempText.set('fontSize', currentFontSize);
+          textWidth = tempText.calcTextWidth();
+        }
+
+        if (currentFontSize < textbox.fontSize) {
+          if (typeof textbox.set === 'function') {
+            textbox.set('fontSize', currentFontSize);
+          } else {
+            textbox.fontSize = currentFontSize;
+          }
+          // Update UI input if exists
+          if (typeof fontSizeInput !== 'undefined' && fontSizeInput) {
+            fontSizeInput.value = currentFontSize;
+          }
+          if (typeof fontSizeValue !== 'undefined' && fontSizeValue) {
+            fontSizeValue.textContent = currentFontSize + ' px';
+          }
+        }
+      }
+
       if (textWidth > width) {
         width = textWidth + 50; // Add buffer
         // IMPORTANT: Update the actual textbox width to prevent soft-wrapping!
