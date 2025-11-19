@@ -2195,7 +2195,6 @@
         }
         resolve();
       }, (o, obj) => {
-        console.log('loadFromJSON: Object loaded:', obj);
         applyObjectUiDefaults(obj);
       });
     });
@@ -4045,9 +4044,12 @@
         headers: { 'X-WP-Nonce': NB_DESIGNER.nonce }
       });
       const data = await res.json();
+      alert('API Response:\ndata: ' + JSON.stringify(data).substring(0, 200) + '\ndata.layers exists: ' + !!(data && data.layers));
       if (data && data.layers) {
         await loadDesign(data);
         if (templatesModal) templatesModal.setAttribute('hidden', '');
+      } else {
+        alert('ERROR: data.layers is missing!');
       }
     } catch (e) {
       alert('Hiba a sablon betöltésekor.');
@@ -4060,6 +4062,7 @@
     sideStates.back = { json: null, preview: null, hasContent: false, undoStack: [], redoStack: [] };
 
     const layers = data.layers;
+    alert('loadDesign called! layers type: ' + (Array.isArray(layers) ? 'array' : typeof layers) + '\nlayers.front: ' + (layers ? layers.front : 'N/A') + '\nlayers.back: ' + (layers ? layers.back : 'N/A'));
     // Check if layers has explicit front/back properties (saved designs)
     if (layers && layers.front) {
       sideStates.front.json = layers.front;
@@ -4074,6 +4077,7 @@
     if (!layers.front && !layers.back && layers) {
       sideStates.front.json = layers;
       sideStates.front.hasContent = true;
+      alert('Template mode activated! Layers: ' + JSON.stringify(layers).substring(0, 100));
     }
 
     // Switch to front and load
