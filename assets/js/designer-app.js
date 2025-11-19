@@ -2953,14 +2953,15 @@
         charSpacing: textbox.charSpacing
       });
       let textWidth = tempText.calcTextWidth();
+      const scaleX = textbox.scaleX || 1;
 
       // Auto-scale font size if text is too wide for the canvas
       if (c && c.width) {
-        const maxWidth = c.width * 0.9; // 90% of canvas width
+        const maxWidth = c.width * 0.85; // 85% of canvas width
         let currentFontSize = textbox.fontSize;
         const minFontSize = 10;
 
-        while (textWidth > maxWidth && currentFontSize > minFontSize) {
+        while ((textWidth * scaleX) > maxWidth && currentFontSize > minFontSize) {
           currentFontSize -= 1;
           tempText.set('fontSize', currentFontSize);
           textWidth = tempText.calcTextWidth();
