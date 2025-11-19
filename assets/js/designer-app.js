@@ -2193,7 +2193,11 @@
         if (typeof c.requestRenderAll === 'function') {
           c.requestRenderAll();
         }
-        resolve();
+        // Add small delay to ensure images from URLs have time to load
+        setTimeout(() => {
+          c.requestRenderAll();
+          resolve();
+        }, 100);
       }, (o, obj) => {
         applyObjectUiDefaults(obj);
       });
