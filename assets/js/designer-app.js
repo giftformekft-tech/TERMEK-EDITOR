@@ -3927,6 +3927,10 @@
   const templatesModal = document.getElementById('nb-templates-modal');
   const templatesTrigger = document.getElementById('nb-templates-trigger');
   const templatesList = document.getElementById('nb-templates-list');
+  const templatesCats = document.getElementById('nb-template-categories');
+  const templateSearch = document.getElementById('nb-template-search-input');
+  let currentCat = 0;
+  let searchTimer = null;
 
   if (templatesTrigger) {
     templatesTrigger.onclick = function () {
@@ -3934,41 +3938,93 @@
     };
   }
 
+  if (templateSearch) {
+    templateSearch.oninput = function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        fetchTemplates(currentCat, this.value);
+      }, 500);
+    };
+  }
+
   async function openTemplatesModal() {
     if (!templatesModal) return;
     templatesModal.removeAttribute('hidden');
     templatesList.innerHTML = '<p>Betöltés...</p>';
+
+    // Reset filters
+    currentCat = 0;
+    if (templateSearch) templateSearch.value = '';
+
     try {
       const res = await fetch(NB_DESIGNER.rest + 'templates', {
         headers: { 'X-WP-Nonce': NB_DESIGNER.nonce }
       });
       const data = await res.json();
-      renderTemplates(data);
+
+      renderCategories(data.categories || []);
+      renderTemplates(data.templates || []);
     } catch (e) {
       templatesList.innerHTML = '<p>Hiba a sablonok betöltésekor.</p>';
     }
   }
 
+  async function fetchTemplates(catId, searchVal) {
+    templatesList.innerHTML = '<p>Keresés...</p>';
+    currentCat = catId;
+
+    // Update active state in sidebar
+    const links = templatesCats.querySelectorAll('li');
+    links.forEach(li => li.classList.remove('active'));
+    const activeLi = templatesCats.querySelector(`li[data-id="${catId}"]`);
+    if (activeLi) activeLi.classList.add('active');
+
+    const url = new URL(NB_DESIGNER.rest + 'templates');
+    if (catId) url.searchParams.append('category', catId);
+    if (searchVal) url.searchParams.append('search', searchVal);
+
+    try {
+      const res = await fetch(url.toString(), {
+        headers: { 'X-WP-Nonce': NB_DESIGNER.nonce }
+      });
+      const data = await res.json();
+      renderTemplates(data.templates || []);
+    } catch (e) {
+      templatesList.innerHTML = '<p>Hiba a keresés során.</p>';
+    }
+  }
+
+  function renderCategories(cats) {
+    if (!templatesCats) return;
+    let html = `<li data-id="0" class="active">Összes</li>`;
+    cats.forEach(c => {
+      html += `<li data-id="${c.id}">${c.name} <small>(${c.count})</small></li>`;
+    });
+    templatesCats.innerHTML = html;
+
+    templatesCats.querySelectorAll('li').forEach(li => {
+      li.onclick = () => {
+        const id = parseInt(li.dataset.id);
+        fetchTemplates(id, templateSearch ? templateSearch.value : '');
+      };
+    });
+  }
+
   function renderTemplates(list) {
     templatesList.innerHTML = '';
     if (!list || !list.length) {
-      templatesList.innerHTML = '<p>Nincs elérhető sablon.</p>';
+      templatesList.innerHTML = '<p>Nincs találat.</p>';
       return;
     }
     list.forEach(tpl => {
       const div = document.createElement('div');
-      div.className = 'nb-template-item';
-      div.style.cursor = 'pointer';
-      div.style.border = '1px solid #eee';
-      div.style.padding = '0.5rem';
-      div.style.borderRadius = '4px';
-      div.style.textAlign = 'center';
+      div.className = 'nb-template-card';
 
-      const img = tpl.preview_url ? `<img src="${tpl.preview_url}" style="width:100%;height:auto;display:block;margin-bottom:0.5rem;">` : '<div style="height:100px;background:#eee;margin-bottom:0.5rem;"></div>';
+      const img = tpl.preview_url ? `<img src="${tpl.preview_url}" alt="${tpl.title}">` : '<div class="nb-template-placeholder"></div>';
 
       div.innerHTML = `
-        ${img}
-        <div style="font-size:0.9rem;font-weight:bold;">${tpl.title}</div>
+        <div class="nb-template-preview">${img}</div>
+        <div class="nb-template-title">${tpl.title}</div>
       `;
       div.onclick = () => loadTemplate(tpl.id);
       templatesList.appendChild(div);

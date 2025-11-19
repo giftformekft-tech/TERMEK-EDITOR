@@ -585,14 +585,30 @@ add_action('rest_api_init', function(){
   register_rest_route('nb/v1','/templates', [
     'methods'=>'GET',
     'permission_callback'=>'__return_true',
-    'callback'=>function(){
+    'callback'=>function($req){
+      $cat_id = intval($req->get_param('category'));
+      $search = sanitize_text_field($req->get_param('search'));
+      
       $args = [
-        'post_type' => 'nb_design',
+        'post_type' => 'nb_template',
         'post_status' => 'publish',
-        'meta_key' => 'is_template',
-        'meta_value' => '1',
-        'posts_per_page' => 50
+        'posts_per_page' => 50,
+        'orderby' => 'date',
+        'order' => 'DESC'
       ];
+
+      if ($cat_id > 0){
+        $args['tax_query'] = [[
+          'taxonomy' => 'nb_template_cat',
+          'field' => 'term_id',
+          'terms' => $cat_id
+        ]];
+      }
+
+      if ($search !== ''){
+        $args['s'] = $search;
+      }
+
       $query = new WP_Query($args);
       $templates = [];
       foreach($query->posts as $p){
@@ -603,7 +619,23 @@ add_action('rest_api_init', function(){
           'preview_url' => $preview
         ];
       }
-      return $templates;
+
+      $categories = [];
+      $terms = get_terms(['taxonomy'=>'nb_template_cat', 'hide_empty'=>false]);
+      if (!is_wp_error($terms)){
+        foreach($terms as $t){
+          $categories[] = [
+            'id' => $t->term_id,
+            'name' => $t->name,
+            'count' => $t->count
+          ];
+        }
+      }
+
+      return [
+        'templates' => $templates,
+        'categories' => $categories
+      ];
     }
   ]);
 
