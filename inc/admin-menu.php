@@ -84,6 +84,7 @@ function nb_sync_product_color_configuration(&$cfg, $settings){
 
 add_action('admin_menu', function(){
   add_menu_page('Terméktervező','Terméktervező','manage_options','nb-designer','nb_admin_render','dashicons-art',58);
+  add_submenu_page('nb-designer', 'Beállítások', 'Beállítások', 'manage_options', 'nb-designer', 'nb_admin_render');
 });
 
 function nb_admin_render(){
