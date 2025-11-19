@@ -104,6 +104,17 @@
             <span>Betűszín</span>
             <input type="color" id="nb-font-color" value="#ff0000">
           </label>
+          <label class="nb-field nb-field--color">
+            <span>Körvonal színe</span>
+            <input type="color" id="nb-font-stroke-color" value="#000000">
+          </label>
+          <label class="nb-field">
+            <span>Körvonal vastagsága</span>
+            <div class="nb-range">
+              <input type="range" id="nb-font-stroke-width" min="0" max="10" step="0.5" value="0">
+              <span id="nb-font-stroke-width-value">0 px</span>
+            </div>
+          </label>
           <div class="nb-text-style">
             <button type="button" class="nb-toggle" id="nb-font-bold" aria-pressed="false">B</button>
             <button type="button" class="nb-toggle" id="nb-font-italic" aria-pressed="false"><em>I</em></button>
