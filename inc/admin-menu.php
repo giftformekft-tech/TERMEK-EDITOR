@@ -85,6 +85,7 @@ function nb_sync_product_color_configuration(&$cfg, $settings){
 add_action('admin_menu', function(){
   add_menu_page('Terméktervező','Terméktervező','manage_options','nb-designer','nb_admin_render','dashicons-art',58);
   add_submenu_page('nb-designer', 'Beállítások', 'Beállítások', 'manage_options', 'nb-designer', 'nb_admin_render');
+  add_submenu_page('nb-designer', 'Sablon Feltöltő', 'Sablon Feltöltő', 'manage_options', 'nb-template-uploader', 'nb_template_uploader_render');
 });
 
 function nb_admin_render(){
@@ -346,3 +347,165 @@ function nb_admin_render(){
   }
   include NB_DESIGNER_PATH.'admin/templates/admin-page.php';
 }
+
+function nb_template_uploader_render(){
+  if (!current_user_can('manage_options')) return;
+  
+  $message = '';
+  $error = '';
+  
+  // Handle upload
+  if (isset($_POST['nb_upload_templates']) && check_admin_referer('nb_template_upload', 'nb_upload_nonce')){
+    $category_id = isset($_POST['template_category']) ? intval($_POST['template_category']) : 0;
+    
+    if (!empty($_FILES['template_images']['name'][0])){
+      require_once(ABSPATH . 'wp-admin/includes/image.php');
+      require_once(ABSPATH . 'wp-admin/includes/file.php');
+      require_once(ABSPATH . 'wp-admin/includes/media.php');
+      
+      $files = $_FILES['template_images'];
+      $uploaded_count = 0;
+      $failed_count = 0;
+      
+      foreach ($files['name'] as $key => $value){
+        if ($files['error'][$key] === 0){
+          $file = array(
+            'name'     => $files['name'][$key],
+            'type'     => $files['type'][$key],
+            'tmp_name' => $files['tmp_name'][$key],
+            'error'    => $files['error'][$key],
+            'size'     => $files['size'][$key]
+          );
+          
+          // Upload to WordPress media library
+          $upload_overrides = array('test_form' => false);
+          $uploaded_file = wp_handle_upload($file, $upload_overrides);
+          
+          if (isset($uploaded_file['file'])){
+            // Get image dimensions
+            $image_info = getimagesize($uploaded_file['file']);
+            $width = $image_info ? $image_info[0] : 800;
+            $height = $image_info ? $image_info[1] : 600;
+            
+            // Create layers_json with a single image object
+            $layers = array(
+              array(
+                'type' => 'image',
+                'src' => $uploaded_file['url'],
+                'left' => 0,
+                'top' => 0,
+                'scaleX' => 1,
+                'scaleY' => 1,
+                'width' => $width,
+                'height' => $height,
+                'angle' => 0
+              )
+            );
+            
+            // Create template post
+            $template_id = wp_insert_post(array(
+              'post_type' => 'nb_template',
+              'post_title' => sanitize_text_field($files['name'][$key]),
+              'post_status' => 'publish',
+              'meta_input' => array(
+                'preview_url' => esc_url_raw($uploaded_file['url']),
+                'layers_json' => wp_json_encode($layers),
+                'width_mm' => 200,
+                'height_mm' => 150,
+                'dpi' => 300
+              )
+            ));
+            
+            if (!is_wp_error($template_id) && $category_id > 0){
+              wp_set_object_terms($template_id, $category_id, 'nb_template_cat');
+              $uploaded_count++;
+            } elseif (is_wp_error($template_id)){
+              $failed_count++;
+            } else {
+              $uploaded_count++;
+            }
+          } else {
+            $failed_count++;
+          }
+        }
+      }
+      
+      if ($uploaded_count > 0){
+        $message = sprintf('%d sablon sikeresen létrehozva.', $uploaded_count);
+      }
+      if ($failed_count > 0){
+        $error = sprintf('%d fájl feltöltése sikertelen.', $failed_count);
+      }
+    } else {
+      $error = 'Kérlek válassz ki legalább egy képet.';
+    }
+  }
+  
+  // Get categories
+  $categories = get_terms(array(
+    'taxonomy' => 'nb_template_cat',
+    'hide_empty' => false
+  ));
+  
+  ?>
+  <div class="wrap">
+    <h1>Sablon Feltöltő</h1>
+    
+    <?php if ($message): ?>
+      <div class="notice notice-success is-dismissible"><p><?php echo esc_html($message); ?></p></div>
+    <?php endif; ?>
+    
+    <?php if ($error): ?>
+      <div class="notice notice-error is-dismissible"><p><?php echo esc_html($error); ?></p></div>
+    <?php endif; ?>
+    
+    <div class="card" style="max-width: 800px;">
+      <h2>Képek feltöltése sablonként</h2>
+      <form method="post" enctype="multipart/form-data">
+        <?php wp_nonce_field('nb_template_upload', 'nb_upload_nonce'); ?>
+        
+        <table class="form-table">
+          <tr>
+            <th scope="row"><label for="template_images">Képek kiválasztása</label></th>
+            <td>
+              <input type="file" name="template_images[]" id="template_images" multiple accept="image/*" required>
+              <p class="description">Több kép is kiválasztható. Támogatott formátumok: JPG, PNG, GIF, WebP</p>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row"><label for="template_category">Kategória</label></th>
+            <td>
+              <select name="template_category" id="template_category">
+                <option value="0">-- Nincs kategória --</option>
+                <?php foreach ($categories as $cat): ?>
+                  <option value="<?php echo esc_attr($cat->term_id); ?>">
+                    <?php echo esc_html($cat->name); ?> (<?php echo $cat->count; ?>)
+                  </option>
+                <?php endforeach; ?>
+              </select>
+              <p class="description">A feltöltött sablonok ebbe a kategóriába kerülnek.</p>
+            </td>
+          </tr>
+        </table>
+        
+        <p class="submit">
+          <button type="submit" name="nb_upload_templates" class="button button-primary">Sablonok létrehozása</button>
+        </p>
+      </form>
+    </div>
+    
+    <div class="card" style="max-width: 800px; margin-top: 20px;">
+      <h2>Hogyan működik?</h2>
+      <ol>
+        <li>Válaszd ki a feltölteni kívánt képeket (többet is egyszerre)</li>
+        <li>Opcionálisan válassz kategóriát</li>
+        <li>Kattints a "Sablonok létrehozása" gombra</li>
+        <li>A képek automatikusan sablonokká alakulnak</li>
+        <li>A frontenden a felhasználók kiválaszthatják és betölthetik őket a tervezőbe</li>
+      </ol>
+      <p><strong>Tipp:</strong> A kategóriákat a <a href="edit-tags.php?taxonomy=nb_template_cat&post_type=nb_template">Sablon Kategóriák</a> menüpontban tudod kezelni.</p>
+    </div>
+  </div>
+  <?php
+}
+
