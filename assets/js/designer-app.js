@@ -2590,6 +2590,8 @@
     const obj = c.getActiveObject();
     if (!obj || obj.type !== 'textbox') return;
     cb(obj);
+    if (typeof obj.initDimensions === 'function') obj.initDimensions();
+    obj.dirty = true;
     obj.setCoords();
     c.requestRenderAll();
     markDesignDirty();
