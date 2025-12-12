@@ -2793,6 +2793,128 @@
     return fontSize;
   }
 
+  function clampTextboxToArea(textbox) {
+    if (!textbox || textbox.type !== 'textbox') return;
+    if (!c || !c.width) return;
+    const area = c.__nb_area || fallbackArea;
+    const maxWidth = area ? area.w * 0.9 : c.width * 0.85;
+    if (!Number.isFinite(maxWidth) || maxWidth <= 0) return;
+
+    if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
+
+    shrinkTextboxFontToFit(textbox, maxWidth);
+
+    let currentWidth = measureTextboxWidth(textbox);
+    if (currentWidth > maxWidth) {
+      const wrapped = wrapTextboxTextToWidth(textbox, maxWidth);
+      if (wrapped && typeof textbox.initDimensions === 'function') {
+        textbox.initDimensions();
+        currentWidth = measureTextboxWidth(textbox);
+      }
+    }
+
+    const unscaledMax = maxWidth / (textbox.scaleX || 1);
+    if (Number.isFinite(unscaledMax) && Number.isFinite(textbox.width) && textbox.width > unscaledMax) {
+      if (typeof textbox.set === 'function') {
+        textbox.set('width', unscaledMax);
+      } else {
+        textbox.width = unscaledMax;
+      }
+    }
+
+    textbox.dirty = true;
+    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+  }
+
+  function wrapTextboxTextToWidth(textbox, maxWidth) {
+    if (!textbox || textbox.type !== 'textbox') return null;
+    const textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    if (!textValue.length) return null;
+    if (!Number.isFinite(maxWidth) || maxWidth <= 0) return null;
+    if (typeof fabric === 'undefined' || !fabric.Text) return null;
+
+    const availableWidth = maxWidth / (textbox.scaleX || 1);
+    const measureProps = {
+      fontSize: textbox.fontSize,
+      fontFamily: textbox.fontFamily,
+      fontWeight: textbox.fontWeight,
+      fontStyle: textbox.fontStyle,
+      charSpacing: textbox.charSpacing,
+      splitByGrapheme: textbox.splitByGrapheme
+    };
+
+    const measure = str => {
+      const temp = new fabric.Text(str || '', measureProps);
+      return typeof temp.calcTextWidth === 'function' ? temp.calcTextWidth() : 0;
+    };
+
+    const lines = [];
+    let current = '';
+    const tokens = textValue.split(/(\s+)/);
+
+    const pushCurrent = () => {
+      if (current.length) {
+        lines.push(current.replace(/\s+$/g, ''));
+        current = '';
+      }
+    };
+
+    tokens.forEach(token => {
+      if (!token) return;
+      const isWhitespace = !token.trim();
+      if (isWhitespace) {
+        current += token;
+        return;
+      }
+
+      const tokenNormalized = current.length ? token : token.replace(/^\s+/g, '');
+      if (!tokenNormalized.length) return;
+
+      const tentative = current + tokenNormalized;
+      if (!current.length || measure(tentative) <= availableWidth) {
+        current = tentative;
+        return;
+      }
+
+      pushCurrent();
+
+      if (measure(tokenNormalized) <= availableWidth) {
+        current = tokenNormalized;
+        return;
+      }
+
+      // Token alone is too long: hard-wrap it by characters
+      let chunk = '';
+      tokenNormalized.split('').forEach(ch => {
+        const candidate = chunk + ch;
+        if (!chunk.length || measure(candidate) <= availableWidth) {
+          chunk = candidate;
+        } else {
+          if (chunk.length) lines.push(chunk);
+          chunk = ch;
+        }
+      });
+      current = chunk;
+    });
+
+    pushCurrent();
+
+    const wrapped = lines.join('\n');
+    if (wrapped && wrapped !== textValue) {
+      if (typeof textbox.set === 'function') {
+        textbox.set('text', wrapped);
+      } else {
+        textbox.text = wrapped;
+      }
+      if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
+      textbox.dirty = true;
+      if (typeof textbox.setCoords === 'function') textbox.setCoords();
+      return wrapped;
+    }
+
+    return null;
+  }
+
   function collapseTextboxMultilineForCurve(textbox) {
     if (!textbox || textbox.type !== 'textbox') return;
     const textValue = typeof textbox.text === 'string' ? textbox.text : '';
@@ -2939,6 +3061,7 @@
       if (typeof textbox.setCoords === 'function') textbox.setCoords();
     };
     if (!curveActive || !textbox.text || !textbox.text.length) {
+      clampTextboxToArea(textbox);
       assignStyles(baseStyles);
       assignPathProps(null, 'left');
       if (typeof textbox.set === 'function') {
@@ -2969,8 +3092,10 @@
       const scaleX = textbox.scaleX || 1;
 
       // Auto-scale font size if text is too wide for the canvas
+      const area = c && (c.__nb_area || fallbackArea) ? (c.__nb_area || fallbackArea) : null;
+      let maxWidth = null;
       if (c && c.width) {
-        const maxWidth = c.width * 0.85; // 85% of canvas width
+        maxWidth = (area ? area.w * 0.9 : c.width * 0.85); // Prefer print area width when available
         let currentFontSize = textbox.fontSize;
         const minFontSize = 10;
 
@@ -2994,6 +3119,15 @@
             fontSizeValue.textContent = currentFontSize + ' px';
           }
         }
+
+        if ((textWidth * scaleX) > maxWidth && currentFontSize <= minFontSize) {
+          const wrapped = wrapTextboxTextToWidth(textbox, maxWidth);
+          if (wrapped) {
+            textValue = wrapped;
+            tempText.set('text', wrapped);
+            textWidth = tempText.calcTextWidth();
+          }
+        }
       }
 
       if (textWidth > width) {
@@ -3004,6 +3138,21 @@
           textbox.set('width', width);
         } else {
           textbox.width = width;
+        }
+      }
+
+      if (c && c.width && maxWidth) {
+        const maxUnscaled = maxWidth / scaleX;
+        const minNeeded = Math.max(textWidth + 20, 20);
+        const desiredWidth = Math.min(maxUnscaled, minNeeded);
+        const clampedWidth = Math.min(width, desiredWidth);
+        if (clampedWidth !== width) {
+          width = clampedWidth;
+          if (typeof textbox.set === 'function') {
+            textbox.set('width', width);
+          } else {
+            textbox.width = width;
+          }
         }
       }
     }
