@@ -2793,6 +2793,39 @@
     return fontSize;
   }
 
+  function clampTextboxToArea(textbox) {
+    if (!textbox || textbox.type !== 'textbox') return;
+    if (!c || !c.width) return;
+    const area = c.__nb_area || fallbackArea;
+    const maxWidth = area ? area.w * 0.9 : c.width * 0.85;
+    if (!Number.isFinite(maxWidth) || maxWidth <= 0) return;
+
+    if (typeof textbox.initDimensions === 'function') textbox.initDimensions();
+
+    shrinkTextboxFontToFit(textbox, maxWidth);
+
+    let currentWidth = measureTextboxWidth(textbox);
+    if (currentWidth > maxWidth) {
+      const wrapped = wrapTextboxTextToWidth(textbox, maxWidth);
+      if (wrapped && typeof textbox.initDimensions === 'function') {
+        textbox.initDimensions();
+        currentWidth = measureTextboxWidth(textbox);
+      }
+    }
+
+    const unscaledMax = maxWidth / (textbox.scaleX || 1);
+    if (Number.isFinite(unscaledMax) && Number.isFinite(textbox.width) && textbox.width > unscaledMax) {
+      if (typeof textbox.set === 'function') {
+        textbox.set('width', unscaledMax);
+      } else {
+        textbox.width = unscaledMax;
+      }
+    }
+
+    textbox.dirty = true;
+    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+  }
+
   function wrapTextboxTextToWidth(textbox, maxWidth) {
     if (!textbox || textbox.type !== 'textbox') return null;
     const textValue = typeof textbox.text === 'string' ? textbox.text : '';
@@ -3028,6 +3061,7 @@
       if (typeof textbox.setCoords === 'function') textbox.setCoords();
     };
     if (!curveActive || !textbox.text || !textbox.text.length) {
+      clampTextboxToArea(textbox);
       assignStyles(baseStyles);
       assignPathProps(null, 'left');
       if (typeof textbox.set === 'function') {
