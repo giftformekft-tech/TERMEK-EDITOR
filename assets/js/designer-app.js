@@ -2591,6 +2591,7 @@
     if (!obj || obj.type !== 'textbox') return;
     cb(obj);
     if (typeof obj.initDimensions === 'function') obj.initDimensions();
+    clampTextboxToArea(obj);
     obj.dirty = true;
     obj.setCoords();
     c.requestRenderAll();
