@@ -1294,24 +1294,33 @@
 
   function parsePriceValue(str) {
     if (typeof str !== 'string') return null;
-    let cleaned = str.replace(/[^0-9,\.\-]/g, '');
-    if (!cleaned) return null;
-    cleaned = cleaned.replace(/,/g, '.');
-    const dotMatches = cleaned.match(/\./g) || [];
-    if (dotMatches.length > 1) {
-      const lastDot = cleaned.lastIndexOf('.');
-      const integerPart = cleaned.slice(0, lastDot).replace(/\./g, '');
-      const decimalPart = cleaned.slice(lastDot + 1);
-      cleaned = integerPart + (decimalPart !== '' ? '.' + decimalPart : '');
-    } else if (dotMatches.length === 1) {
-      const dotPos = cleaned.indexOf('.');
-      const decimals = cleaned.length - dotPos - 1;
-      if (decimals === 3) {
-        cleaned = cleaned.replace('.', '');
+    const matches = str.match(/[0-9][0-9\s.,\u00a0-]*/g);
+    if (!matches) return null;
+    const parseChunk = (chunk) => {
+      let cleaned = chunk.replace(/[^0-9,\.\-]/g, '');
+      if (!cleaned) return null;
+      cleaned = cleaned.replace(/,/g, '.');
+      const dotMatches = cleaned.match(/\./g) || [];
+      if (dotMatches.length > 1) {
+        const lastDot = cleaned.lastIndexOf('.');
+        const integerPart = cleaned.slice(0, lastDot).replace(/\./g, '');
+        const decimalPart = cleaned.slice(lastDot + 1);
+        cleaned = integerPart + (decimalPart !== '' ? '.' + decimalPart : '');
+      } else if (dotMatches.length === 1) {
+        const dotPos = cleaned.indexOf('.');
+        const decimals = cleaned.length - dotPos - 1;
+        if (decimals === 3) {
+          cleaned = cleaned.replace('.', '');
+        }
       }
+      const num = Number(cleaned);
+      return Number.isFinite(num) ? num : null;
+    };
+    for (let i = matches.length - 1; i >= 0; i -= 1) {
+      const parsed = parseChunk(matches[i]);
+      if (Number.isFinite(parsed)) return parsed;
     }
-    const num = Number(cleaned);
-    return Number.isFinite(num) ? num : null;
+    return null;
   }
 
   function doubleSidedFeeValue() {

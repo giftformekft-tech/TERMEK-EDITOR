@@ -14,11 +14,16 @@
 
     <?php if ($tab==='products'): ?>
       <h2>Tervezhető termékek</h2>
+      <div class="nb-products-toolbar">
+        <label for="nb-product-search">Keresés:</label>
+        <input type="search" id="nb-product-search" class="nb-product-search" placeholder="Keress terméknévre vagy azonosítóra..." autocomplete="off" />
+        <span class="nb-products-count" aria-live="polite"></span>
+      </div>
       <div class="nb-products">
         <?php
           $product_query = new WP_Query([
             'post_type'      => 'product',
-            'posts_per_page' => 200,
+            'posts_per_page' => -1,
             'post_status'    => 'publish',
             'orderby'        => 'title',
             'order'          => 'ASC',
@@ -34,6 +39,37 @@
           wp_reset_postdata();
         ?>
       </div>
+      <p class="nb-products-empty" aria-live="polite" hidden>Nincs találat a keresésre.</p>
+      <script>
+        document.addEventListener('DOMContentLoaded', function(){
+          var searchInput = document.querySelector('.nb-product-search');
+          var productList = document.querySelector('.nb-products');
+          if (!searchInput || !productList) return;
+          var items = Array.prototype.slice.call(productList.querySelectorAll('.nb-prod'));
+          var countLabel = document.querySelector('.nb-products-count');
+          var emptyState = document.querySelector('.nb-products-empty');
+          function normalize(value){
+            return (value || '').toString().toLowerCase();
+          }
+          function update(){
+            var term = normalize(searchInput.value);
+            var visibleCount = 0;
+            items.forEach(function(item){
+              var match = normalize(item.textContent).indexOf(term) !== -1;
+              item.style.display = match ? '' : 'none';
+              if (match) visibleCount += 1;
+            });
+            if (countLabel){
+              countLabel.textContent = visibleCount + ' / ' + items.length;
+            }
+            if (emptyState){
+              emptyState.hidden = visibleCount !== 0;
+            }
+          }
+          searchInput.addEventListener('input', update);
+          update();
+        });
+      </script>
       <h2>Globális terméktípusok</h2>
       <p>Add meg külön a tervezőben látható és a rendelésben megjelenő elnevezést, valamint válassz alap WooCommerce terméket az árakhoz.</p>
       <?php

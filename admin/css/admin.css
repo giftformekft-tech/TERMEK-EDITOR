@@ -1,5 +1,10 @@
 .nb-admin .nb-products{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:6px;max-width:900px}
 .nb-admin .nb-prod{padding:6px;border:1px solid #eee;background:#fff}
+.nb-products-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 12px}
+.nb-products-toolbar label{font-weight:600}
+.nb-products-toolbar input[type=search]{min-width:240px;padding:4px 8px}
+.nb-products-count{color:#646970}
+.nb-products-empty{margin:6px 0;color:#646970}
 .nb-var-card{border:1px solid #e5e5e5;background:#fff;margin:12px 0;padding:12px}
 .nb-mockup{border:1px solid #e5e5e5;background:#fff;margin:10px 0;padding:10px}
 .nb-editor{display:flex;gap:10px;align-items:flex-start}
