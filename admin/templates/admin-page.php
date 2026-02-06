@@ -23,7 +23,7 @@
         <?php
           $product_query = new WP_Query([
             'post_type'      => 'product',
-            'posts_per_page' => 200,
+            'posts_per_page' => -1,
             'post_status'    => 'publish',
             'orderby'        => 'title',
             'order'          => 'ASC',
