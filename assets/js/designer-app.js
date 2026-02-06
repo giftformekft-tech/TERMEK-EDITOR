@@ -1292,6 +1292,16 @@
     return '';
   }
 
+  function currentProductPriceValue() {
+    const sel = currentSelection();
+    if (!sel || !sel.cfg) return null;
+    const cfg = sel.cfg;
+    if (Number.isFinite(cfg.price_value)) return cfg.price_value;
+    const priceText = currentProductPriceText();
+    if (!priceText) return null;
+    return parsePriceValue(priceText);
+  }
+
   function parsePriceValue(str) {
     if (typeof str !== 'string') return null;
     const matches = str.match(/[0-9][0-9\s.,\u00a0-]*/g);
@@ -1345,7 +1355,7 @@
     if (!priceDisplayEl) return;
     const markup = currentProductPriceMarkup();
     const priceText = currentProductPriceText();
-    const baseAmount = parsePriceValue(priceText);
+    const baseAmount = currentProductPriceValue();
     const surcharge = shouldApplyDoubleSidedSurcharge() ? doubleSidedFeeValue() : 0;
     const hasBase = (markup && markup.trim()) || (priceText && priceText.trim());
     const totalTargets = [priceTotalEl, priceTotalMobileEl].filter(Boolean);

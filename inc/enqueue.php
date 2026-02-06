@@ -16,12 +16,19 @@ add_action('wp_enqueue_scripts', function(){
       foreach($settings['catalog'] as $pid=>&$cfg){
         if (empty($cfg['title'])) $cfg['title'] = get_the_title($pid);
         unset($cfg['price_html'], $cfg['price_text']);
+        unset($cfg['price_value']);
         if (function_exists('wc_get_product')) {
           $product_obj = wc_get_product($pid);
           if ($product_obj) {
-            $price_html = $product_obj->get_price_html();
-            if ($price_html === '' && function_exists('wc_get_price_to_display') && function_exists('wc_price')) {
+            $display_price = '';
+            if (function_exists('wc_get_price_to_display')) {
               $display_price = wc_get_price_to_display($product_obj);
+            }
+            if ($display_price !== '' && is_numeric($display_price)) {
+              $cfg['price_value'] = (float)$display_price;
+            }
+            $price_html = $product_obj->get_price_html();
+            if ($price_html === '' && $display_price !== '' && function_exists('wc_price')) {
               if ($display_price !== '') {
                 $price_html = wc_price($display_price);
               }
@@ -74,12 +81,19 @@ add_action('admin_enqueue_scripts', function($hook){
       foreach($adminSettings['catalog'] as $pid=>&$cfg){
         if (empty($cfg['title'])) $cfg['title'] = get_the_title($pid);
         unset($cfg['price_html'], $cfg['price_text']);
+        unset($cfg['price_value']);
         if (function_exists('wc_get_product')) {
           $product_obj = wc_get_product($pid);
           if ($product_obj) {
-            $price_html = $product_obj->get_price_html();
-            if ($price_html === '' && function_exists('wc_get_price_to_display') && function_exists('wc_price')) {
+            $display_price = '';
+            if (function_exists('wc_get_price_to_display')) {
               $display_price = wc_get_price_to_display($product_obj);
+            }
+            if ($display_price !== '' && is_numeric($display_price)) {
+              $cfg['price_value'] = (float)$display_price;
+            }
+            $price_html = $product_obj->get_price_html();
+            if ($price_html === '' && $display_price !== '' && function_exists('wc_price')) {
               if ($display_price !== '') {
                 $price_html = wc_price($display_price);
               }
