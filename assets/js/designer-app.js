@@ -342,6 +342,8 @@
   const canvasEmptyHintEl = document.getElementById('nb-canvas-empty-hint');
   const sideButtons = Array.from(document.querySelectorAll('[data-nb-side]'));
   const sideFabButton = document.getElementById('nb-side-toggle-mobile');
+  const undoBtn = document.getElementById('nb-undo-btn');
+  const redoBtn = document.getElementById('nb-redo-btn');
   const mobileMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
     ? window.matchMedia('(max-width: 768px)')
     : null;
@@ -1708,7 +1710,10 @@
     return {
       json: { version: (c && c.version) || '5.0.0', objects: [] },
       objectCount: 0,
-      hasContent: false
+      hasContent: false,
+      undoStack: [],
+      redoStack: [],
+      historyBaseline: null
     };
   }
 
@@ -1762,6 +1767,73 @@
     state.json = snapshot;
     state.objectCount = designObjects().length;
     state.hasContent = state.objectCount > 0;
+  }
+
+  let suspendHistory = false;
+  let historyDebounceTimer = null;
+  let historyOpInProgress = false;
+  const HISTORY_LIMIT = 50;
+
+  function historyState(key) {
+    return ensureSideState(key || activeSideKey);
+  }
+
+  function currentHistorySnapshot() {
+    return JSON.stringify(sanitizeCanvasJSON());
+  }
+
+  function updateHistoryButtons() {
+    const state = historyState(activeSideKey);
+    if (undoBtn) undoBtn.disabled = !state.undoStack.length;
+    if (redoBtn) redoBtn.disabled = !state.redoStack.length;
+  }
+
+  function commitHistory() {
+    if (suspendHistory) return;
+    const state = historyState(activeSideKey);
+    const snapshot = currentHistorySnapshot();
+    if (typeof state.historyBaseline !== 'string') {
+      state.historyBaseline = snapshot;
+      updateHistoryButtons();
+      return;
+    }
+    if (snapshot === state.historyBaseline) return;
+    state.undoStack.push(state.historyBaseline);
+    if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
+    state.redoStack.length = 0;
+    state.historyBaseline = snapshot;
+    updateHistoryButtons();
+  }
+
+  function scheduleHistoryCommit() {
+    if (suspendHistory) return;
+    if (historyDebounceTimer) clearTimeout(historyDebounceTimer);
+    historyDebounceTimer = setTimeout(commitHistory, 500);
+  }
+
+  function undoHistory() {
+    if (sideLoading || historyOpInProgress) return;
+    if (historyDebounceTimer) { clearTimeout(historyDebounceTimer); historyDebounceTimer = null; }
+    commitHistory();
+    const state = historyState(activeSideKey);
+    if (!state.undoStack.length) return;
+    const previous = state.undoStack.pop();
+    state.redoStack.push(state.historyBaseline);
+    if (state.redoStack.length > HISTORY_LIMIT) state.redoStack.shift();
+    historyOpInProgress = true;
+    loadSideState(activeSideKey, JSON.parse(previous)).finally(() => { historyOpInProgress = false; });
+  }
+
+  function redoHistory() {
+    if (sideLoading || historyOpInProgress) return;
+    if (historyDebounceTimer) { clearTimeout(historyDebounceTimer); historyDebounceTimer = null; }
+    const state = historyState(activeSideKey);
+    if (!state.redoStack.length) return;
+    const next = state.redoStack.pop();
+    state.undoStack.push(state.historyBaseline);
+    if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
+    historyOpInProgress = true;
+    loadSideState(activeSideKey, JSON.parse(next)).finally(() => { historyOpInProgress = false; });
   }
 
   function sideHasContent(key) {
@@ -2180,9 +2252,10 @@
     }
   }
 
-  function loadSideState(key) {
+  function loadSideState(key, overrideJson) {
     const state = ensureSideState(key);
-    const json = prunePrintAreaObjects(cloneSideJson(state));
+    const json = prunePrintAreaObjects(overrideJson || cloneSideJson(state));
+    suspendHistory = true;
     return new Promise(resolve => {
       const previousBg = (typeof c.backgroundColor !== 'undefined' && c.backgroundColor) ? c.backgroundColor : '#fff';
       if (typeof c.clear === 'function') {
@@ -2208,6 +2281,9 @@
         });
         c.discardActiveObject();
         captureActiveSideState();
+        suspendHistory = false;
+        state.historyBaseline = currentHistorySnapshot();
+        updateHistoryButtons();
         updateCanvasEmptyHint();
         syncLayerList();
         syncTextControls();
@@ -2347,6 +2423,7 @@
     }
     c.requestRenderAll();
     markDesignDirty();
+    commitHistory();
     syncLayerList();
     syncMobileSelectionUi();
   }
@@ -2364,6 +2441,7 @@
     c.setActiveObject(obj);
     c.requestRenderAll();
     markDesignDirty();
+    commitHistory();
     syncLayerList();
     syncTextControls();
     syncMobileSelectionUi();
@@ -2615,6 +2693,7 @@
     obj.setCoords();
     c.requestRenderAll();
     markDesignDirty();
+    scheduleHistoryCommit();
   }
 
   function activeTextbox() {
@@ -3583,14 +3662,15 @@
       keepObjectInside(e.target);
       initializeTextboxCurve(e.target);
       markDesignDirty();
+      commitHistory();
       syncLayerList();
     }
   });
   c.on('object:moving', e => { keepObjectInside(e.target, { fit: false }); });
   c.on('object:scaling', e => { keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
   c.on('object:rotating', e => { keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
-  c.on('object:modified', e => { if (isDesignObject(e.target)) { markDesignDirty(); syncLayerList(); } });
-  c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); syncLayerList(); } });
+  c.on('object:modified', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
+  c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
   c.on('selection:created', () => { syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('selection:updated', () => { syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('selection:cleared', () => { syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
@@ -3782,7 +3862,24 @@
         removeActiveObject(active);
       }
     }
+    if ((key === 'z' || key === 'Z') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+      evt.preventDefault();
+      if (evt.shiftKey) {
+        redoHistory();
+      } else {
+        undoHistory();
+      }
+      return;
+    }
+    if ((key === 'y' || key === 'Y') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+      evt.preventDefault();
+      redoHistory();
+    }
   });
+
+  if (undoBtn) undoBtn.addEventListener('click', undoHistory);
+  if (redoBtn) redoBtn.addEventListener('click', redoHistory);
+  updateHistoryButtons();
 
   let resizeRaf = null;
   window.addEventListener('resize', () => {
@@ -3906,10 +4003,13 @@
 
   if (clearButton) {
     clearButton.onclick = () => {
+      suspendHistory = true;
       designObjects().forEach(obj => c.remove(obj));
+      suspendHistory = false;
       c.discardActiveObject();
       c.requestRenderAll();
       markDesignDirty();
+      commitHistory();
       syncTextControls();
       syncLayerList();
     };
@@ -4352,8 +4452,8 @@
 
   async function loadDesign(data) {
     // Reset sides
-    sideStates.front = { json: null, preview: null, hasContent: false, undoStack: [], redoStack: [] };
-    sideStates.back = { json: null, preview: null, hasContent: false, undoStack: [], redoStack: [] };
+    sideStates.front = emptySideSnapshot();
+    sideStates.back = emptySideSnapshot();
 
     const layers = data.layers;
     // Check if layers has explicit front/back properties (saved designs)

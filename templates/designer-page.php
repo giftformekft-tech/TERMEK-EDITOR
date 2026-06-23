@@ -76,6 +76,10 @@
           <div class="nb-canvas-empty-hint" id="nb-canvas-empty-hint" hidden>Ide húzd a mintát</div>
           <canvas id="nb-canvas" width="480" height="640"></canvas>
         </div>
+        <div class="nb-history-controls" id="nb-history-controls">
+          <button type="button" class="nb-history-btn" id="nb-undo-btn" aria-label="Visszavonás" title="Visszavonás (Ctrl+Z)" disabled>↺</button>
+          <button type="button" class="nb-history-btn" id="nb-redo-btn" aria-label="Ismétlés" title="Ismétlés (Ctrl+Shift+Z)" disabled>↻</button>
+        </div>
         <button type="button" class="nb-side-fab" id="nb-side-toggle-mobile" aria-label="Oldal váltása" hidden>
           ⟲
         </button>

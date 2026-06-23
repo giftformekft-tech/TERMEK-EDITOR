@@ -63,6 +63,10 @@
 .nb-side-fab{position:absolute;bottom:18px;right:18px;background:#111827;color:#f8fafc;border:none;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;box-shadow:0 16px 30px rgba(15,23,42,.32);cursor:pointer;transition:transform .2s ease,background .2s ease}
 .nb-side-fab:hover{transform:translateY(-2px);background:#0f172a}
 .nb-side-fab[hidden]{display:none}
+.nb-history-controls{position:absolute;top:14px;left:14px;display:flex;gap:8px}
+.nb-history-btn{background:rgba(17,24,39,.85);color:#f8fafc;border:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;box-shadow:0 10px 20px rgba(15,23,42,.22);transition:transform .2s ease,background .2s ease,opacity .2s ease}
+.nb-history-btn:hover:not(:disabled){transform:translateY(-2px);background:#0f172a}
+.nb-history-btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
 #nb-canvas{max-width:100%;background:#ffffff;border:none;box-shadow:none;border-radius:inherit}
 
 .nb-mobile-toolbar{position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));margin:0 auto;max-width:480px;background:rgba(255,255,255,.95);padding:12px 18px;border-radius:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;box-shadow:0 18px 36px rgba(15,23,42,.18);z-index:910;backdrop-filter:blur(12px);color:#0b1f3a}
