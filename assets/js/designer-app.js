@@ -343,6 +343,10 @@
   const objectAlignButtons = Array.from(document.querySelectorAll('[data-nb-obj-align]'));
   const distributeHBtn = document.getElementById('nb-distribute-h');
   const distributeVBtn = document.getElementById('nb-distribute-v');
+  const opacityInput = document.getElementById('nb-opacity');
+  const opacityValue = document.getElementById('nb-opacity-value');
+  const flipHBtn = document.getElementById('nb-flip-h');
+  const flipVBtn = document.getElementById('nb-flip-v');
   const zoomInBtn = document.getElementById('nb-zoom-in');
   const zoomOutBtn = document.getElementById('nb-zoom-out');
   const zoomResetBtn = document.getElementById('nb-zoom-reset');
@@ -412,7 +416,7 @@
     upload: ['upload', 'templates'],
     text: ['text'],
     product: ['product', 'color', 'size', 'double'],
-    layers: ['layers', 'align']
+    layers: ['layers', 'align', 'appearance']
   };
   const sheetState = {
     activeKey: '',
@@ -2647,9 +2651,40 @@
     if (distributeVBtn) distributeVBtn.disabled = !canDistribute;
   }
 
+  function activeAppearanceTargets() {
+    const active = c.getActiveObject();
+    if (!active || !isDesignObject(active)) return [];
+    if (active.type === 'activeSelection' && typeof active.getObjects === 'function') {
+      return active.getObjects().filter(isDesignObject);
+    }
+    return [active];
+  }
+
+  function syncObjectAppearance() {
+    const targets = activeAppearanceTargets();
+    const hasTarget = targets.length > 0;
+    if (opacityInput) opacityInput.disabled = !hasTarget;
+    if (flipHBtn) flipHBtn.disabled = !hasTarget;
+    if (flipVBtn) flipVBtn.disabled = !hasTarget;
+    if (!hasTarget) {
+      if (opacityInput) opacityInput.value = '100';
+      if (opacityValue) opacityValue.textContent = '100%';
+      setPressed(flipHBtn, false);
+      setPressed(flipVBtn, false);
+      return;
+    }
+    const primary = targets[0];
+    const opacityPct = Math.round((Number.isFinite(primary.opacity) ? primary.opacity : 1) * 100);
+    if (opacityInput) opacityInput.value = opacityPct;
+    if (opacityValue) opacityValue.textContent = opacityPct + '%';
+    setPressed(flipHBtn, !!primary.flipX);
+    setPressed(flipVBtn, !!primary.flipY);
+  }
+
   function syncLayerList() {
     syncGroupButtons();
     syncAlignButtons();
+    syncObjectAppearance();
     if (!layerListEl) return;
     const objects = designObjects();
     layerListEl.innerHTML = '';
@@ -4429,6 +4464,35 @@
   });
   if (distributeHBtn) distributeHBtn.addEventListener('click', () => distributeSelection('horizontal'));
   if (distributeVBtn) distributeVBtn.addEventListener('click', () => distributeSelection('vertical'));
+
+  if (opacityInput) {
+    opacityInput.addEventListener('input', () => {
+      const pct = parseInt(opacityInput.value, 10);
+      const normalized = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 100;
+      if (opacityValue) opacityValue.textContent = normalized + '%';
+      const targets = activeAppearanceTargets();
+      if (!targets.length) return;
+      targets.forEach(obj => obj.set('opacity', normalized / 100));
+      c.requestRenderAll();
+      markDesignDirty();
+      scheduleHistoryCommit();
+    });
+  }
+
+  function toggleFlip(axis) {
+    const targets = activeAppearanceTargets();
+    if (!targets.length) return;
+    const prop = axis === 'horizontal' ? 'flipX' : 'flipY';
+    const next = !targets[0][prop];
+    targets.forEach(obj => obj.set(prop, next));
+    c.requestRenderAll();
+    markDesignDirty();
+    commitHistory();
+    syncObjectAppearance();
+  }
+
+  if (flipHBtn) flipHBtn.addEventListener('click', () => toggleFlip('horizontal'));
+  if (flipVBtn) flipVBtn.addEventListener('click', () => toggleFlip('vertical'));
 
   if (zoomInBtn) zoomInBtn.addEventListener('click', () => setZoomLevel(c.getZoom() + ZOOM_STEP));
   if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => setZoomLevel(c.getZoom() - ZOOM_STEP));

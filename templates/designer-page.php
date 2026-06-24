@@ -187,6 +187,22 @@
           <button type="button" class="nb-align-tool nb-align-tool--wide" id="nb-distribute-v" title="Egyenletes függőleges elosztás" disabled>↕ Függ. elosztás</button>
         </div>
       </div>
+      <div class="nb-action-card nb-action-card--appearance" data-nb-sheet-source="appearance">
+        <div class="nb-card-header">
+          <h3>Megjelenés</h3>
+        </div>
+        <label class="nb-field">
+          <span>Áttűnés</span>
+          <div class="nb-range">
+            <input type="range" id="nb-opacity" min="0" max="100" step="1" value="100" disabled>
+            <span id="nb-opacity-value">100%</span>
+          </div>
+        </label>
+        <div class="nb-align-toolbar nb-align-toolbar--distribute">
+          <button type="button" class="nb-align-tool nb-align-tool--wide" id="nb-flip-h" aria-pressed="false" title="Vízszintes tükrözés" disabled>⇋ Tükrözés</button>
+          <button type="button" class="nb-align-tool nb-align-tool--wide" id="nb-flip-v" aria-pressed="false" title="Függőleges tükrözés" disabled>⇵ Tükrözés</button>
+        </div>
+      </div>
       <div class="nb-action-card nb-action-card--layers" data-nb-sheet-source="layers" data-nb-sheet-title="Rétegek">
         <div class="nb-card-header">
           <h3>Rétegek</h3>
