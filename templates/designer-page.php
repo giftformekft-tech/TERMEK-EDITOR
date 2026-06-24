@@ -140,6 +140,23 @@
           </div>
         </div>
       </div>
+      <div class="nb-action-card nb-action-card--align" data-nb-sheet-source="align">
+        <div class="nb-card-header">
+          <h3>Igazítás és elosztás</h3>
+        </div>
+        <div class="nb-align-toolbar">
+          <button type="button" class="nb-align-tool" data-nb-obj-align="left" aria-label="Balra igazítás" title="Balra igazítás" disabled>⟸</button>
+          <button type="button" class="nb-align-tool" data-nb-obj-align="center-h" aria-label="Vízszintes középre igazítás" title="Vízszintes középre" disabled>≡</button>
+          <button type="button" class="nb-align-tool" data-nb-obj-align="right" aria-label="Jobbra igazítás" title="Jobbra igazítás" disabled>⟹</button>
+          <button type="button" class="nb-align-tool" data-nb-obj-align="top" aria-label="Felülre igazítás" title="Felülre igazítás" disabled>↑</button>
+          <button type="button" class="nb-align-tool" data-nb-obj-align="center-v" aria-label="Függőleges középre igazítás" title="Függőleges középre" disabled>≡</button>
+          <button type="button" class="nb-align-tool" data-nb-obj-align="bottom" aria-label="Alulra igazítás" title="Alulra igazítás" disabled>↓</button>
+        </div>
+        <div class="nb-align-toolbar nb-align-toolbar--distribute">
+          <button type="button" class="nb-align-tool nb-align-tool--wide" id="nb-distribute-h" title="Egyenletes vízszintes elosztás" disabled>↔ Vízsz. elosztás</button>
+          <button type="button" class="nb-align-tool nb-align-tool--wide" id="nb-distribute-v" title="Egyenletes függőleges elosztás" disabled>↕ Függ. elosztás</button>
+        </div>
+      </div>
       <div class="nb-action-card nb-action-card--layers" data-nb-sheet-source="layers" data-nb-sheet-title="Rétegek">
         <div class="nb-card-header">
           <h3>Rétegek</h3>

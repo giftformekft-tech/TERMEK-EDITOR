@@ -331,6 +331,9 @@
   const layerListEl = document.getElementById('nb-layer-list');
   const groupBtn = document.getElementById('nb-group-btn');
   const ungroupBtn = document.getElementById('nb-ungroup-btn');
+  const objectAlignButtons = Array.from(document.querySelectorAll('[data-nb-obj-align]'));
+  const distributeHBtn = document.getElementById('nb-distribute-h');
+  const distributeVBtn = document.getElementById('nb-distribute-v');
   const summaryCardEl = document.querySelector('.nb-summary-card');
   if (summaryCardEl) {
     const straySummaryToggle = summaryCardEl.querySelector('.nb-double-sided');
@@ -396,7 +399,7 @@
     upload: ['upload', 'templates'],
     text: ['text'],
     product: ['product', 'color', 'size', 'double'],
-    layers: ['layers']
+    layers: ['layers', 'align']
   };
   const sheetState = {
     activeKey: '',
@@ -2510,8 +2513,130 @@
     }
   }
 
+  function applyAlign(obj, mode, box) {
+    obj.setCoords();
+    const rect = obj.getBoundingRect(true, true);
+    switch (mode) {
+      case 'left':
+        obj.left += box.left - rect.left;
+        break;
+      case 'center-h':
+        obj.left += (box.left + box.width / 2) - (rect.left + rect.width / 2);
+        break;
+      case 'right':
+        obj.left += (box.left + box.width) - (rect.left + rect.width);
+        break;
+      case 'top':
+        obj.top += box.top - rect.top;
+        break;
+      case 'center-v':
+        obj.top += (box.top + box.height / 2) - (rect.top + rect.height / 2);
+        break;
+      case 'bottom':
+        obj.top += (box.top + box.height) - (rect.top + rect.height);
+        break;
+      default:
+        return;
+    }
+    obj.setCoords();
+  }
+
+  function alignSelection(mode) {
+    const active = c.getActiveObject();
+    if (!active || !isDesignObject(active)) return;
+    if (active.type === 'activeSelection' && typeof active.getObjects === 'function') {
+      const objects = active.getObjects().slice();
+      if (objects.length < 2) return;
+      c.discardActiveObject();
+      let minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
+      objects.forEach(obj => {
+        obj.setCoords();
+        const r = obj.getBoundingRect(true, true);
+        minLeft = Math.min(minLeft, r.left);
+        minTop = Math.min(minTop, r.top);
+        maxRight = Math.max(maxRight, r.left + r.width);
+        maxBottom = Math.max(maxBottom, r.top + r.height);
+      });
+      const box = { left: minLeft, top: minTop, width: maxRight - minLeft, height: maxBottom - minTop };
+      objects.forEach(obj => applyAlign(obj, mode, box));
+      c.setActiveObject(new fabric.ActiveSelection(objects, { canvas: c }));
+    } else {
+      const area = c.__nb_area || fallbackArea;
+      if (!area) return;
+      applyAlign(active, mode, { left: area.x, top: area.y, width: area.w, height: area.h });
+    }
+    c.requestRenderAll();
+    markDesignDirty();
+    commitHistory();
+    syncLayerList();
+    syncTextControls();
+  }
+
+  function distributeSelection(axis) {
+    const active = c.getActiveObject();
+    if (!active || active.type !== 'activeSelection' || typeof active.getObjects !== 'function') return;
+    const objects = active.getObjects().slice();
+    if (objects.length < 3) return;
+    c.discardActiveObject();
+    const items = objects.map(obj => {
+      obj.setCoords();
+      return { obj, rect: obj.getBoundingRect(true, true) };
+    });
+    if (axis === 'horizontal') {
+      items.sort((a, b) => a.rect.left - b.rect.left);
+      const first = items[0], last = items[items.length - 1];
+      const totalSpan = (last.rect.left + last.rect.width) - first.rect.left;
+      const totalWidth = items.reduce((sum, it) => sum + it.rect.width, 0);
+      const gap = (totalSpan - totalWidth) / (items.length - 1);
+      let cursor = first.rect.left + first.rect.width;
+      for (let i = 1; i < items.length - 1; i++) {
+        cursor += gap;
+        const it = items[i];
+        const dx = cursor - it.rect.left;
+        it.obj.left += dx;
+        it.obj.setCoords();
+        cursor += it.rect.width;
+      }
+    } else {
+      items.sort((a, b) => a.rect.top - b.rect.top);
+      const first = items[0], last = items[items.length - 1];
+      const totalSpan = (last.rect.top + last.rect.height) - first.rect.top;
+      const totalHeight = items.reduce((sum, it) => sum + it.rect.height, 0);
+      const gap = (totalSpan - totalHeight) / (items.length - 1);
+      let cursor = first.rect.top + first.rect.height;
+      for (let i = 1; i < items.length - 1; i++) {
+        cursor += gap;
+        const it = items[i];
+        const dy = cursor - it.rect.top;
+        it.obj.top += dy;
+        it.obj.setCoords();
+        cursor += it.rect.height;
+      }
+    }
+    c.setActiveObject(new fabric.ActiveSelection(objects, { canvas: c }));
+    c.requestRenderAll();
+    markDesignDirty();
+    commitHistory();
+    syncLayerList();
+  }
+
+  function syncAlignButtons() {
+    const active = c.getActiveObject();
+    const hasSelection = !!active && isDesignObject(active);
+    objectAlignButtons.forEach(btn => {
+      btn.disabled = !hasSelection;
+    });
+    const objects = active && active.type === 'activeSelection' && typeof active.getObjects === 'function'
+      ? active.getObjects()
+      : [];
+    const canDistribute = objects.length >= 3;
+    if (distributeHBtn) distributeHBtn.disabled = !canDistribute;
+    if (distributeVBtn) distributeVBtn.disabled = !canDistribute;
+  }
+
   function syncLayerList() {
     syncGroupButtons();
+    syncAlignButtons();
     if (!layerListEl) return;
     const objects = designObjects();
     layerListEl.innerHTML = '';
@@ -3947,6 +4072,11 @@
 
   if (groupBtn) groupBtn.addEventListener('click', groupActiveSelection);
   if (ungroupBtn) ungroupBtn.addEventListener('click', ungroupActiveGroup);
+  objectAlignButtons.forEach(btn => {
+    btn.addEventListener('click', () => alignSelection(btn.dataset.nbObjAlign));
+  });
+  if (distributeHBtn) distributeHBtn.addEventListener('click', () => distributeSelection('horizontal'));
+  if (distributeVBtn) distributeVBtn.addEventListener('click', () => distributeSelection('vertical'));
 
   let resizeRaf = null;
   window.addEventListener('resize', () => {
