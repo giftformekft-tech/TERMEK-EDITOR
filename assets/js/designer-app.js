@@ -2785,6 +2785,19 @@
     designObjects().forEach(obj => keepObjectInside(obj));
   }
 
+  function nudgeActiveObject(dx, dy) {
+    const obj = activeDesignObject();
+    if (!obj) return false;
+    obj.left += dx;
+    obj.top += dy;
+    obj.setCoords();
+    keepObjectInside(obj, { fit: false });
+    markDesignDirty();
+    syncLayerList();
+    scheduleHistoryCommit();
+    return true;
+  }
+
   const SNAP_THRESHOLD = 6;
 
   function collectSnapTargets(excludeObj) {
@@ -4054,8 +4067,21 @@
   });
   c.on('object:moving', e => { keepObjectInside(e.target, { fit: false }); applySnapGuides(e); });
   c.on('object:scaling', e => { keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
-  c.on('object:rotating', e => { keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
-  c.on('object:modified', e => { clearSnapGuides(); if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
+  c.on('object:rotating', e => {
+    if (e.target) {
+      const snapping = !!(e.e && e.e.shiftKey);
+      e.target.snapAngle = snapping ? 15 : 0;
+      e.target.snapThreshold = 5;
+    }
+    keepObjectInside(e.target);
+    markDesignDirty();
+    syncLayerList();
+  });
+  c.on('object:modified', e => {
+    clearSnapGuides();
+    if (e.target) e.target.snapAngle = 0;
+    if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); }
+  });
   c.on('mouse:up', () => clearSnapGuides());
   c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
   c.on('selection:created', () => { syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
@@ -4247,6 +4273,18 @@
       if (active) {
         evt.preventDefault();
         removeActiveObject(active);
+      }
+    }
+    if ((key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') && !isEditableTarget(evt.target)) {
+      const step = evt.shiftKey ? 10 : 1;
+      let dx = 0, dy = 0;
+      if (key === 'ArrowUp') dy = -step;
+      else if (key === 'ArrowDown') dy = step;
+      else if (key === 'ArrowLeft') dx = -step;
+      else dx = step;
+      if (nudgeActiveObject(dx, dy)) {
+        evt.preventDefault();
+        return;
       }
     }
     if ((key === 'z' || key === 'Z') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
