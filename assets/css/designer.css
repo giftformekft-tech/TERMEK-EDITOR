@@ -47,6 +47,7 @@
 .nb-field--curve input[type=range][disabled]{opacity:.45}
 .nb-field--curve .nb-range span{white-space:nowrap}
 .nb-filter-toggles{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.nb-image-warning{display:flex;align-items:center;gap:6px;margin:0;padding:8px 10px;border-radius:10px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:12.5px;font-weight:600;line-height:1.35}
 .nb-field--shadow{gap:10px}
 .nb-shadow-controls{display:flex;align-items:center;gap:12px}
 .nb-shadow-controls input[type=color]{width:40px;height:34px;border-radius:10px;border:1px solid rgba(148,163,184,.45);background:#fff;padding:0;flex:0 0 auto}

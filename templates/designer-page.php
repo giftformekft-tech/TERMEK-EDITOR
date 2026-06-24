@@ -175,6 +175,9 @@
           <h3>Kép szerkesztése</h3>
         </div>
         <div class="nb-card-body">
+          <p class="nb-image-warning" id="nb-image-lowres-warning" hidden>⚠ Alacsony felbontás – nyomtatásban pixeles lehet.</p>
+          <button type="button" class="nb-layer-tool" id="nb-replace-image" disabled>Kép cseréje</button>
+          <input type="file" id="nb-replace-image-input" accept="image/png,image/jpeg,image/svg+xml" hidden>
           <div class="nb-filter-toggles">
             <button type="button" class="nb-toggle" id="nb-filter-grayscale" aria-pressed="false" disabled>Fekete-fehér</button>
             <button type="button" class="nb-toggle" id="nb-filter-sepia" aria-pressed="false" disabled>Szépia</button>
