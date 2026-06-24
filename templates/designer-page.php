@@ -176,8 +176,18 @@
         </div>
         <div class="nb-card-body">
           <p class="nb-image-warning" id="nb-image-lowres-warning" hidden>⚠ Alacsony felbontás – nyomtatásban pixeles lehet.</p>
-          <button type="button" class="nb-layer-tool" id="nb-replace-image" disabled>Kép cseréje</button>
+          <div class="nb-layer-toolbar">
+            <button type="button" class="nb-layer-tool" id="nb-replace-image" disabled>Kép cseréje</button>
+            <button type="button" class="nb-layer-tool" id="nb-crop-image" disabled>Vágás</button>
+          </div>
           <input type="file" id="nb-replace-image-input" accept="image/png,image/jpeg,image/svg+xml" hidden>
+          <div class="nb-crop-toolbar" id="nb-crop-toolbar" hidden>
+            <p class="nb-crop-toolbar-label">Húzd a kijelölt területet a vágáshoz, majd alkalmazd.</p>
+            <div class="nb-crop-toolbar-actions">
+              <button type="button" class="nb-layer-tool nb-crop-apply" id="nb-crop-apply">Alkalmaz</button>
+              <button type="button" class="nb-layer-tool" id="nb-crop-cancel">Mégse</button>
+            </div>
+          </div>
           <div class="nb-filter-toggles">
             <button type="button" class="nb-toggle" id="nb-filter-grayscale" aria-pressed="false" disabled>Fekete-fehér</button>
             <button type="button" class="nb-toggle" id="nb-filter-sepia" aria-pressed="false" disabled>Szépia</button>

@@ -48,6 +48,11 @@
 .nb-field--curve .nb-range span{white-space:nowrap}
 .nb-filter-toggles{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .nb-image-warning{display:flex;align-items:center;gap:6px;margin:0;padding:8px 10px;border-radius:10px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:12.5px;font-weight:600;line-height:1.35}
+.nb-crop-toolbar{display:flex;flex-direction:column;gap:8px;margin:0;padding:10px 12px;border-radius:10px;background:#eff6ff;border:1px solid #93c5fd}
+.nb-crop-toolbar-label{margin:0;color:#1e3a8a;font-size:12.5px;font-weight:600;line-height:1.35}
+.nb-crop-toolbar-actions{display:flex;gap:8px}
+.nb-crop-apply{background:#2563eb;border-color:#2563eb;color:#fff}
+.nb-crop-apply:hover:not(:disabled){background:#1e3a8a;border-color:#1e3a8a;color:#fff}
 .nb-field--shadow{gap:10px}
 .nb-shadow-controls{display:flex;align-items:center;gap:12px}
 .nb-shadow-controls input[type=color]{width:40px;height:34px;border-radius:10px;border:1px solid rgba(148,163,184,.45);background:#fff;padding:0;flex:0 0 auto}

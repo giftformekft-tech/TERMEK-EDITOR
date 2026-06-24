@@ -356,6 +356,10 @@
   const imageLowResWarningEl = document.getElementById('nb-image-lowres-warning');
   const replaceImageBtn = document.getElementById('nb-replace-image');
   const replaceImageInput = document.getElementById('nb-replace-image-input');
+  const cropImageBtn = document.getElementById('nb-crop-image');
+  const cropToolbarEl = document.getElementById('nb-crop-toolbar');
+  const cropApplyBtn = document.getElementById('nb-crop-apply');
+  const cropCancelBtn = document.getElementById('nb-crop-cancel');
   const zoomInBtn = document.getElementById('nb-zoom-in');
   const zoomOutBtn = document.getElementById('nb-zoom-out');
   const zoomResetBtn = document.getElementById('nb-zoom-reset');
@@ -1715,7 +1719,7 @@
   }
 
   function isDesignObject(obj) {
-    return !!obj && !obj.__nb_bg && !obj.__nb_area;
+    return !!obj && !obj.__nb_bg && !obj.__nb_area && !obj.__nb_crop_overlay;
   }
 
   function designObjects() {
@@ -3209,9 +3213,11 @@
     updateLowResWarning();
     const img = activeImage();
     const hasImage = !!img;
-    if (replaceImageBtn) replaceImageBtn.disabled = !hasImage;
+    const cropping = !!cropSession;
+    if (replaceImageBtn) replaceImageBtn.disabled = !hasImage || cropping;
+    if (cropImageBtn) cropImageBtn.disabled = !hasImage || cropping;
     [filterGrayscaleToggle, filterSepiaToggle, filterBrightnessInput, filterContrastInput].forEach(ctrl => {
-      if (ctrl) ctrl.disabled = !hasImage;
+      if (ctrl) ctrl.disabled = !hasImage || cropping;
     });
     if (!hasImage) {
       setPressed(filterGrayscaleToggle, false);
@@ -3232,6 +3238,203 @@
     const contrastPct = contrastFilter ? Math.round(contrastFilter.contrast * 100) : 0;
     if (filterContrastInput) filterContrastInput.value = contrastPct;
     if (filterContrastValue) filterContrastValue.textContent = contrastPct;
+  }
+
+  let cropSession = null;
+
+  function cropAxisToFull(boxStart, cropStart, cropLength, nativeLength, scale, flipped) {
+    return flipped
+      ? boxStart + scale * (cropStart + cropLength - nativeLength)
+      : boxStart - cropStart * scale;
+  }
+
+  function cropAxisFromBox(boxStart, boxLength, fullStart, nativeLength, scale, flipped) {
+    const length = boxLength / scale;
+    const start = flipped
+      ? nativeLength - (boxStart + boxLength - fullStart) / scale
+      : (boxStart - fullStart) / scale;
+    return { start, length };
+  }
+
+  function clampCropOverlay() {
+    if (!cropSession) return;
+    const MIN_CROP_SIZE = 20;
+    const { overlay, bounds } = cropSession;
+    overlay.setCoords();
+    if (overlay.width * overlay.scaleX < MIN_CROP_SIZE) overlay.scaleX = MIN_CROP_SIZE / overlay.width;
+    if (overlay.height * overlay.scaleY < MIN_CROP_SIZE) overlay.scaleY = MIN_CROP_SIZE / overlay.height;
+    let w = overlay.width * overlay.scaleX;
+    let h = overlay.height * overlay.scaleY;
+    if (w > bounds.width) { overlay.scaleX = bounds.width / overlay.width; w = bounds.width; }
+    if (h > bounds.height) { overlay.scaleY = bounds.height / overlay.height; h = bounds.height; }
+    if (overlay.left < bounds.left) overlay.left = bounds.left;
+    if (overlay.top < bounds.top) overlay.top = bounds.top;
+    if (overlay.left + w > bounds.left + bounds.width) overlay.left = bounds.left + bounds.width - w;
+    if (overlay.top + h > bounds.top + bounds.height) overlay.top = bounds.top + bounds.height - h;
+    overlay.setCoords();
+    c.requestRenderAll();
+  }
+
+  function updateCropToolbarVisibility() {
+    if (cropToolbarEl) cropToolbarEl.hidden = !cropSession;
+  }
+
+  function startImageCrop() {
+    if (cropSession) return;
+    const img = activeImage();
+    if (!img) return;
+    const orig = img.getOriginalSize();
+    if (!orig || !orig.width || !orig.height) return;
+
+    const original = {
+      cropX: img.cropX || 0,
+      cropY: img.cropY || 0,
+      width: img.width,
+      height: img.height,
+      left: img.left,
+      top: img.top,
+      angle: img.angle || 0,
+      originX: img.originX,
+      originY: img.originY,
+      selectable: img.selectable,
+      evented: img.evented,
+      opacity: img.opacity
+    };
+
+    const cropDisplayW = original.width * img.scaleX;
+    const cropDisplayH = original.height * img.scaleY;
+
+    const center = img.getCenterPoint();
+    img.angle = 0;
+    img.setPositionByOrigin(center, 'center', 'center');
+    const topLeftNow = img.getPointByOrigin('left', 'top');
+    img.originX = 'left';
+    img.originY = 'top';
+    img.left = topLeftNow.x;
+    img.top = topLeftNow.y;
+
+    const fullLeft = cropAxisToFull(img.left, original.cropX, original.width, orig.width, img.scaleX, !!img.flipX);
+    const fullTop = cropAxisToFull(img.top, original.cropY, original.height, orig.height, img.scaleY, !!img.flipY);
+    const overlayLeft = img.left;
+    const overlayTop = img.top;
+
+    img.set({
+      left: fullLeft,
+      top: fullTop,
+      cropX: 0,
+      cropY: 0,
+      width: orig.width,
+      height: orig.height,
+      selectable: false,
+      evented: false,
+      opacity: 0.45
+    });
+    img.setCoords();
+
+    const overlay = new fabric.Rect({
+      left: overlayLeft,
+      top: overlayTop,
+      width: cropDisplayW,
+      height: cropDisplayH,
+      originX: 'left',
+      originY: 'top',
+      angle: 0,
+      fill: 'rgba(37,99,235,0.12)',
+      stroke: '#2563eb',
+      strokeWidth: 2,
+      strokeDashArray: [6, 6],
+      strokeUniform: true,
+      cornerStyle: 'circle',
+      transparentCorners: false,
+      lockRotation: true,
+      lockScalingFlip: true,
+      hasRotatingPoint: false,
+      __nb_crop_overlay: true,
+      excludeFromExport: true
+    });
+    overlay.setControlsVisibility({ mtr: false });
+    overlay.on('moving', clampCropOverlay);
+    overlay.on('scaling', clampCropOverlay);
+
+    cropSession = {
+      img,
+      overlay,
+      original,
+      bounds: { left: fullLeft, top: fullTop, width: orig.width * img.scaleX, height: orig.height * img.scaleY }
+    };
+
+    c.add(overlay);
+    c.setActiveObject(overlay);
+    c.requestRenderAll();
+    updateCropToolbarVisibility();
+    syncImageControls();
+  }
+
+  function endImageCrop(apply) {
+    if (!cropSession) return;
+    const { img, overlay, original, bounds } = cropSession;
+    cropSession = null;
+    overlay.off('moving', clampCropOverlay);
+    overlay.off('scaling', clampCropOverlay);
+
+    if (apply) {
+      overlay.setCoords();
+      const orig = img.getOriginalSize();
+      const xInfo = cropAxisFromBox(overlay.left, overlay.width * overlay.scaleX, bounds.left, orig.width, img.scaleX, !!img.flipX);
+      const yInfo = cropAxisFromBox(overlay.top, overlay.height * overlay.scaleY, bounds.top, orig.height, img.scaleY, !!img.flipY);
+      const cropW = Math.max(1, Math.min(Math.round(xInfo.length), orig.width));
+      const cropH = Math.max(1, Math.min(Math.round(yInfo.length), orig.height));
+      const cropX = Math.max(0, Math.min(Math.round(xInfo.start), orig.width - cropW));
+      const cropY = Math.max(0, Math.min(Math.round(yInfo.start), orig.height - cropH));
+
+      img.set({ cropX, cropY, width: cropW, height: cropH, left: overlay.left, top: overlay.top });
+      const newCenter = img.getCenterPoint();
+      img.originX = original.originX;
+      img.originY = original.originY;
+      img.angle = original.angle;
+      img.setPositionByOrigin(newCenter, 'center', 'center');
+      img.set({ selectable: original.selectable, evented: original.evented, opacity: original.opacity });
+      img.setCoords();
+
+      c.remove(overlay);
+      keepObjectInside(img);
+      c.setActiveObject(img);
+      c.requestRenderAll();
+      markDesignDirty();
+      commitHistory();
+    } else {
+      img.set({
+        cropX: original.cropX,
+        cropY: original.cropY,
+        width: original.width,
+        height: original.height,
+        left: original.left,
+        top: original.top,
+        angle: original.angle,
+        originX: original.originX,
+        originY: original.originY,
+        selectable: original.selectable,
+        evented: original.evented,
+        opacity: original.opacity
+      });
+      img.setCoords();
+      c.remove(overlay);
+      c.setActiveObject(img);
+      c.requestRenderAll();
+    }
+
+    updateCropToolbarVisibility();
+    syncLayerList();
+    syncImageControls();
+  }
+
+  function applyImageCrop() { endImageCrop(true); }
+  function cancelImageCrop() { endImageCrop(false); }
+
+  function maybeAutoApplyCrop(nextActive) {
+    if (cropSession && nextActive !== cropSession.overlay) {
+      applyImageCrop();
+    }
   }
 
   function toHexColor(color) {
@@ -4254,7 +4457,10 @@
     }
   });
   c.on('object:moving', e => { keepObjectInside(e.target, { fit: false }); applySnapGuides(e); });
-  c.on('object:scaling', e => { keepObjectInside(e.target); markDesignDirty(); syncLayerList(); updateLowResWarning(); });
+  c.on('object:scaling', e => {
+    if (e.target && e.target.__nb_crop_overlay) return;
+    keepObjectInside(e.target); markDesignDirty(); syncLayerList(); updateLowResWarning();
+  });
   c.on('object:rotating', e => {
     if (e.target) {
       const snapping = !!(e.e && e.e.shiftKey);
@@ -4273,9 +4479,9 @@
   });
   c.on('mouse:up', () => clearSnapGuides());
   c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
-  c.on('selection:created', () => { syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
-  c.on('selection:updated', () => { syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
-  c.on('selection:cleared', () => { syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
+  c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
+  c.on('selection:updated', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
+  c.on('selection:cleared', () => { maybeAutoApplyCrop(null); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('text:changed', e => {
     if (!isDesignObject(e.target)) return;
     initializeTextboxCurve(e.target);
@@ -4477,6 +4683,10 @@
   document.addEventListener('keydown', evt => {
     const key = evt.key;
     if (key === 'Escape') {
+      if (cropSession) {
+        cancelImageCrop();
+        return;
+      }
       if (mobileSheet && sheetState.activeKey) {
         closeMobileSheet();
         return;
@@ -4682,6 +4892,10 @@
       if (file && target) replaceImageWithFile(target, file);
     });
   }
+
+  if (cropImageBtn) cropImageBtn.addEventListener('click', () => startImageCrop());
+  if (cropApplyBtn) cropApplyBtn.addEventListener('click', () => applyImageCrop());
+  if (cropCancelBtn) cropCancelBtn.addEventListener('click', () => cancelImageCrop());
 
   if (zoomInBtn) zoomInBtn.addEventListener('click', () => setZoomLevel(c.getZoom() + ZOOM_STEP));
   if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => setZoomLevel(c.getZoom() - ZOOM_STEP));
