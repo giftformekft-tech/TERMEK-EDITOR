@@ -397,6 +397,14 @@
         <span class="nb-mobile-icon-symbol">★</span>
         <span class="nb-mobile-icon-label">Elemek</span>
       </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="templates" aria-label="Sablonok">
+        <span class="nb-mobile-icon-symbol">📄</span>
+        <span class="nb-mobile-icon-label">Sablonok</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="properties" aria-label="Tulajdonságok">
+        <span class="nb-mobile-icon-symbol">⚙</span>
+        <span class="nb-mobile-icon-label">Tulajdonságok</span>
+      </button>
     </div>
   </div>
 

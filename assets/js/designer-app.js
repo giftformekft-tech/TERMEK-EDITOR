@@ -451,7 +451,7 @@
     templates: ['templates'],
     text: ['text'],
     product: ['product', 'color', 'size', 'double'],
-    layers: ['layers', 'align', 'appearance', 'image'],
+    layers: ['layers'],
     properties: ['text', 'image', 'align', 'appearance', 'properties-empty']
   };
   const sheetState = {
