@@ -2781,6 +2781,95 @@
     designObjects().forEach(obj => keepObjectInside(obj));
   }
 
+  const SNAP_THRESHOLD = 6;
+
+  function collectSnapTargets(excludeObj) {
+    const area = c.__nb_area || fallbackArea;
+    const vertical = [];
+    const horizontal = [];
+    if (area) {
+      vertical.push(area.x, area.x + area.w / 2, area.x + area.w);
+      horizontal.push(area.y, area.y + area.h / 2, area.y + area.h);
+    }
+    const excludedChildren = excludeObj && excludeObj.type === 'activeSelection' && typeof excludeObj.getObjects === 'function'
+      ? excludeObj.getObjects()
+      : [];
+    designObjects().forEach(obj => {
+      if (obj === excludeObj || excludedChildren.indexOf(obj) !== -1) return;
+      obj.setCoords();
+      const r = obj.getBoundingRect(true, true);
+      vertical.push(r.left, r.left + r.width / 2, r.left + r.width);
+      horizontal.push(r.top, r.top + r.height / 2, r.top + r.height);
+    });
+    return { vertical, horizontal };
+  }
+
+  function clearSnapGuides() {
+    if (!c.contextTop) return;
+    c.clearContext(c.contextTop);
+  }
+
+  function drawSnapGuides(xLine, yLine) {
+    if (!c.contextTop) return;
+    const ctx = c.contextTop;
+    c.clearContext(ctx);
+    if (xLine == null && yLine == null) return;
+    ctx.save();
+    ctx.strokeStyle = '#ec4899';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    if (xLine != null) {
+      ctx.beginPath();
+      ctx.moveTo(xLine + 0.5, 0);
+      ctx.lineTo(xLine + 0.5, c.height);
+      ctx.stroke();
+    }
+    if (yLine != null) {
+      ctx.beginPath();
+      ctx.moveTo(0, yLine + 0.5);
+      ctx.lineTo(c.width, yLine + 0.5);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function applySnapGuides(e) {
+    const target = e && e.target;
+    if (!target || !isDesignObject(target) || target.group) {
+      clearSnapGuides();
+      return;
+    }
+    target.setCoords();
+    const rect = target.getBoundingRect(true, true);
+    const targets = collectSnapTargets(target);
+
+    let bestX = null;
+    [rect.left, rect.left + rect.width / 2, rect.left + rect.width].forEach(value => {
+      targets.vertical.forEach(v => {
+        const delta = v - value;
+        if (Math.abs(delta) <= SNAP_THRESHOLD && (!bestX || Math.abs(delta) < Math.abs(bestX.delta))) {
+          bestX = { delta, line: v };
+        }
+      });
+    });
+
+    let bestY = null;
+    [rect.top, rect.top + rect.height / 2, rect.top + rect.height].forEach(value => {
+      targets.horizontal.forEach(h => {
+        const delta = h - value;
+        if (Math.abs(delta) <= SNAP_THRESHOLD && (!bestY || Math.abs(delta) < Math.abs(bestY.delta))) {
+          bestY = { delta, line: h };
+        }
+      });
+    });
+
+    if (bestX) target.left += bestX.delta;
+    if (bestY) target.top += bestY.delta;
+    if (bestX || bestY) target.setCoords();
+
+    drawSnapGuides(bestX ? bestX.line : null, bestY ? bestY.line : null);
+  }
+
   function markDesignDirty() {
     if (sideLoading) return;
     designState.savedDesignId = null;
@@ -3855,10 +3944,11 @@
       syncLayerList();
     }
   });
-  c.on('object:moving', e => { keepObjectInside(e.target, { fit: false }); });
+  c.on('object:moving', e => { keepObjectInside(e.target, { fit: false }); applySnapGuides(e); });
   c.on('object:scaling', e => { keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
   c.on('object:rotating', e => { keepObjectInside(e.target); markDesignDirty(); syncLayerList(); });
-  c.on('object:modified', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
+  c.on('object:modified', e => { clearSnapGuides(); if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
+  c.on('mouse:up', () => clearSnapGuides());
   c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
   c.on('selection:created', () => { syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('selection:updated', () => { syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
