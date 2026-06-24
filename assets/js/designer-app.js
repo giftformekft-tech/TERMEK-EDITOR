@@ -312,12 +312,21 @@
   const DEFAULT_FONT_SIZE = 24;
   const DEFAULT_STROKE_WIDTH = 0;
   const DEFAULT_STROKE_COLOR = '#000000';
+  const DEFAULT_LINE_HEIGHT = 1.16;
+  const DEFAULT_SHADOW_COLOR = '#000000';
   const fontSizeInput = document.getElementById('nb-font-size');
   const fontSizeValue = document.getElementById('nb-font-size-value');
   const fontColorInput = document.getElementById('nb-font-color');
   const fontStrokeColorInput = document.getElementById('nb-font-stroke-color');
   const fontStrokeWidthInput = document.getElementById('nb-font-stroke-width');
   const fontStrokeWidthValue = document.getElementById('nb-font-stroke-width-value');
+  const letterSpacingInput = document.getElementById('nb-letter-spacing');
+  const letterSpacingValue = document.getElementById('nb-letter-spacing-value');
+  const lineHeightInput = document.getElementById('nb-line-height');
+  const lineHeightValue = document.getElementById('nb-line-height-value');
+  const textShadowColorInput = document.getElementById('nb-text-shadow-color');
+  const textShadowBlurInput = document.getElementById('nb-text-shadow-blur');
+  const textShadowBlurValue = document.getElementById('nb-text-shadow-blur-value');
   const fontBoldToggle = document.getElementById('nb-font-bold');
   const fontItalicToggle = document.getElementById('nb-font-italic');
   const alignButtons = Array.from(document.querySelectorAll('[data-nb-align]'));
@@ -3121,6 +3130,16 @@
     return `${rounded} px`;
   }
 
+  function formatLetterSpacing(value) {
+    const num = Number.isFinite(value) ? value : 0;
+    return `${Math.round(num)}`;
+  }
+
+  function formatShadowBlur(value) {
+    const num = Number.isFinite(value) ? value : 0;
+    return num > 0 ? `${Math.round(num)} px` : 'Nincs';
+  }
+
   function setPressed(btn, state) {
     if (!btn) return;
     btn.setAttribute('aria-pressed', state ? 'true' : 'false');
@@ -3729,6 +3748,10 @@
       fontColorInput,
       fontStrokeColorInput,
       fontStrokeWidthInput,
+      letterSpacingInput,
+      lineHeightInput,
+      textShadowColorInput,
+      textShadowBlurInput,
       fontBoldToggle,
       fontItalicToggle,
       textCurveToggle,
@@ -3743,6 +3766,13 @@
       if (fontStrokeWidthInput) fontStrokeWidthInput.value = DEFAULT_STROKE_WIDTH;
       if (fontStrokeWidthValue) fontStrokeWidthValue.textContent = formatStrokeWidth(DEFAULT_STROKE_WIDTH);
       if (fontStrokeColorInput) fontStrokeColorInput.value = DEFAULT_STROKE_COLOR;
+      if (letterSpacingInput) letterSpacingInput.value = '0';
+      if (letterSpacingValue) letterSpacingValue.textContent = formatLetterSpacing(0);
+      if (lineHeightInput) lineHeightInput.value = DEFAULT_LINE_HEIGHT;
+      if (lineHeightValue) lineHeightValue.textContent = DEFAULT_LINE_HEIGHT.toFixed(2);
+      if (textShadowColorInput) textShadowColorInput.value = DEFAULT_SHADOW_COLOR;
+      if (textShadowBlurInput) textShadowBlurInput.value = '0';
+      if (textShadowBlurValue) textShadowBlurValue.textContent = formatShadowBlur(0);
       if (textCurveToggle) setPressed(textCurveToggle, false);
       if (textCurveInput) {
         textCurveInput.value = '0';
@@ -3778,6 +3808,23 @@
       const width = Number.isFinite(textbox.strokeWidth) ? textbox.strokeWidth : DEFAULT_STROKE_WIDTH;
       fontStrokeWidthInput.value = width;
       if (fontStrokeWidthValue) fontStrokeWidthValue.textContent = formatStrokeWidth(width);
+    }
+    if (letterSpacingInput) {
+      const spacing = Number.isFinite(textbox.charSpacing) ? textbox.charSpacing : 0;
+      letterSpacingInput.value = spacing;
+      if (letterSpacingValue) letterSpacingValue.textContent = formatLetterSpacing(spacing);
+    }
+    if (lineHeightInput) {
+      const lh = Number.isFinite(textbox.lineHeight) ? textbox.lineHeight : DEFAULT_LINE_HEIGHT;
+      lineHeightInput.value = lh;
+      if (lineHeightValue) lineHeightValue.textContent = lh.toFixed(2);
+    }
+    if (textShadowBlurInput) {
+      const shadow = textbox.shadow;
+      const blur = shadow && Number.isFinite(shadow.blur) ? shadow.blur : 0;
+      textShadowBlurInput.value = blur;
+      if (textShadowBlurValue) textShadowBlurValue.textContent = formatShadowBlur(blur);
+      if (textShadowColorInput) textShadowColorInput.value = toHexColor(shadow && shadow.color ? shadow.color : DEFAULT_SHADOW_COLOR);
     }
     setPressed(fontBoldToggle, (textbox.fontWeight || '').toString().toLowerCase() === 'bold' || parseInt(textbox.fontWeight, 10) >= 600);
     setPressed(fontItalicToggle, (textbox.fontStyle || '').toString().toLowerCase() === 'italic');
@@ -3824,6 +3871,22 @@
 
   function currentFontStyle() {
     return fontItalicToggle && fontItalicToggle.getAttribute('aria-pressed') === 'true' ? 'italic' : 'normal';
+  }
+
+  function currentLetterSpacing() {
+    return letterSpacingInput ? parseFloat(letterSpacingInput.value) || 0 : 0;
+  }
+
+  function currentLineHeight() {
+    return lineHeightInput ? parseFloat(lineHeightInput.value) || DEFAULT_LINE_HEIGHT : DEFAULT_LINE_HEIGHT;
+  }
+
+  function currentTextShadow() {
+    const blur = textShadowBlurInput ? parseFloat(textShadowBlurInput.value) || 0 : 0;
+    if (blur <= 0) return null;
+    const color = textShadowColorInput && textShadowColorInput.value ? textShadowColorInput.value : DEFAULT_SHADOW_COLOR;
+    const offset = Math.round(blur / 3);
+    return { color: color, blur: blur, offsetX: offset, offsetY: offset };
   }
 
   function currentTextAlign() {
@@ -4143,6 +4206,43 @@
     });
   }
 
+  if (letterSpacingInput) {
+    letterSpacingInput.addEventListener('input', () => {
+      const spacing = parseFloat(letterSpacingInput.value) || 0;
+      if (letterSpacingValue) letterSpacingValue.textContent = formatLetterSpacing(spacing);
+      applyToActiveText(obj => { obj.set('charSpacing', spacing); });
+    });
+  }
+
+  if (lineHeightInput) {
+    lineHeightInput.addEventListener('input', () => {
+      const lh = parseFloat(lineHeightInput.value) || DEFAULT_LINE_HEIGHT;
+      if (lineHeightValue) lineHeightValue.textContent = lh.toFixed(2);
+      applyToActiveText(obj => { obj.set('lineHeight', lh); });
+    });
+  }
+
+  function applyTextShadow() {
+    const blur = textShadowBlurInput ? parseFloat(textShadowBlurInput.value) || 0 : 0;
+    if (textShadowBlurValue) textShadowBlurValue.textContent = formatShadowBlur(blur);
+    applyToActiveText(obj => {
+      if (blur <= 0) {
+        obj.set('shadow', null);
+        return;
+      }
+      const color = textShadowColorInput && textShadowColorInput.value ? textShadowColorInput.value : DEFAULT_SHADOW_COLOR;
+      const offset = Math.round(blur / 3);
+      obj.set('shadow', { color: color, blur: blur, offsetX: offset, offsetY: offset });
+    });
+  }
+
+  if (textShadowBlurInput) {
+    textShadowBlurInput.addEventListener('input', applyTextShadow);
+  }
+  if (textShadowColorInput) {
+    textShadowColorInput.onchange = applyTextShadow;
+  }
+
   if (fontBoldToggle) {
     fontBoldToggle.onclick = () => {
       const next = fontBoldToggle.getAttribute('aria-pressed') !== 'true';
@@ -4393,6 +4493,9 @@
         fontWeight: currentFontWeight(),
         fontStyle: currentFontStyle(),
         textAlign: currentTextAlign(),
+        charSpacing: currentLetterSpacing(),
+        lineHeight: currentLineHeight(),
+        shadow: currentTextShadow(),
         cornerStyle: 'circle',
         transparentCorners: false,
         lockScalingFlip: true

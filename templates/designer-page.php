@@ -125,6 +125,20 @@
               <span id="nb-font-stroke-width-value">0 px</span>
             </div>
           </label>
+          <label class="nb-field">
+            <span>Betűköz</span>
+            <div class="nb-range">
+              <input type="range" id="nb-letter-spacing" min="-200" max="800" step="10" value="0">
+              <span id="nb-letter-spacing-value">0</span>
+            </div>
+          </label>
+          <label class="nb-field">
+            <span>Sorköz</span>
+            <div class="nb-range">
+              <input type="range" id="nb-line-height" min="0.8" max="2.5" step="0.05" value="1.16">
+              <span id="nb-line-height-value">1.16</span>
+            </div>
+          </label>
           <div class="nb-text-style">
             <button type="button" class="nb-toggle" id="nb-font-bold" aria-pressed="false">B</button>
             <button type="button" class="nb-toggle" id="nb-font-italic" aria-pressed="false"><em>I</em></button>
@@ -132,6 +146,16 @@
               <button type="button" class="nb-toggle" data-nb-align="left" aria-pressed="false">⟸</button>
               <button type="button" class="nb-toggle" data-nb-align="center" aria-pressed="false">≡</button>
               <button type="button" class="nb-toggle" data-nb-align="right" aria-pressed="false">⟹</button>
+            </div>
+          </div>
+          <div class="nb-field nb-field--shadow">
+            <span>Szövegárnyék</span>
+            <div class="nb-shadow-controls">
+              <input type="color" id="nb-text-shadow-color" value="#000000">
+              <div class="nb-range">
+                <input type="range" id="nb-text-shadow-blur" min="0" max="30" step="1" value="0">
+                <span id="nb-text-shadow-blur-value">Nincs</span>
+              </div>
             </div>
           </div>
           <div class="nb-field nb-field--curve">
