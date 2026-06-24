@@ -67,6 +67,11 @@
 .nb-history-btn{background:rgba(17,24,39,.85);color:#f8fafc;border:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;box-shadow:0 10px 20px rgba(15,23,42,.22);transition:transform .2s ease,background .2s ease,opacity .2s ease}
 .nb-history-btn:hover:not(:disabled){transform:translateY(-2px);background:#0f172a}
 .nb-history-btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+.nb-zoom-controls{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:6px;background:rgba(17,24,39,.85);border-radius:24px;padding:6px 10px;box-shadow:0 10px 20px rgba(15,23,42,.22)}
+.nb-zoom-btn{background:transparent;color:#f8fafc;border:none;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;transition:background .2s ease}
+.nb-zoom-btn:hover:not(:disabled){background:rgba(255,255,255,.15)}
+.nb-zoom-btn:disabled{opacity:.35;cursor:not-allowed}
+.nb-zoom-level{color:#f8fafc;font-size:12px;font-weight:700;min-width:42px;text-align:center}
 #nb-canvas{max-width:100%;background:#ffffff;border:none;box-shadow:none;border-radius:inherit}
 
 .nb-mobile-toolbar{position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));margin:0 auto;max-width:480px;background:rgba(255,255,255,.95);padding:12px 18px;border-radius:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;box-shadow:0 18px 36px rgba(15,23,42,.18);z-index:910;backdrop-filter:blur(12px);color:#0b1f3a}
@@ -257,6 +262,7 @@ body.nb-modal-open{overflow:hidden}
   .nb-column--actions,.nb-column--summary{display:none}
   .nb-column--stage{flex:1;min-height:0;padding:16px;position:relative}
   .nb-stage-controls{display:none}
+  .nb-zoom-controls{display:none}
   .nb-product-stage{flex:1}
   .nb-product-frame{padding:0;margin:0 auto;max-width:100%;width:100%;display:flex;justify-content:center;align-items:center}
   .nb-product-frame .canvas-container{max-height:calc(100dvh - 220px);margin:auto}

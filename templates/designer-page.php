@@ -80,6 +80,12 @@
           <button type="button" class="nb-history-btn" id="nb-undo-btn" aria-label="Visszavonás" title="Visszavonás (Ctrl+Z)" disabled>↺</button>
           <button type="button" class="nb-history-btn" id="nb-redo-btn" aria-label="Ismétlés" title="Ismétlés (Ctrl+Shift+Z)" disabled>↻</button>
         </div>
+        <div class="nb-zoom-controls" id="nb-zoom-controls">
+          <button type="button" class="nb-zoom-btn" id="nb-zoom-out" aria-label="Kicsinyítés" title="Kicsinyítés (Ctrl+-)">−</button>
+          <span class="nb-zoom-level" id="nb-zoom-level">100%</span>
+          <button type="button" class="nb-zoom-btn" id="nb-zoom-in" aria-label="Nagyítás" title="Nagyítás (Ctrl++)">+</button>
+          <button type="button" class="nb-zoom-btn nb-zoom-btn--reset" id="nb-zoom-reset" aria-label="Nagyítás visszaállítása" title="Visszaállítás (Ctrl+0)">⤢</button>
+        </div>
         <button type="button" class="nb-side-fab" id="nb-side-toggle-mobile" aria-label="Oldal váltása" hidden>
           ⟲
         </button>

@@ -334,6 +334,10 @@
   const objectAlignButtons = Array.from(document.querySelectorAll('[data-nb-obj-align]'));
   const distributeHBtn = document.getElementById('nb-distribute-h');
   const distributeVBtn = document.getElementById('nb-distribute-v');
+  const zoomInBtn = document.getElementById('nb-zoom-in');
+  const zoomOutBtn = document.getElementById('nb-zoom-out');
+  const zoomResetBtn = document.getElementById('nb-zoom-reset');
+  const zoomLevelEl = document.getElementById('nb-zoom-level');
   const summaryCardEl = document.querySelector('.nb-summary-card');
   if (summaryCardEl) {
     const straySummaryToggle = summaryCardEl.querySelector('.nb-double-sided');
@@ -2814,20 +2818,23 @@
     const ctx = c.contextTop;
     c.clearContext(ctx);
     if (xLine == null && yLine == null) return;
+    const vpt = c.viewportTransform || [1, 0, 0, 1, 0, 0];
     ctx.save();
     ctx.strokeStyle = '#ec4899';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     if (xLine != null) {
+      const sx = xLine * vpt[0] + vpt[4];
       ctx.beginPath();
-      ctx.moveTo(xLine + 0.5, 0);
-      ctx.lineTo(xLine + 0.5, c.height);
+      ctx.moveTo(sx + 0.5, 0);
+      ctx.lineTo(sx + 0.5, c.height);
       ctx.stroke();
     }
     if (yLine != null) {
+      const sy = yLine * vpt[3] + vpt[5];
       ctx.beginPath();
-      ctx.moveTo(0, yLine + 0.5);
-      ctx.lineTo(c.width, yLine + 0.5);
+      ctx.moveTo(0, sy + 0.5);
+      ctx.lineTo(c.width, sy + 0.5);
       ctx.stroke();
     }
     ctx.restore();
@@ -2870,6 +2877,106 @@
     drawSnapGuides(bestX ? bestX.line : null, bestY ? bestY.line : null);
   }
 
+  const ZOOM_MIN = 1;
+  const ZOOM_MAX = 4;
+  const ZOOM_STEP = 0.25;
+  let isPanning = false;
+  let panLastX = 0;
+  let panLastY = 0;
+
+  function clampZoom(z) {
+    return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+  }
+
+  function clampPan() {
+    const zoom = c.getZoom();
+    const vpt = c.viewportTransform;
+    if (zoom <= 1) {
+      vpt[4] = 0;
+      vpt[5] = 0;
+    } else {
+      const maxPanX = c.width * zoom - c.width;
+      const maxPanY = c.height * zoom - c.height;
+      vpt[4] = Math.min(0, Math.max(vpt[4], -maxPanX));
+      vpt[5] = Math.min(0, Math.max(vpt[5], -maxPanY));
+    }
+    c.setViewportTransform(vpt);
+  }
+
+  function syncZoomUi() {
+    const zoom = c.getZoom();
+    if (zoomLevelEl) zoomLevelEl.textContent = Math.round(zoom * 100) + '%';
+    if (zoomOutBtn) zoomOutBtn.disabled = zoom <= ZOOM_MIN + 0.001;
+    if (zoomInBtn) zoomInBtn.disabled = zoom >= ZOOM_MAX - 0.001;
+  }
+
+  function setZoomLevel(newZoom) {
+    const zoom = clampZoom(newZoom);
+    c.zoomToPoint(new fabric.Point(c.width / 2, c.height / 2), zoom);
+    clampPan();
+    c.requestRenderAll();
+    syncZoomUi();
+  }
+
+  function resetZoom() {
+    isPanning = false;
+    c.selection = true;
+    c.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    c.requestRenderAll();
+    syncZoomUi();
+  }
+
+  function withResetViewport(fn) {
+    const previousVpt = c.viewportTransform ? c.viewportTransform.slice() : [1, 0, 0, 1, 0, 0];
+    c.viewportTransform = [1, 0, 0, 1, 0, 0];
+    if (typeof c.calcViewportBoundaries === 'function') c.calcViewportBoundaries();
+    try {
+      return fn();
+    } finally {
+      c.viewportTransform = previousVpt;
+      if (typeof c.calcViewportBoundaries === 'function') c.calcViewportBoundaries();
+    }
+  }
+
+  c.on('mouse:wheel', opt => {
+    const evt = opt && opt.e;
+    if (!evt || (!evt.ctrlKey && !evt.metaKey)) return;
+    evt.preventDefault();
+    evt.stopPropagation();
+    const pointer = c.getPointer(evt, true);
+    const zoom = clampZoom(c.getZoom() * (0.999 ** evt.deltaY));
+    c.zoomToPoint(new fabric.Point(pointer.x, pointer.y), zoom);
+    clampPan();
+    syncZoomUi();
+  });
+
+  c.on('mouse:down', opt => {
+    const evt = opt && opt.e;
+    if (!evt || evt.button !== 1) return;
+    evt.preventDefault();
+    isPanning = true;
+    c.selection = false;
+    panLastX = evt.clientX;
+    panLastY = evt.clientY;
+  });
+  c.on('mouse:move', opt => {
+    if (!isPanning) return;
+    const evt = opt && opt.e;
+    if (!evt) return;
+    const vpt = c.viewportTransform;
+    vpt[4] += evt.clientX - panLastX;
+    vpt[5] += evt.clientY - panLastY;
+    panLastX = evt.clientX;
+    panLastY = evt.clientY;
+    clampPan();
+    c.requestRenderAll();
+  });
+  c.on('mouse:up', () => {
+    if (!isPanning) return;
+    isPanning = false;
+    c.selection = true;
+  });
+
   function markDesignDirty() {
     if (sideLoading) return;
     designState.savedDesignId = null;
@@ -2884,6 +2991,7 @@
   }
 
   function setMockupBgAndArea() {
+    resetZoom();
     const sel = currentSelection();
     const mockupsBySide = sel.mockups || { front: null, back: null };
     const mk = activeSideKey === 'back'
@@ -4153,6 +4261,22 @@
     if ((key === 'y' || key === 'Y') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
       evt.preventDefault();
       redoHistory();
+      return;
+    }
+    if ((key === '+' || key === '=') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+      evt.preventDefault();
+      setZoomLevel(c.getZoom() + ZOOM_STEP);
+      return;
+    }
+    if ((key === '-' || key === '_') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+      evt.preventDefault();
+      setZoomLevel(c.getZoom() - ZOOM_STEP);
+      return;
+    }
+    if (key === '0' && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+      evt.preventDefault();
+      resetZoom();
+      return;
     }
   });
 
@@ -4167,6 +4291,11 @@
   });
   if (distributeHBtn) distributeHBtn.addEventListener('click', () => distributeSelection('horizontal'));
   if (distributeVBtn) distributeVBtn.addEventListener('click', () => distributeSelection('vertical'));
+
+  if (zoomInBtn) zoomInBtn.addEventListener('click', () => setZoomLevel(c.getZoom() + ZOOM_STEP));
+  if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => setZoomLevel(c.getZoom() - ZOOM_STEP));
+  if (zoomResetBtn) zoomResetBtn.addEventListener('click', resetZoom);
+  syncZoomUi();
 
   let resizeRaf = null;
   window.addEventListener('resize', () => {
@@ -4336,7 +4465,7 @@
 
     let dataUrl = '';
     try {
-      dataUrl = c.toDataURL({
+      dataUrl = withResetViewport(() => c.toDataURL({
         format: 'png',
         left,
         top,
@@ -4344,7 +4473,7 @@
         height,
         multiplier,
         enableRetinaScaling: false
-      });
+      }));
     } finally {
       if (bgImage) {
         c.backgroundImage = bgImage;
@@ -4374,7 +4503,7 @@
     let preview = '';
     let printData = { dataUrl: '', width: 0, height: 0 };
     if (hasContent && canRender) {
-      preview = c.toDataURL({ format: 'png', multiplier: 2, left: 0, top: 0 });
+      preview = withResetViewport(() => c.toDataURL({ format: 'png', multiplier: 2, left: 0, top: 0 }));
       printData = exportPrintImage();
     }
     return {
@@ -4410,7 +4539,7 @@
       const backData = await exportSideForSaving('back');
       await setActiveSide(previousSide);
       const shouldIncludeBack = doubleSidedEnabled && backData.hasContent;
-      const previewPng = frontData.preview || c.toDataURL({ format: 'png', multiplier: 2, left: 0, top: 0 });
+      const previewPng = frontData.preview || withResetViewport(() => c.toDataURL({ format: 'png', multiplier: 2, left: 0, top: 0 }));
       const printExport = frontData.printData || exportPrintImage();
       if (!printExport.dataUrl) {
         const err = new Error('print-export-failed');
