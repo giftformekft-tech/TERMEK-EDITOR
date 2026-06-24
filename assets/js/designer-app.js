@@ -329,6 +329,8 @@
   const uploadInput = document.getElementById('nb-upload');
   const addTextBtn = document.getElementById('nb-add-text');
   const layerListEl = document.getElementById('nb-layer-list');
+  const groupBtn = document.getElementById('nb-group-btn');
+  const ungroupBtn = document.getElementById('nb-ungroup-btn');
   const summaryCardEl = document.querySelector('.nb-summary-card');
   if (summaryCardEl) {
     const straySummaryToggle = summaryCardEl.querySelector('.nb-double-sided');
@@ -1747,7 +1749,18 @@
   }
 
   function sanitizeCanvasJSON() {
+    const activeObject = c.getActiveObject();
+    const isMultiSelection = !!activeObject && activeObject.type === 'activeSelection' && typeof activeObject.getObjects === 'function';
+    const selectedObjects = isMultiSelection ? activeObject.getObjects().slice() : null;
+    if (isMultiSelection) {
+      // ActiveSelection stores child left/top relative to the selection center;
+      // discard before snapshotting so toJSON sees each object's absolute coords.
+      c.discardActiveObject();
+    }
     const raw = c.toJSON(['__nb_layer_id', '__nb_layer_name', '__nb_curve']);
+    if (selectedObjects && selectedObjects.length) {
+      c.setActiveObject(new fabric.ActiveSelection(selectedObjects, { canvas: c }));
+    }
     const clean = Object.assign({}, raw);
     clean.background = 'rgba(0,0,0,0)';
     clean.backgroundImage = null;
@@ -2355,6 +2368,9 @@
     if (obj.type === 'image') {
       return 'Kép';
     }
+    if (obj.type === 'group') {
+      return 'Csoport';
+    }
     return 'Elem';
   }
 
@@ -2447,7 +2463,55 @@
     syncMobileSelectionUi();
   }
 
+  function groupActiveSelection() {
+    const active = c.getActiveObject();
+    if (!active || active.type !== 'activeSelection') return;
+    const objects = typeof active.getObjects === 'function' ? active.getObjects() : (active._objects || []);
+    if (objects.length < 2) return;
+    suspendHistory = true;
+    const group = active.toGroup();
+    suspendHistory = false;
+    if (!group.__nb_layer_name) {
+      group.__nb_layer_name = 'Csoport';
+    }
+    c.setActiveObject(group);
+    c.requestRenderAll();
+    markDesignDirty();
+    commitHistory();
+    syncLayerList();
+    syncTextControls();
+    syncMobileSelectionUi();
+  }
+
+  function ungroupActiveGroup() {
+    const active = c.getActiveObject();
+    if (!active || active.type !== 'group' || !isDesignObject(active)) return;
+    suspendHistory = true;
+    active.toActiveSelection();
+    suspendHistory = false;
+    c.requestRenderAll();
+    markDesignDirty();
+    commitHistory();
+    syncLayerList();
+    syncTextControls();
+    syncMobileSelectionUi();
+  }
+
+  function syncGroupButtons() {
+    const active = c.getActiveObject();
+    if (groupBtn) {
+      const objects = active && active.type === 'activeSelection' && typeof active.getObjects === 'function'
+        ? active.getObjects()
+        : [];
+      groupBtn.disabled = objects.length < 2;
+    }
+    if (ungroupBtn) {
+      ungroupBtn.disabled = !active || active.type !== 'group' || !isDesignObject(active);
+    }
+  }
+
   function syncLayerList() {
+    syncGroupButtons();
     if (!layerListEl) return;
     const objects = designObjects();
     layerListEl.innerHTML = '';
@@ -2579,7 +2643,7 @@
   }
 
   function keepObjectInside(obj, options) {
-    if (!isDesignObject(obj)) return;
+    if (!isDesignObject(obj) || obj.group) return;
     const opts = Object.assign({ fit: true }, options || {});
     if (opts.fit) {
       fitWithinArea(obj);
@@ -3880,6 +3944,9 @@
   if (undoBtn) undoBtn.addEventListener('click', undoHistory);
   if (redoBtn) redoBtn.addEventListener('click', redoHistory);
   updateHistoryButtons();
+
+  if (groupBtn) groupBtn.addEventListener('click', groupActiveSelection);
+  if (ungroupBtn) ungroupBtn.addEventListener('click', ungroupActiveGroup);
 
   let resizeRaf = null;
   window.addEventListener('resize', () => {

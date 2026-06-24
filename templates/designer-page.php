@@ -144,6 +144,10 @@
         <div class="nb-card-header">
           <h3>Rétegek</h3>
         </div>
+        <div class="nb-layer-toolbar">
+          <button type="button" id="nb-group-btn" class="nb-layer-tool" disabled>Csoportosítás</button>
+          <button type="button" id="nb-ungroup-btn" class="nb-layer-tool" disabled>Szétválasztás</button>
+        </div>
         <div class="nb-layer-list" id="nb-layer-list"></div>
       </div>
       <div class="nb-summary-card">
