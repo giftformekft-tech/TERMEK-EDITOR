@@ -424,6 +424,7 @@
   const flyoutContent = document.getElementById('nb-flyout-content');
   const flyoutTitle = document.getElementById('nb-flyout-title');
   const flyoutClose = document.getElementById('nb-flyout-close');
+  const propertiesEmptyEl = document.getElementById('nb-properties-empty');
   const designerShell = document.querySelector('.nb-designer-shell');
   const flyoutState = { activeKey: '' };
   const sheetSources = new Map();
@@ -450,7 +451,8 @@
     templates: ['templates'],
     text: ['text'],
     product: ['product', 'color', 'size', 'double'],
-    layers: ['layers', 'align', 'appearance', 'image']
+    layers: ['layers', 'align', 'appearance', 'image'],
+    properties: ['text', 'image', 'align', 'appearance', 'properties-empty']
   };
   const sheetState = {
     activeKey: '',
@@ -2773,6 +2775,8 @@
   function syncAlignButtons() {
     const active = c.getActiveObject();
     const hasSelection = !!active && isDesignObject(active);
+    const alignSection = sheetSources.get('align');
+    if (alignSection && alignSection.node) alignSection.node.hidden = !hasSelection;
     objectAlignButtons.forEach(btn => {
       btn.disabled = !hasSelection;
     });
@@ -2796,6 +2800,8 @@
   function syncObjectAppearance() {
     const targets = activeAppearanceTargets();
     const hasTarget = targets.length > 0;
+    const appearanceSection = sheetSources.get('appearance');
+    if (appearanceSection && appearanceSection.node) appearanceSection.node.hidden = !hasTarget;
     if (opacityInput) opacityInput.disabled = !hasTarget;
     if (flipHBtn) flipHBtn.disabled = !hasTarget;
     if (flipVBtn) flipVBtn.disabled = !hasTarget;
@@ -2837,6 +2843,19 @@
         if (patternScaleValue) patternScaleValue.textContent = pct + '%';
       }
     }
+  }
+
+  function syncPropertiesEmptyState() {
+    if (!propertiesEmptyEl) return;
+    const textSection = sheetSources.get('text');
+    const textBody = textSection && textSection.node ? textSection.node.querySelector('.nb-card-body--text') : null;
+    const textHidden = !textBody || textBody.hidden;
+    const otherKeys = ['image', 'align', 'appearance'];
+    const otherHidden = otherKeys.every(key => {
+      const source = sheetSources.get(key);
+      return !source || !source.node || source.node.hidden;
+    });
+    propertiesEmptyEl.hidden = !(textHidden && otherHidden);
   }
 
   function syncLayerList() {
@@ -3355,6 +3374,8 @@
     updateLowResWarning();
     const img = activeImage();
     const hasImage = !!img;
+    const imageSection = sheetSources.get('image');
+    if (imageSection && imageSection.node) imageSection.node.hidden = !hasImage;
     const cropping = !!cropSession;
     if (replaceImageBtn) replaceImageBtn.disabled = !hasImage || cropping;
     if (cropImageBtn) cropImageBtn.disabled = !hasImage || cropping;
@@ -4419,6 +4440,9 @@
   function syncTextControls() {
     const textbox = activeTextbox();
     const hasTextbox = !!textbox;
+    const textSection = sheetSources.get('text');
+    const textBody = textSection && textSection.node ? textSection.node.querySelector('.nb-card-body--text') : null;
+    if (textBody) textBody.hidden = !hasTextbox;
     if (textbox) initializeTextboxCurve(textbox);
     const controls = [
       fontFamilySel,
@@ -4660,6 +4684,7 @@
   requestAnimationFrame(() => { setMockupBgAndArea(); });
   updateSelectionSummary();
   syncTextControls();
+  syncImageControls();
   captureActiveSideState();
   updateCanvasEmptyHint();
   updateSideUiState();
@@ -4844,9 +4869,9 @@
   });
   c.on('mouse:up', () => clearSnapGuides());
   c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
-  c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
-  c.on('selection:updated', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
-  c.on('selection:cleared', () => { maybeAutoApplyCrop(null); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
+  c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); });
+  c.on('selection:updated', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); });
+  c.on('selection:cleared', () => { maybeAutoApplyCrop(null); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); });
   c.on('text:changed', e => {
     if (!isDesignObject(e.target)) return;
     initializeTextboxCurve(e.target);
@@ -5373,6 +5398,7 @@
   });
 
   syncLayerList();
+  syncPropertiesEmptyState();
 
   if (addTextBtn) {
     addTextBtn.onclick = () => {

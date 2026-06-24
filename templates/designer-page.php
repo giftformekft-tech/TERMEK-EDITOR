@@ -22,6 +22,10 @@
           <span class="nb-rail-icon" aria-hidden="true">🧱</span>
           <span class="nb-rail-label">Rétegek</span>
         </button>
+        <button type="button" class="nb-rail-btn" data-nb-rail-target="properties" aria-label="Tulajdonságok">
+          <span class="nb-rail-icon" aria-hidden="true">⚙</span>
+          <span class="nb-rail-label">Tulajdonságok</span>
+        </button>
       </nav>
 
       <div class="nb-flyout" id="nb-flyout" hidden>
@@ -149,6 +153,7 @@
     </main>
 
     <aside class="nb-column nb-column--summary">
+      <div class="nb-rail-rest-state" id="nb-properties-panel">
       <div class="nb-action-card" data-nb-sheet-source="text" data-nb-sheet-title="Szöveg">
         <button type="button" id="nb-add-text" class="nb-hero-button nb-hero-button--accent">
           <span class="nb-hero-icon">✎</span>
@@ -315,6 +320,8 @@
           <button type="button" class="nb-align-tool nb-align-tool--wide" id="nb-flip-h" aria-pressed="false" title="Vízszintes tükrözés" disabled>⇋ Tükrözés</button>
           <button type="button" class="nb-align-tool nb-align-tool--wide" id="nb-flip-v" aria-pressed="false" title="Függőleges tükrözés" disabled>⇵ Tükrözés</button>
         </div>
+      </div>
+      <p class="nb-empty" id="nb-properties-empty" data-nb-sheet-source="properties-empty" hidden>Válassz egy elemet a vászonon a tulajdonságok megtekintéséhez.</p>
       </div>
       <div class="nb-rail-rest-state">
         <div class="nb-action-card nb-action-card--layers" data-nb-sheet-source="layers" data-nb-sheet-title="Rétegek">

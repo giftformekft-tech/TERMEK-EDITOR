@@ -90,7 +90,8 @@
 .nb-flyout-content .nb-action-card,.nb-flyout-content .nb-card-body{background:transparent;border:none;box-shadow:none;padding:0}
 .nb-flyout-content .nb-sheet-section{gap:18px}
 .nb-flyout [data-nb-sheet-source]{width:100%}
-.nb-properties-empty{font-size:13px;color:#6b7280;margin:0}
+[data-nb-sheet-source][hidden]{display:none!important}
+.nb-card-body[hidden]{display:none!important}
 
 #nb-designer button.nb-side-fab{font:inherit}
 .nb-stage-controls{display:flex;justify-content:center;align-items:center;margin-bottom:12px}
