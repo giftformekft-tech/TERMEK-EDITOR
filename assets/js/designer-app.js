@@ -375,13 +375,6 @@
   const zoomOutBtn = document.getElementById('nb-zoom-out');
   const zoomResetBtn = document.getElementById('nb-zoom-reset');
   const zoomLevelEl = document.getElementById('nb-zoom-level');
-  const summaryCardEl = document.querySelector('.nb-summary-card');
-  if (summaryCardEl) {
-    const straySummaryToggle = summaryCardEl.querySelector('.nb-double-sided');
-    if (straySummaryToggle) {
-      straySummaryToggle.remove();
-    }
-  }
   const doubleSidedToggle = document.getElementById('nb-double-sided-toggle');
   const sideStatusEl = document.getElementById('nb-side-status');
   const printSummaryEl = document.getElementById('nb-print-summary');
