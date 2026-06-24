@@ -1,91 +1,123 @@
 <div id="nb-designer">
   <div class="nb-designer-shell">
     <aside class="nb-column nb-column--actions">
-      <div class="nb-action-card nb-action-card--product">
-        <div class="nb-sheet-section" data-nb-sheet-source="product" data-nb-sheet-title="Terméktípus">
-          <button type="button" class="nb-hero-button" id="nb-product-modal-trigger">
-            <span class="nb-hero-icon">👕</span>
-            <span>Válassz terméket</span>
-          </button>
-        </div>
-        <div class="nb-sheet-section" data-nb-sheet-source="color" data-nb-sheet-title="Színválasztás">
-          <button type="button" class="nb-hero-button nb-hero-button--secondary" id="nb-color-modal-trigger">
-            <span class="nb-hero-icon">🎨</span>
-            <span id="nb-color-modal-label">Válassz színt</span>
-          </button>
-        </div>
-        <div class="nb-sheet-section" data-nb-sheet-source="size" data-nb-sheet-title="Méret és készlet">
-          <div class="nb-card-body">
-            <div class="nb-size-group">
-              <span class="nb-field-label">Méret</span>
-              <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
-            </div>
-          </div>
-        </div>
-        <div class="nb-sheet-section" data-nb-sheet-source="double" data-nb-sheet-title="Kétoldalas nyomtatás">
-          <div class="nb-double-sided" id="nb-double-sided">
-            <label class="nb-double-sided-toggle">
-              <input type="checkbox" id="nb-double-sided-toggle">
-              <span>
-                <strong>Kétoldalas nyomtatás</strong>
-                <small>Kapcsold be, ha a hátlapot is terveznéd.</small>
-              </span>
-            </label>
-            <div class="nb-side-status" id="nb-side-status">
-              <span data-nb-side="front">Előlap: üres</span>
-              <span data-nb-side="back">Hátlap: kikapcsolva</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="nb-action-card" data-nb-sheet-source="upload" data-nb-sheet-title="Saját képek">
-        <label class="nb-hero-button nb-hero-button--upload">
-          <span class="nb-hero-icon">⬆</span>
-          <span>Tölts fel saját képet</span>
-          <input type="file" id="nb-upload" accept="image/png,image/jpeg,image/svg+xml" />
-        </label>
-        <button type="button" id="nb-clear-design" class="nb-subtle-link">Terv ürítése</button>
-      </div>
-
-      <div class="nb-action-card nb-action-card--shapes" data-nb-sheet-source="shapes" data-nb-sheet-title="Elemek">
-        <div class="nb-card-header">
-          <h3>Elemek</h3>
-        </div>
-        <div class="nb-card-body">
-          <div class="nb-shape-grid">
-            <button type="button" class="nb-shape-btn" data-nb-shape="rect" title="Téglalap" aria-label="Téglalap"><span aria-hidden="true">▭</span></button>
-            <button type="button" class="nb-shape-btn" data-nb-shape="circle" title="Kör" aria-label="Kör"><span aria-hidden="true">●</span></button>
-            <button type="button" class="nb-shape-btn" data-nb-shape="triangle" title="Háromszög" aria-label="Háromszög"><span aria-hidden="true">▲</span></button>
-            <button type="button" class="nb-shape-btn" data-nb-shape="line" title="Vonal" aria-label="Vonal"><span aria-hidden="true">━</span></button>
-            <button type="button" class="nb-shape-btn" data-nb-shape="star" title="Csillag" aria-label="Csillag"><span aria-hidden="true">★</span></button>
-            <button type="button" class="nb-shape-btn" data-nb-shape="heart" title="Szív" aria-label="Szív"><span aria-hidden="true">♥</span></button>
-          </div>
-          <div class="nb-qr-tool">
-            <label class="nb-field nb-field--text">
-              <span>QR kód szövege vagy linkje</span>
-              <input type="text" id="nb-qr-input" placeholder="https://example.hu">
-            </label>
-            <button type="button" class="nb-layer-tool nb-qr-add" id="nb-qr-add" disabled>QR kód hozzáadása</button>
-            <p class="nb-qr-hint" id="nb-qr-hint" hidden></p>
-          </div>
-        </div>
-      </div>
-
-      <div class="nb-action-card nb-action-card--saved" data-nb-sheet-source="elements" data-nb-sheet-title="Mentett minták">
-        <div class="nb-card-body">
-          <h3 class="nb-card-title">Mentett minták</h3>
-          <p class="nb-empty">Itt fognak megjelenni a kedvencek és a legutóbbi elemek.</p>
-        </div>
-      </div>
-
-      <div class="nb-action-card" data-nb-sheet-source="templates" data-nb-sheet-title="Sablonok">
-        <button type="button" id="nb-templates-trigger" class="nb-hero-button nb-hero-button--secondary">
-          <span class="nb-hero-icon">📄</span>
-          <span>Sablon választása</span>
+      <nav class="nb-rail" id="nb-rail" aria-label="Eszközök">
+        <button type="button" class="nb-rail-btn" data-nb-rail-target="product" aria-label="Termék">
+          <span class="nb-rail-icon" aria-hidden="true">👕</span>
+          <span class="nb-rail-label">Termék</span>
         </button>
+        <button type="button" class="nb-rail-btn" data-nb-rail-target="upload" aria-label="Feltöltés">
+          <span class="nb-rail-icon" aria-hidden="true">⬆</span>
+          <span class="nb-rail-label">Feltöltés</span>
+        </button>
+        <button type="button" class="nb-rail-btn" data-nb-rail-target="shapes" aria-label="Elemek">
+          <span class="nb-rail-icon" aria-hidden="true">★</span>
+          <span class="nb-rail-label">Elemek</span>
+        </button>
+        <button type="button" class="nb-rail-btn" data-nb-rail-target="templates" aria-label="Sablonok">
+          <span class="nb-rail-icon" aria-hidden="true">📄</span>
+          <span class="nb-rail-label">Sablonok</span>
+        </button>
+        <button type="button" class="nb-rail-btn" data-nb-rail-target="layers" aria-label="Rétegek">
+          <span class="nb-rail-icon" aria-hidden="true">🧱</span>
+          <span class="nb-rail-label">Rétegek</span>
+        </button>
+      </nav>
+
+      <div class="nb-flyout" id="nb-flyout" hidden>
+        <div class="nb-flyout-header">
+          <h2 class="nb-flyout-title" id="nb-flyout-title"></h2>
+          <button type="button" class="nb-flyout-close" id="nb-flyout-close" aria-label="Bezárás">×</button>
+        </div>
+        <div class="nb-flyout-content" id="nb-flyout-content"></div>
       </div>
 
+      <div class="nb-rail-rest-state">
+        <div class="nb-action-card nb-action-card--product">
+          <div class="nb-sheet-section" data-nb-sheet-source="product" data-nb-sheet-title="Terméktípus">
+            <button type="button" class="nb-hero-button" id="nb-product-modal-trigger">
+              <span class="nb-hero-icon">👕</span>
+              <span>Válassz terméket</span>
+            </button>
+          </div>
+          <div class="nb-sheet-section" data-nb-sheet-source="color" data-nb-sheet-title="Színválasztás">
+            <button type="button" class="nb-hero-button nb-hero-button--secondary" id="nb-color-modal-trigger">
+              <span class="nb-hero-icon">🎨</span>
+              <span id="nb-color-modal-label">Válassz színt</span>
+            </button>
+          </div>
+          <div class="nb-sheet-section" data-nb-sheet-source="size" data-nb-sheet-title="Méret és készlet">
+            <div class="nb-card-body">
+              <div class="nb-size-group">
+                <span class="nb-field-label">Méret</span>
+                <div id="nb-size-buttons" class="nb-pill-group nb-pill-group--compact"></div>
+              </div>
+            </div>
+          </div>
+          <div class="nb-sheet-section" data-nb-sheet-source="double" data-nb-sheet-title="Kétoldalas nyomtatás">
+            <div class="nb-double-sided" id="nb-double-sided">
+              <label class="nb-double-sided-toggle">
+                <input type="checkbox" id="nb-double-sided-toggle">
+                <span>
+                  <strong>Kétoldalas nyomtatás</strong>
+                  <small>Kapcsold be, ha a hátlapot is terveznéd.</small>
+                </span>
+              </label>
+              <div class="nb-side-status" id="nb-side-status">
+                <span data-nb-side="front">Előlap: üres</span>
+                <span data-nb-side="back">Hátlap: kikapcsolva</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nb-action-card" data-nb-sheet-source="upload" data-nb-sheet-title="Saját képek">
+          <label class="nb-hero-button nb-hero-button--upload">
+            <span class="nb-hero-icon">⬆</span>
+            <span>Tölts fel saját képet</span>
+            <input type="file" id="nb-upload" accept="image/png,image/jpeg,image/svg+xml" />
+          </label>
+          <button type="button" id="nb-clear-design" class="nb-subtle-link">Terv ürítése</button>
+        </div>
+
+        <div class="nb-action-card nb-action-card--shapes" data-nb-sheet-source="shapes" data-nb-sheet-title="Elemek">
+          <div class="nb-card-header">
+            <h3>Elemek</h3>
+          </div>
+          <div class="nb-card-body">
+            <div class="nb-shape-grid">
+              <button type="button" class="nb-shape-btn" data-nb-shape="rect" title="Téglalap" aria-label="Téglalap"><span aria-hidden="true">▭</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="circle" title="Kör" aria-label="Kör"><span aria-hidden="true">●</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="triangle" title="Háromszög" aria-label="Háromszög"><span aria-hidden="true">▲</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="line" title="Vonal" aria-label="Vonal"><span aria-hidden="true">━</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="star" title="Csillag" aria-label="Csillag"><span aria-hidden="true">★</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="heart" title="Szív" aria-label="Szív"><span aria-hidden="true">♥</span></button>
+            </div>
+            <div class="nb-qr-tool">
+              <label class="nb-field nb-field--text">
+                <span>QR kód szövege vagy linkje</span>
+                <input type="text" id="nb-qr-input" placeholder="https://example.hu">
+              </label>
+              <button type="button" class="nb-layer-tool nb-qr-add" id="nb-qr-add" disabled>QR kód hozzáadása</button>
+              <p class="nb-qr-hint" id="nb-qr-hint" hidden></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="nb-action-card nb-action-card--saved" data-nb-sheet-source="elements" data-nb-sheet-title="Mentett minták">
+          <div class="nb-card-body">
+            <h3 class="nb-card-title">Mentett minták</h3>
+            <p class="nb-empty">Itt fognak megjelenni a kedvencek és a legutóbbi elemek.</p>
+          </div>
+        </div>
+
+        <div class="nb-action-card" data-nb-sheet-source="templates" data-nb-sheet-title="Sablonok">
+          <button type="button" id="nb-templates-trigger" class="nb-hero-button nb-hero-button--secondary">
+            <span class="nb-hero-icon">📄</span>
+            <span>Sablon választása</span>
+          </button>
+        </div>
+      </div>
     </aside>
 
     <main class="nb-column nb-column--stage">
@@ -284,15 +316,17 @@
           <button type="button" class="nb-align-tool nb-align-tool--wide" id="nb-flip-v" aria-pressed="false" title="Függőleges tükrözés" disabled>⇵ Tükrözés</button>
         </div>
       </div>
-      <div class="nb-action-card nb-action-card--layers" data-nb-sheet-source="layers" data-nb-sheet-title="Rétegek">
-        <div class="nb-card-header">
-          <h3>Rétegek</h3>
+      <div class="nb-rail-rest-state">
+        <div class="nb-action-card nb-action-card--layers" data-nb-sheet-source="layers" data-nb-sheet-title="Rétegek">
+          <div class="nb-card-header">
+            <h3>Rétegek</h3>
+          </div>
+          <div class="nb-layer-toolbar">
+            <button type="button" id="nb-group-btn" class="nb-layer-tool" disabled>Csoportosítás</button>
+            <button type="button" id="nb-ungroup-btn" class="nb-layer-tool" disabled>Szétválasztás</button>
+          </div>
+          <div class="nb-layer-list" id="nb-layer-list"></div>
         </div>
-        <div class="nb-layer-toolbar">
-          <button type="button" id="nb-group-btn" class="nb-layer-tool" disabled>Csoportosítás</button>
-          <button type="button" id="nb-ungroup-btn" class="nb-layer-tool" disabled>Szétválasztás</button>
-        </div>
-        <div class="nb-layer-list" id="nb-layer-list"></div>
       </div>
       <div class="nb-summary-card">
         <div class="nb-product-heading">
@@ -381,51 +415,6 @@
       <button type="button" class="nb-mobile-secondary" id="nb-mobile-bulk">Többet vennék</button>
     </div>
   </div>
-
-  <div class="nb-mobile-overlay" id="nb-mobile-sheet-overlay" hidden></div>
-  <div class="nb-mobile-sheet" id="nb-mobile-sheet" hidden aria-hidden="true" role="dialog" aria-modal="false">
-    <div class="nb-mobile-sheet-handle" id="nb-mobile-sheet-handle" aria-hidden="true"></div>
-    <div class="nb-mobile-sheet-header">
-      <h2 id="nb-mobile-sheet-title"></h2>
-      <button type="button" class="nb-mobile-sheet-close" id="nb-mobile-sheet-close" aria-label="Bezárás">×</button>
-    </div>
-    <div class="nb-mobile-sheet-content" id="nb-mobile-sheet-content"></div>
-  </div>
-
-
-
-  <div class="nb-modal" id="nb-product-modal" hidden>
-    <div class="nb-modal-backdrop" data-nb-close="product-modal"></div>
-    <div class="nb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-product-modal-title">
-      <div class="nb-modal-header">
-        <h2 id="nb-product-modal-title">Válassz terméket</h2>
-        <button type="button" class="nb-modal-close" data-nb-close="product-modal" aria-label="Bezárás">×</button>
-      </div>
-      <div class="nb-modal-body">
-        <div class="nb-modal-section">
-          <h3>Terméktípus</h3>
-          <div class="nb-modal-type-list" id="nb-modal-type-list"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="nb-modal" id="nb-color-modal" hidden>
-    <div class="nb-modal-backdrop" data-nb-close="color-modal"></div>
-    <div class="nb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-color-modal-title">
-      <div class="nb-modal-header">
-        <h2 id="nb-color-modal-title">Válassz színt</h2>
-        <button type="button" class="nb-modal-close" data-nb-close="color-modal" aria-label="Bezárás">×</button>
-      </div>
-      <div class="nb-modal-body">
-        <div class="nb-modal-section">
-          <h3>Elérhető színek</h3>
-          <div class="nb-modal-color-grid" id="nb-modal-color-list"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
 
   <div class="nb-mobile-overlay" id="nb-mobile-sheet-overlay" hidden></div>
   <div class="nb-mobile-sheet" id="nb-mobile-sheet" hidden aria-hidden="true" role="dialog" aria-modal="false">

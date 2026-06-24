@@ -411,6 +411,21 @@
       mobileToolbarButtons.set(key, btn);
     });
   }
+  const rail = document.getElementById('nb-rail');
+  const railButtons = new Map();
+  if (rail) {
+    Array.from(rail.querySelectorAll('[data-nb-rail-target]')).forEach(btn => {
+      const key = btn.dataset.nbRailTarget;
+      if (!key) return;
+      railButtons.set(key, btn);
+    });
+  }
+  const flyout = document.getElementById('nb-flyout');
+  const flyoutContent = document.getElementById('nb-flyout-content');
+  const flyoutTitle = document.getElementById('nb-flyout-title');
+  const flyoutClose = document.getElementById('nb-flyout-close');
+  const designerShell = document.querySelector('.nb-designer-shell');
+  const flyoutState = { activeKey: '' };
   const sheetSources = new Map();
   Array.from(document.querySelectorAll('[data-nb-sheet-source]')).forEach(node => {
     const key = node.dataset.nbSheetSource;
@@ -427,11 +442,12 @@
       title
     });
   });
-  const sheetBundles = {
+  const sectionBundles = {
     sides: ['sides', 'double'],
     elements: ['elements'],
     shapes: ['shapes'],
-    upload: ['upload', 'templates'],
+    upload: ['upload'],
+    templates: ['templates'],
     text: ['text'],
     product: ['product', 'color', 'size', 'double'],
     layers: ['layers', 'align', 'appearance', 'image']
@@ -1959,7 +1975,7 @@
 
   function sheetKeysForTarget(key) {
     if (!key) return [];
-    const bundle = sheetBundles[key];
+    const bundle = sectionBundles[key];
     if (Array.isArray(bundle) && bundle.length) {
       return bundle.filter(entry => sheetSources.has(entry));
     }
@@ -2132,6 +2148,9 @@
       closeMobileSheet();
       return;
     }
+    if (flyout && flyoutState.activeKey) {
+      closeFlyout({ skipFocus: true });
+    }
     const wasActive = !!sheetState.activeKey;
     if (sheetState.activeKey) {
       const previousKeys = sheetKeysForTarget(sheetState.activeKey);
@@ -2185,6 +2204,99 @@
     sheetState.pendingClose = false;
     sheetState.activeKey = key;
     updateToolbarActiveState();
+  }
+
+  function updateRailActiveState() {
+    railButtons.forEach((btn, key) => {
+      if (!btn) return;
+      if (flyoutState.activeKey === key) {
+        btn.classList.add('is-active');
+      } else {
+        btn.classList.remove('is-active');
+      }
+    });
+  }
+
+  function closeFlyout(options) {
+    const opts = options || {};
+    if (!flyout || !flyoutState.activeKey) return;
+    const previousKey = flyoutState.activeKey;
+    const keys = sheetKeysForTarget(previousKey);
+    restoreSheetSources(keys);
+    if (flyoutContent) {
+      while (flyoutContent.firstChild) {
+        flyoutContent.removeChild(flyoutContent.firstChild);
+      }
+    }
+    flyoutState.activeKey = '';
+    flyout.setAttribute('hidden', '');
+    if (designerShell) {
+      designerShell.classList.remove('nb-flyout-open');
+    }
+    updateRailActiveState();
+    if (!opts.skipFocus) {
+      const btn = railButtons.get(previousKey);
+      if (btn && typeof btn.focus === 'function') {
+        btn.focus();
+      }
+    }
+  }
+
+  function openFlyout(key) {
+    if (!flyout || !flyoutContent || !key) return;
+    if (flyoutState.activeKey === key) {
+      closeFlyout();
+      return;
+    }
+    if (mobileSheet && sheetState.activeKey) {
+      closeMobileSheet();
+    }
+    const wasActive = !!flyoutState.activeKey;
+    if (flyoutState.activeKey) {
+      const previousKeys = sheetKeysForTarget(flyoutState.activeKey);
+      restoreSheetSources(previousKeys);
+      while (flyoutContent.firstChild) {
+        flyoutContent.removeChild(flyoutContent.firstChild);
+      }
+    }
+    const keys = sheetKeysForTarget(key);
+    if (!keys.length) {
+      flyoutState.activeKey = '';
+      updateRailActiveState();
+      return;
+    }
+    const titles = [];
+    keys.forEach(sheetKey => {
+      const source = sheetSources.get(sheetKey);
+      if (!source || !source.node) return;
+      source.parent = source.node.parentNode;
+      source.nextSibling = source.node.nextSibling;
+      if (source.title) {
+        titles.push(source.title);
+      }
+      flyoutContent.appendChild(source.node);
+    });
+    if (flyoutTitle) {
+      const label = titles.length ? titles.join(' • ') : '';
+      if (label) {
+        flyoutTitle.textContent = label;
+      } else {
+        const btn = railButtons.get(key);
+        flyoutTitle.textContent = btn ? (btn.getAttribute('aria-label') || btn.textContent || '') : '';
+      }
+    }
+    if (!wasActive && designerShell) {
+      designerShell.classList.add('nb-flyout-open');
+    }
+    flyout.removeAttribute('hidden');
+    flyoutState.activeKey = key;
+    updateRailActiveState();
+    const focusTarget = flyoutContent.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      focusTarget.focus();
+    } else if (flyoutClose && typeof flyoutClose.focus === 'function') {
+      flyoutClose.focus();
+    }
   }
 
   function refreshMobileUi() {
@@ -4595,6 +4707,21 @@
     });
   }
 
+  if (railButtons.size) {
+    railButtons.forEach((btn, key) => {
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        openFlyout(key);
+      });
+    });
+  }
+
+  if (flyoutClose) {
+    flyoutClose.addEventListener('click', () => {
+      closeFlyout();
+    });
+  }
+
   if (mobileSheetHandle) {
     mobileSheetHandle.addEventListener('pointerdown', beginSheetDrag);
   }
@@ -4929,6 +5056,10 @@
         closeMobileSheet();
         return;
       }
+      if (flyout && flyoutState.activeKey) {
+        closeFlyout();
+        return;
+      }
       if (bulkModal && !bulkModal.hidden) {
         closeBulkModal();
         return;
@@ -5193,13 +5324,24 @@
   syncZoomUi();
 
   let resizeRaf = null;
-  window.addEventListener('resize', () => {
+  function scheduleStageResize() {
     if (resizeRaf) cancelAnimationFrame(resizeRaf);
     resizeRaf = requestAnimationFrame(() => {
       refreshControlProfile();
       setMockupBgAndArea();
     });
-  });
+  }
+  window.addEventListener('resize', scheduleStageResize);
+
+  if (typeof ResizeObserver === 'function') {
+    const stageColumnEl = document.querySelector('.nb-column--stage');
+    if (stageColumnEl) {
+      const stageResizeObserver = new ResizeObserver(() => {
+        scheduleStageResize();
+      });
+      stageResizeObserver.observe(stageColumnEl);
+    }
+  }
 
   window.addEventListener('load', () => {
     setMockupBgAndArea();
