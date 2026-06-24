@@ -348,6 +348,12 @@
   const flipHBtn = document.getElementById('nb-flip-h');
   const flipVBtn = document.getElementById('nb-flip-v');
   const shapeFillInput = document.getElementById('nb-shape-fill');
+  const patternUploadBtn = document.getElementById('nb-pattern-upload');
+  const patternUploadInput = document.getElementById('nb-pattern-upload-input');
+  const patternClearBtn = document.getElementById('nb-pattern-clear');
+  const patternScaleWrap = document.getElementById('nb-pattern-scale-wrap');
+  const patternScaleInput = document.getElementById('nb-pattern-scale');
+  const patternScaleValue = document.getElementById('nb-pattern-scale-value');
   const filterGrayscaleToggle = document.getElementById('nb-filter-grayscale');
   const filterSepiaToggle = document.getElementById('nb-filter-sepia');
   const filterBrightnessInput = document.getElementById('nb-filter-brightness');
@@ -1799,7 +1805,7 @@
       // discard before snapshotting so toJSON sees each object's absolute coords.
       c.discardActiveObject();
     }
-    const raw = c.toJSON(['__nb_layer_id', '__nb_layer_name', '__nb_curve']);
+    const raw = c.toJSON(['__nb_layer_id', '__nb_layer_name', '__nb_curve', '__nb_pre_pattern_fill']);
     if (selectedObjects && selectedObjects.length) {
       c.setActiveObject(new fabric.ActiveSelection(selectedObjects, { canvas: c }));
     }
@@ -2694,6 +2700,9 @@
       setPressed(flipHBtn, false);
       setPressed(flipVBtn, false);
       if (shapeFillInput) shapeFillInput.disabled = true;
+      if (patternUploadBtn) patternUploadBtn.disabled = true;
+      if (patternClearBtn) { patternClearBtn.disabled = true; patternClearBtn.hidden = true; }
+      if (patternScaleWrap) patternScaleWrap.hidden = true;
       return;
     }
     const primary = targets[0];
@@ -2705,9 +2714,22 @@
     if (shapeFillInput) {
       const allShapes = targets.every(isRecolorableShape);
       shapeFillInput.disabled = !allShapes;
-      if (allShapes) {
-        const raw = primary[shapeColorProp(primary)];
+      if (patternUploadBtn) patternUploadBtn.disabled = !allShapes;
+      const raw = allShapes ? primary[shapeColorProp(primary)] : null;
+      const isPattern = !!raw && raw instanceof fabric.Pattern;
+      if (allShapes && !isPattern) {
         shapeFillInput.value = toHexColor(typeof raw === 'string' && raw ? raw : '#111827');
+      }
+      if (patternClearBtn) {
+        patternClearBtn.hidden = !isPattern;
+        patternClearBtn.disabled = !isPattern;
+      }
+      if (patternScaleWrap) patternScaleWrap.hidden = !isPattern;
+      if (isPattern && patternScaleInput) {
+        const scale = Array.isArray(raw.patternTransform) && raw.patternTransform[0] ? raw.patternTransform[0] : 1;
+        const pct = Math.round(scale * 100);
+        patternScaleInput.value = pct;
+        if (patternScaleValue) patternScaleValue.textContent = pct + '%';
       }
     }
   }
@@ -3592,6 +3614,72 @@
       setQrHint(null);
       syncLayerList();
     });
+  }
+
+  function applyPatternFillToTargets(pattern) {
+    const targets = activeAppearanceTargets().filter(isRecolorableShape);
+    if (!targets.length) return;
+    targets.forEach(obj => {
+      const prop = shapeColorProp(obj);
+      const current = obj[prop];
+      if (typeof current === 'string' && current) {
+        obj.__nb_pre_pattern_fill = current;
+      }
+      obj.set(prop, pattern);
+    });
+    c.requestRenderAll();
+    markDesignDirty();
+    commitHistory();
+    syncObjectAppearance();
+  }
+
+  function clearPatternFillFromTargets() {
+    const targets = activeAppearanceTargets().filter(isRecolorableShape);
+    if (!targets.length) return;
+    targets.forEach(obj => {
+      const prop = shapeColorProp(obj);
+      if (!(obj[prop] instanceof fabric.Pattern)) return;
+      obj.set(prop, obj.__nb_pre_pattern_fill || '#111827');
+    });
+    c.requestRenderAll();
+    markDesignDirty();
+    commitHistory();
+    syncObjectAppearance();
+  }
+
+  function updatePatternScaleForTargets(scale) {
+    const targets = activeAppearanceTargets().filter(isRecolorableShape);
+    let changed = false;
+    targets.forEach(obj => {
+      const fill = obj[shapeColorProp(obj)];
+      if (!(fill instanceof fabric.Pattern)) return;
+      fill.patternTransform = [scale, 0, 0, scale, 0, 0];
+      changed = true;
+    });
+    if (!changed) return;
+    c.requestRenderAll();
+    markDesignDirty();
+    scheduleHistoryCommit();
+  }
+
+  function loadPatternFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = evt => {
+      const dataUrl = evt && evt.target && typeof evt.target.result === 'string' ? evt.target.result : '';
+      if (!dataUrl) return;
+      new fabric.Pattern({
+        source: dataUrl,
+        repeat: 'repeat',
+        patternTransform: [1, 0, 0, 1, 0, 0]
+      }, (pattern, isError) => {
+        if (isError) return;
+        applyPatternFillToTargets(pattern);
+      });
+    };
+    reader.onerror = () => {
+      console.error('Nem sikerült beolvasni a minta képfájlt.');
+    };
+    reader.readAsDataURL(file);
   }
 
   function toHexColor(color) {
@@ -4960,6 +5048,27 @@
       c.requestRenderAll();
       markDesignDirty();
       scheduleHistoryCommit();
+    });
+  }
+
+  if (patternUploadBtn && patternUploadInput) {
+    patternUploadBtn.addEventListener('click', () => patternUploadInput.click());
+    patternUploadInput.addEventListener('change', e => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (file) loadPatternFromFile(file);
+    });
+  }
+
+  if (patternClearBtn) {
+    patternClearBtn.addEventListener('click', () => clearPatternFillFromTargets());
+  }
+
+  if (patternScaleInput) {
+    patternScaleInput.addEventListener('input', () => {
+      const pct = parseInt(patternScaleInput.value, 10) || 100;
+      if (patternScaleValue) patternScaleValue.textContent = pct + '%';
+      updatePatternScaleForTargets(pct / 100);
     });
   }
 

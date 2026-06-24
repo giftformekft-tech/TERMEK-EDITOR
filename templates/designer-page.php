@@ -257,6 +257,21 @@
           <span>Kitöltés szín</span>
           <input type="color" id="nb-shape-fill" value="#111827" disabled>
         </label>
+        <div class="nb-field nb-field--pattern">
+          <span>Minta kitöltés</span>
+          <div class="nb-layer-toolbar">
+            <button type="button" class="nb-layer-tool" id="nb-pattern-upload" disabled>Minta feltöltése</button>
+            <button type="button" class="nb-layer-tool" id="nb-pattern-clear" disabled hidden>Szín visszaállítása</button>
+          </div>
+          <input type="file" id="nb-pattern-upload-input" accept="image/png,image/jpeg,image/svg+xml" hidden>
+        </div>
+        <label class="nb-field" id="nb-pattern-scale-wrap" hidden>
+          <span>Minta mérete</span>
+          <div class="nb-range">
+            <input type="range" id="nb-pattern-scale" min="20" max="300" step="5" value="100">
+            <span id="nb-pattern-scale-value">100%</span>
+          </div>
+        </label>
         <label class="nb-field">
           <span>Áttűnés</span>
           <div class="nb-range">
