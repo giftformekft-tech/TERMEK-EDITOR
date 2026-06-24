@@ -3211,6 +3211,70 @@
     c.selection = true;
   });
 
+  const touchGesture = { active: false, pointers: new Map(), lastDist: 0, lastMidX: 0, lastMidY: 0 };
+
+  function touchPointToCanvas(t) {
+    const bounds = c.upperCanvasEl.getBoundingClientRect();
+    const scaleX = bounds.width ? c.upperCanvasEl.width / bounds.width : 1;
+    const scaleY = bounds.height ? c.upperCanvasEl.height / bounds.height : 1;
+    return { x: (t.clientX - bounds.left) * scaleX, y: (t.clientY - bounds.top) * scaleY };
+  }
+
+  function twoTouchMetrics() {
+    const pts = Array.from(touchGesture.pointers.values()).map(touchPointToCanvas);
+    return {
+      dist: Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
+      midX: (pts[0].x + pts[1].x) / 2,
+      midY: (pts[0].y + pts[1].y) / 2
+    };
+  }
+
+  c.upperCanvasEl.addEventListener('touchstart', e => {
+    Array.from(e.changedTouches).forEach(t => touchGesture.pointers.set(t.identifier, t));
+    if (touchGesture.pointers.size === 2) {
+      touchGesture.active = true;
+      c._currentTransform = null;
+      c.upperCanvasEl.style.touchAction = 'none';
+      const m = twoTouchMetrics();
+      touchGesture.lastDist = m.dist;
+      touchGesture.lastMidX = m.midX;
+      touchGesture.lastMidY = m.midY;
+    }
+  }, { passive: false });
+
+  c.upperCanvasEl.addEventListener('touchmove', e => {
+    if (!touchGesture.active || touchGesture.pointers.size !== 2) return;
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t => {
+      if (touchGesture.pointers.has(t.identifier)) touchGesture.pointers.set(t.identifier, t);
+    });
+    const m = twoTouchMetrics();
+    if (touchGesture.lastDist > 0 && m.dist > 0) {
+      const zoom = clampZoom(c.getZoom() * (m.dist / touchGesture.lastDist));
+      c.zoomToPoint(new fabric.Point(touchGesture.lastMidX, touchGesture.lastMidY), zoom);
+    }
+    const vpt = c.viewportTransform;
+    vpt[4] += m.midX - touchGesture.lastMidX;
+    vpt[5] += m.midY - touchGesture.lastMidY;
+    clampPan();
+    syncZoomUi();
+    touchGesture.lastDist = m.dist;
+    touchGesture.lastMidX = m.midX;
+    touchGesture.lastMidY = m.midY;
+  }, { passive: false });
+
+  function endTouchGesture(e) {
+    Array.from(e.changedTouches).forEach(t => touchGesture.pointers.delete(t.identifier));
+    if (touchGesture.pointers.size < 2) {
+      touchGesture.active = false;
+    }
+    if (touchGesture.pointers.size === 0) {
+      c.upperCanvasEl.style.touchAction = 'manipulation';
+    }
+  }
+  c.upperCanvasEl.addEventListener('touchend', endTouchGesture);
+  c.upperCanvasEl.addEventListener('touchcancel', endTouchGesture);
+
   function markDesignDirty() {
     if (sideLoading) return;
     designState.savedDesignId = null;
