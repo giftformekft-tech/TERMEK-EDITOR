@@ -48,6 +48,30 @@
         <button type="button" id="nb-clear-design" class="nb-subtle-link">Terv ürítése</button>
       </div>
 
+      <div class="nb-action-card nb-action-card--shapes" data-nb-sheet-source="shapes" data-nb-sheet-title="Elemek">
+        <div class="nb-card-header">
+          <h3>Elemek</h3>
+        </div>
+        <div class="nb-card-body">
+          <div class="nb-shape-grid">
+            <button type="button" class="nb-shape-btn" data-nb-shape="rect" title="Téglalap" aria-label="Téglalap"><span aria-hidden="true">▭</span></button>
+            <button type="button" class="nb-shape-btn" data-nb-shape="circle" title="Kör" aria-label="Kör"><span aria-hidden="true">●</span></button>
+            <button type="button" class="nb-shape-btn" data-nb-shape="triangle" title="Háromszög" aria-label="Háromszög"><span aria-hidden="true">▲</span></button>
+            <button type="button" class="nb-shape-btn" data-nb-shape="line" title="Vonal" aria-label="Vonal"><span aria-hidden="true">━</span></button>
+            <button type="button" class="nb-shape-btn" data-nb-shape="star" title="Csillag" aria-label="Csillag"><span aria-hidden="true">★</span></button>
+            <button type="button" class="nb-shape-btn" data-nb-shape="heart" title="Szív" aria-label="Szív"><span aria-hidden="true">♥</span></button>
+          </div>
+          <div class="nb-qr-tool">
+            <label class="nb-field nb-field--text">
+              <span>QR kód szövege vagy linkje</span>
+              <input type="text" id="nb-qr-input" placeholder="https://example.hu">
+            </label>
+            <button type="button" class="nb-layer-tool nb-qr-add" id="nb-qr-add" disabled>QR kód hozzáadása</button>
+            <p class="nb-qr-hint" id="nb-qr-hint" hidden></p>
+          </div>
+        </div>
+      </div>
+
       <div class="nb-action-card nb-action-card--saved" data-nb-sheet-source="elements" data-nb-sheet-title="Mentett minták">
         <div class="nb-card-body">
           <h3 class="nb-card-title">Mentett minták</h3>
@@ -229,6 +253,10 @@
         <div class="nb-card-header">
           <h3>Megjelenés</h3>
         </div>
+        <label class="nb-field nb-field--color">
+          <span>Kitöltés szín</span>
+          <input type="color" id="nb-shape-fill" value="#111827" disabled>
+        </label>
         <label class="nb-field">
           <span>Áttűnés</span>
           <div class="nb-range">
@@ -319,6 +347,12 @@
         <span class="nb-mobile-icon-symbol">🧱</span>
         <span class="nb-mobile-icon-label">Rétegek</span>
         <span class="nb-mobile-icon-badge" hidden></span>
+      </button>
+    </div>
+    <div class="nb-mobile-toolbar-row nb-mobile-toolbar-row--secondary">
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="shapes" aria-label="Elemek">
+        <span class="nb-mobile-icon-symbol">★</span>
+        <span class="nb-mobile-icon-label">Elemek</span>
       </button>
     </div>
   </div>

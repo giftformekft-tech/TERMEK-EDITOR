@@ -347,6 +347,7 @@
   const opacityValue = document.getElementById('nb-opacity-value');
   const flipHBtn = document.getElementById('nb-flip-h');
   const flipVBtn = document.getElementById('nb-flip-v');
+  const shapeFillInput = document.getElementById('nb-shape-fill');
   const filterGrayscaleToggle = document.getElementById('nb-filter-grayscale');
   const filterSepiaToggle = document.getElementById('nb-filter-sepia');
   const filterBrightnessInput = document.getElementById('nb-filter-brightness');
@@ -360,6 +361,10 @@
   const cropToolbarEl = document.getElementById('nb-crop-toolbar');
   const cropApplyBtn = document.getElementById('nb-crop-apply');
   const cropCancelBtn = document.getElementById('nb-crop-cancel');
+  const shapeButtons = Array.from(document.querySelectorAll('[data-nb-shape]'));
+  const qrInput = document.getElementById('nb-qr-input');
+  const qrAddBtn = document.getElementById('nb-qr-add');
+  const qrHintEl = document.getElementById('nb-qr-hint');
   const zoomInBtn = document.getElementById('nb-zoom-in');
   const zoomOutBtn = document.getElementById('nb-zoom-out');
   const zoomResetBtn = document.getElementById('nb-zoom-reset');
@@ -426,6 +431,7 @@
   const sheetBundles = {
     sides: ['sides', 'double'],
     elements: ['elements'],
+    shapes: ['shapes'],
     upload: ['upload', 'templates'],
     text: ['text'],
     product: ['product', 'color', 'size', 'double'],
@@ -2687,6 +2693,7 @@
       if (opacityValue) opacityValue.textContent = '100%';
       setPressed(flipHBtn, false);
       setPressed(flipVBtn, false);
+      if (shapeFillInput) shapeFillInput.disabled = true;
       return;
     }
     const primary = targets[0];
@@ -2695,6 +2702,14 @@
     if (opacityValue) opacityValue.textContent = opacityPct + '%';
     setPressed(flipHBtn, !!primary.flipX);
     setPressed(flipVBtn, !!primary.flipY);
+    if (shapeFillInput) {
+      const allShapes = targets.every(isRecolorableShape);
+      shapeFillInput.disabled = !allShapes;
+      if (allShapes) {
+        const raw = primary[shapeColorProp(primary)];
+        shapeFillInput.value = toHexColor(typeof raw === 'string' && raw ? raw : '#111827');
+      }
+    }
   }
 
   function syncLayerList() {
@@ -3435,6 +3450,148 @@
     if (cropSession && nextActive !== cropSession.overlay) {
       applyImageCrop();
     }
+  }
+
+  const RECOLORABLE_SHAPE_TYPES = ['rect', 'circle', 'ellipse', 'triangle', 'polygon', 'path', 'line'];
+
+  function isRecolorableShape(obj) {
+    return !!obj && RECOLORABLE_SHAPE_TYPES.indexOf(obj.type) !== -1;
+  }
+
+  function shapeColorProp(obj) {
+    return obj && obj.type === 'line' ? 'stroke' : 'fill';
+  }
+
+  function buildStarPoints(spikes, outerRadius, innerRadius) {
+    const points = [];
+    const step = Math.PI / spikes;
+    let rot = -Math.PI / 2;
+    for (let i = 0; i < spikes; i++) {
+      points.push({ x: Math.cos(rot) * outerRadius, y: Math.sin(rot) * outerRadius });
+      rot += step;
+      points.push({ x: Math.cos(rot) * innerRadius, y: Math.sin(rot) * innerRadius });
+      rot += step;
+    }
+    return points;
+  }
+
+  const HEART_PATH_D = 'M 50 90 L 20 60 C 0 40 0 10 25 10 C 40 10 50 25 50 25 C 50 25 60 10 75 10 C 100 10 100 40 80 60 Z';
+
+  function addShapeToCanvas(kind) {
+    const a = c.__nb_area || fallbackArea;
+    const cx = a.x + a.w / 2;
+    const cy = a.y + a.h / 2;
+    const size = Math.max(40, Math.min(a.w, a.h) * 0.4);
+    const common = {
+      left: cx,
+      top: cy,
+      originX: 'center',
+      originY: 'center',
+      fill: '#111827',
+      cornerStyle: 'circle',
+      transparentCorners: false,
+      lockScalingFlip: true
+    };
+    let shape = null;
+    switch (kind) {
+      case 'rect':
+        shape = new fabric.Rect(Object.assign({}, common, { width: size, height: size * 0.7 }));
+        shape.__nb_layer_name = 'Téglalap';
+        break;
+      case 'circle':
+        shape = new fabric.Circle(Object.assign({}, common, { radius: size / 2 }));
+        shape.__nb_layer_name = 'Kör';
+        break;
+      case 'triangle':
+        shape = new fabric.Triangle(Object.assign({}, common, { width: size, height: size }));
+        shape.__nb_layer_name = 'Háromszög';
+        break;
+      case 'line':
+        shape = new fabric.Line([-size / 2, 0, size / 2, 0], Object.assign({}, common, {
+          fill: '',
+          stroke: '#111827',
+          strokeWidth: Math.max(4, Math.round(size * 0.06))
+        }));
+        shape.__nb_layer_name = 'Vonal';
+        break;
+      case 'star':
+        shape = new fabric.Polygon(buildStarPoints(5, size / 2, size / 4), Object.assign({}, common));
+        shape.__nb_layer_name = 'Csillag';
+        break;
+      case 'heart':
+        shape = new fabric.Path(HEART_PATH_D, Object.assign({}, common));
+        shape.scaleToWidth(size);
+        shape.__nb_layer_name = 'Szív';
+        break;
+      default:
+        return;
+    }
+    if (!shape) return;
+    c.add(shape).setActiveObject(shape);
+    keepObjectInside(shape);
+    c.requestRenderAll();
+    syncLayerList();
+  }
+
+  function qrLibAvailable() {
+    return typeof window.qrcode === 'function';
+  }
+
+  function buildQrSvgMarkup(text) {
+    const qr = window.qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    const moduleCount = qr.getModuleCount();
+    const cellSize = moduleCount > 0 ? Math.max(4, Math.round(220 / moduleCount)) : 6;
+    return qr.createSvgTag({ cellSize: cellSize, margin: cellSize * 2 });
+  }
+
+  function setQrHint(message) {
+    if (!qrHintEl) return;
+    if (message) {
+      qrHintEl.textContent = message;
+      qrHintEl.hidden = false;
+    } else {
+      qrHintEl.hidden = true;
+    }
+  }
+
+  function addQrToCanvas(text) {
+    const trimmed = (text || '').trim();
+    if (!trimmed) return;
+    if (!qrLibAvailable()) {
+      setQrHint('A QR kód generátor jelenleg nem érhető el.');
+      return;
+    }
+    let svg;
+    try {
+      svg = buildQrSvgMarkup(trimmed);
+    } catch (err) {
+      setQrHint('Ehhez a szöveghez nem hozható létre QR kód.');
+      return;
+    }
+    fabric.loadSVGFromString(svg, (objects, options) => {
+      const group = fabric.util.groupSVGElements(objects, options);
+      if (!group) return;
+      const a = c.__nb_area || fallbackArea;
+      const size = Math.max(60, Math.min(a.w, a.h) * 0.45);
+      if (typeof group.scaleToWidth === 'function') group.scaleToWidth(size);
+      group.set({
+        left: a.x + a.w / 2,
+        top: a.y + a.h / 2,
+        originX: 'center',
+        originY: 'center',
+        cornerStyle: 'circle',
+        transparentCorners: false,
+        lockScalingFlip: true
+      });
+      group.__nb_layer_name = 'QR kód';
+      c.add(group).setActiveObject(group);
+      keepObjectInside(group);
+      c.requestRenderAll();
+      setQrHint(null);
+      syncLayerList();
+    });
   }
 
   function toHexColor(color) {
@@ -4795,6 +4952,17 @@
   if (flipHBtn) flipHBtn.addEventListener('click', () => toggleFlip('horizontal'));
   if (flipVBtn) flipVBtn.addEventListener('click', () => toggleFlip('vertical'));
 
+  if (shapeFillInput) {
+    shapeFillInput.addEventListener('input', () => {
+      const targets = activeAppearanceTargets().filter(isRecolorableShape);
+      if (!targets.length) return;
+      targets.forEach(obj => obj.set(shapeColorProp(obj), shapeFillInput.value));
+      c.requestRenderAll();
+      markDesignDirty();
+      scheduleHistoryCommit();
+    });
+  }
+
   if (filterGrayscaleToggle) {
     filterGrayscaleToggle.onclick = () => {
       const next = filterGrayscaleToggle.getAttribute('aria-pressed') !== 'true';
@@ -4896,6 +5064,26 @@
   if (cropImageBtn) cropImageBtn.addEventListener('click', () => startImageCrop());
   if (cropApplyBtn) cropApplyBtn.addEventListener('click', () => applyImageCrop());
   if (cropCancelBtn) cropCancelBtn.addEventListener('click', () => cancelImageCrop());
+
+  shapeButtons.forEach(btn => {
+    btn.addEventListener('click', () => addShapeToCanvas(btn.dataset.nbShape));
+  });
+
+  if (qrInput && qrAddBtn) {
+    const syncQrAddState = () => {
+      qrAddBtn.disabled = !qrInput.value.trim();
+    };
+    qrInput.addEventListener('input', () => {
+      setQrHint(null);
+      syncQrAddState();
+    });
+    qrAddBtn.addEventListener('click', () => {
+      addQrToCanvas(qrInput.value);
+      qrInput.value = '';
+      syncQrAddState();
+    });
+    syncQrAddState();
+  }
 
   if (zoomInBtn) zoomInBtn.addEventListener('click', () => setZoomLevel(c.getZoom() + ZOOM_STEP));
   if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => setZoomLevel(c.getZoom() - ZOOM_STEP));

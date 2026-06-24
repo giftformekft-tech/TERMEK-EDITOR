@@ -6,7 +6,9 @@ add_action('wp_enqueue_scripts', function(){
     $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.5.9';
     wp_enqueue_style('nb-designer', NB_DESIGNER_URL.'assets/css/designer.css', [], $version);
     wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
-    wp_enqueue_script('nb-designer', NB_DESIGNER_URL.'assets/js/designer-app.js', ['fabric','jquery'], $version, true);
+    wp_enqueue_script('nb-qrcode', 'https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js', [], null, true);
+    wp_enqueue_script('nb-qrcode-utf8', 'https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode_UTF8.js', ['nb-qrcode'], null, true);
+    wp_enqueue_script('nb-designer', NB_DESIGNER_URL.'assets/js/designer-app.js', ['fabric','jquery','nb-qrcode-utf8'], $version, true);
     $stored = get_option('nb_settings', []);
     $settings = is_array($stored) ? $stored : [];
     $cleaned = nb_clean_settings_unicode($settings);
