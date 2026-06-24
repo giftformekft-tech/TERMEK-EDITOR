@@ -347,6 +347,12 @@
   const opacityValue = document.getElementById('nb-opacity-value');
   const flipHBtn = document.getElementById('nb-flip-h');
   const flipVBtn = document.getElementById('nb-flip-v');
+  const filterGrayscaleToggle = document.getElementById('nb-filter-grayscale');
+  const filterSepiaToggle = document.getElementById('nb-filter-sepia');
+  const filterBrightnessInput = document.getElementById('nb-filter-brightness');
+  const filterBrightnessValue = document.getElementById('nb-filter-brightness-value');
+  const filterContrastInput = document.getElementById('nb-filter-contrast');
+  const filterContrastValue = document.getElementById('nb-filter-contrast-value');
   const zoomInBtn = document.getElementById('nb-zoom-in');
   const zoomOutBtn = document.getElementById('nb-zoom-out');
   const zoomResetBtn = document.getElementById('nb-zoom-reset');
@@ -416,7 +422,7 @@
     upload: ['upload', 'templates'],
     text: ['text'],
     product: ['product', 'color', 'size', 'double'],
-    layers: ['layers', 'align', 'appearance']
+    layers: ['layers', 'align', 'appearance', 'image']
   };
   const sheetState = {
     activeKey: '',
@@ -3144,6 +3150,58 @@
     return (obj && obj.type === 'textbox') ? obj : null;
   }
 
+  function activeImage() {
+    const obj = c.getActiveObject();
+    return (obj && obj.type === 'image') ? obj : null;
+  }
+
+  function findImageFilter(obj, type) {
+    return (obj.filters || []).find(f => f && f.type === type) || null;
+  }
+
+  function setImageFilter(obj, type, filterInstance) {
+    const existing = Array.isArray(obj.filters) ? obj.filters : [];
+    obj.filters = existing.filter(f => !(f && f.type === type));
+    if (filterInstance) obj.filters.push(filterInstance);
+  }
+
+  function applyToActiveImage(cb) {
+    const obj = activeImage();
+    if (!obj) return;
+    cb(obj);
+    obj.applyFilters();
+    c.requestRenderAll();
+    markDesignDirty();
+    scheduleHistoryCommit();
+  }
+
+  function syncImageControls() {
+    const img = activeImage();
+    const hasImage = !!img;
+    [filterGrayscaleToggle, filterSepiaToggle, filterBrightnessInput, filterContrastInput].forEach(ctrl => {
+      if (ctrl) ctrl.disabled = !hasImage;
+    });
+    if (!hasImage) {
+      setPressed(filterGrayscaleToggle, false);
+      setPressed(filterSepiaToggle, false);
+      if (filterBrightnessInput) filterBrightnessInput.value = '0';
+      if (filterBrightnessValue) filterBrightnessValue.textContent = '0';
+      if (filterContrastInput) filterContrastInput.value = '0';
+      if (filterContrastValue) filterContrastValue.textContent = '0';
+      return;
+    }
+    setPressed(filterGrayscaleToggle, !!findImageFilter(img, 'Grayscale'));
+    setPressed(filterSepiaToggle, !!findImageFilter(img, 'Sepia'));
+    const brightnessFilter = findImageFilter(img, 'Brightness');
+    const brightnessPct = brightnessFilter ? Math.round(brightnessFilter.brightness * 100) : 0;
+    if (filterBrightnessInput) filterBrightnessInput.value = brightnessPct;
+    if (filterBrightnessValue) filterBrightnessValue.textContent = brightnessPct;
+    const contrastFilter = findImageFilter(img, 'Contrast');
+    const contrastPct = contrastFilter ? Math.round(contrastFilter.contrast * 100) : 0;
+    if (filterContrastInput) filterContrastInput.value = contrastPct;
+    if (filterContrastValue) filterContrastValue.textContent = contrastPct;
+  }
+
   function toHexColor(color) {
     if (!color) return '#ff0000';
     if (/^#[0-9a-f]{3,8}$/i.test(color)) return color;
@@ -4182,9 +4240,9 @@
   });
   c.on('mouse:up', () => clearSnapGuides());
   c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
-  c.on('selection:created', () => { syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
-  c.on('selection:updated', () => { syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
-  c.on('selection:cleared', () => { syncTextControls(); syncLayerList(); syncMobileSelectionUi(); });
+  c.on('selection:created', () => { syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
+  c.on('selection:updated', () => { syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
+  c.on('selection:cleared', () => { syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); });
   c.on('text:changed', e => {
     if (!isDesignObject(e.target)) return;
     initializeTextboxCurve(e.target);
@@ -4494,6 +4552,43 @@
   if (flipHBtn) flipHBtn.addEventListener('click', () => toggleFlip('horizontal'));
   if (flipVBtn) flipVBtn.addEventListener('click', () => toggleFlip('vertical'));
 
+  if (filterGrayscaleToggle) {
+    filterGrayscaleToggle.onclick = () => {
+      const next = filterGrayscaleToggle.getAttribute('aria-pressed') !== 'true';
+      setPressed(filterGrayscaleToggle, next);
+      applyToActiveImage(obj => {
+        setImageFilter(obj, 'Grayscale', next ? new fabric.Image.filters.Grayscale() : null);
+      });
+    };
+  }
+  if (filterSepiaToggle) {
+    filterSepiaToggle.onclick = () => {
+      const next = filterSepiaToggle.getAttribute('aria-pressed') !== 'true';
+      setPressed(filterSepiaToggle, next);
+      applyToActiveImage(obj => {
+        setImageFilter(obj, 'Sepia', next ? new fabric.Image.filters.Sepia() : null);
+      });
+    };
+  }
+  if (filterBrightnessInput) {
+    filterBrightnessInput.addEventListener('input', () => {
+      const pct = parseInt(filterBrightnessInput.value, 10) || 0;
+      if (filterBrightnessValue) filterBrightnessValue.textContent = pct;
+      applyToActiveImage(obj => {
+        setImageFilter(obj, 'Brightness', pct !== 0 ? new fabric.Image.filters.Brightness({ brightness: pct / 100 }) : null);
+      });
+    });
+  }
+  if (filterContrastInput) {
+    filterContrastInput.addEventListener('input', () => {
+      const pct = parseInt(filterContrastInput.value, 10) || 0;
+      if (filterContrastValue) filterContrastValue.textContent = pct;
+      applyToActiveImage(obj => {
+        setImageFilter(obj, 'Contrast', pct !== 0 ? new fabric.Image.filters.Contrast({ contrast: pct / 100 }) : null);
+      });
+    });
+  }
+
   if (zoomInBtn) zoomInBtn.addEventListener('click', () => setZoomLevel(c.getZoom() + ZOOM_STEP));
   if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => setZoomLevel(c.getZoom() - ZOOM_STEP));
   if (zoomResetBtn) zoomResetBtn.addEventListener('click', resetZoom);
@@ -4611,6 +4706,7 @@
           c.add(img);
           c.setActiveObject(img);
           keepObjectInside(img);
+          syncImageControls();
         });
         e.target.value = '';
       };

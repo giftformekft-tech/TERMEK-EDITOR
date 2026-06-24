@@ -170,6 +170,31 @@
           </div>
         </div>
       </div>
+      <div class="nb-action-card nb-action-card--image" data-nb-sheet-source="image">
+        <div class="nb-card-header">
+          <h3>Kép szerkesztése</h3>
+        </div>
+        <div class="nb-card-body">
+          <div class="nb-filter-toggles">
+            <button type="button" class="nb-toggle" id="nb-filter-grayscale" aria-pressed="false" disabled>Fekete-fehér</button>
+            <button type="button" class="nb-toggle" id="nb-filter-sepia" aria-pressed="false" disabled>Szépia</button>
+          </div>
+          <label class="nb-field">
+            <span>Fényerő</span>
+            <div class="nb-range">
+              <input type="range" id="nb-filter-brightness" min="-100" max="100" step="5" value="0" disabled>
+              <span id="nb-filter-brightness-value">0</span>
+            </div>
+          </label>
+          <label class="nb-field">
+            <span>Kontraszt</span>
+            <div class="nb-range">
+              <input type="range" id="nb-filter-contrast" min="-100" max="100" step="5" value="0" disabled>
+              <span id="nb-filter-contrast-value">0</span>
+            </div>
+          </label>
+        </div>
+      </div>
       <div class="nb-action-card nb-action-card--align" data-nb-sheet-source="align">
         <div class="nb-card-header">
           <h3>Igazítás és elosztás</h3>
