@@ -10,6 +10,10 @@
           <span class="nb-rail-icon" aria-hidden="true">⬆</span>
           <span class="nb-rail-label">Feltöltés</span>
         </button>
+        <button type="button" class="nb-rail-btn" data-nb-rail-target="addtext" aria-label="Szöveg">
+          <span class="nb-rail-icon" aria-hidden="true">✎</span>
+          <span class="nb-rail-label">Szöveg</span>
+        </button>
         <button type="button" class="nb-rail-btn" data-nb-rail-target="shapes" aria-label="Elemek">
           <span class="nb-rail-icon" aria-hidden="true">★</span>
           <span class="nb-rail-label">Elemek</span>
@@ -155,11 +159,13 @@
 
     <aside class="nb-column nb-column--summary">
       <div class="nb-rail-rest-state" id="nb-properties-panel">
-      <div class="nb-action-card" data-nb-sheet-source="text" data-nb-sheet-title="Szöveg">
+      <div class="nb-action-card" data-nb-sheet-source="addtext" data-nb-sheet-title="Szöveg">
         <button type="button" id="nb-add-text" class="nb-hero-button nb-hero-button--accent">
           <span class="nb-hero-icon">✎</span>
           <span>Írj saját feliratot</span>
         </button>
+      </div>
+      <div class="nb-action-card" data-nb-sheet-source="text">
         <div class="nb-card-body nb-card-body--text">
           <label class="nb-field nb-field--select">
             <span>Betűtípus</span>
@@ -379,7 +385,7 @@
         <span class="nb-mobile-icon-symbol">⬆</span>
         <span class="nb-mobile-icon-label">Feltöltés</span>
       </button>
-      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="text" aria-label="Szöveg">
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="addtext" aria-label="Szöveg">
         <span class="nb-mobile-icon-symbol">✎</span>
         <span class="nb-mobile-icon-label">Szöveg</span>
       </button>

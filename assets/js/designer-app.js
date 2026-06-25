@@ -449,7 +449,7 @@
     shapes: ['shapes'],
     upload: ['upload'],
     templates: ['templates'],
-    text: ['text'],
+    addtext: ['addtext'],
     product: ['product', 'color', 'size', 'double'],
     layers: ['layers'],
     properties: ['text', 'image', 'align', 'appearance', 'properties-empty']
