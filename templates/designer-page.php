@@ -21,6 +21,7 @@
         <button type="button" class="nb-rail-btn" data-nb-rail-target="layers" aria-label="Rétegek">
           <span class="nb-rail-icon" aria-hidden="true">🧱</span>
           <span class="nb-rail-label">Rétegek</span>
+          <span class="nb-mobile-icon-badge" hidden></span>
         </button>
         <button type="button" class="nb-rail-btn" data-nb-rail-target="properties" aria-label="Tulajdonságok">
           <span class="nb-rail-icon" aria-hidden="true">⚙</span>

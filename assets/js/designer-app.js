@@ -2056,24 +2056,26 @@
     mobileBulkBtn.disabled = !ready || !sizesAvailable || busy;
   }
 
-  function updateMobileLayerBadge() {
-    const btn = mobileToolbarButtons.get('layers');
-    if (!btn) return;
-    const badge = btn.querySelector('.nb-mobile-icon-badge');
+  function updateLayerBadges() {
     const count = designObjects().length;
-    if (badge) {
-      if (count > 0) {
-        badge.textContent = count > 99 ? '99+' : String(count);
-        badge.removeAttribute('hidden');
-      } else {
-        badge.setAttribute('hidden', '');
+    const hasSelection = !!activeDesignObject();
+    [mobileToolbarButtons.get('layers'), railButtons.get('layers')].forEach(btn => {
+      if (!btn) return;
+      const badge = btn.querySelector('.nb-mobile-icon-badge');
+      if (badge) {
+        if (count > 0) {
+          badge.textContent = count > 99 ? '99+' : String(count);
+          badge.removeAttribute('hidden');
+        } else {
+          badge.setAttribute('hidden', '');
+        }
       }
-    }
-    if (activeDesignObject()) {
-      btn.classList.add('has-selection');
-    } else {
-      btn.classList.remove('has-selection');
-    }
+      if (hasSelection) {
+        btn.classList.add('has-selection');
+      } else {
+        btn.classList.remove('has-selection');
+      }
+    });
   }
 
   function mobileSelectionLabelText() {
@@ -2108,7 +2110,7 @@
       }
       btn.disabled = !!disabled;
     });
-    updateMobileLayerBadge();
+    updateLayerBadges();
   }
 
   function closeMobileSheet(options) {
@@ -2231,6 +2233,7 @@
       }
     }
     flyoutState.activeKey = '';
+    flyout.classList.remove('is-open');
     flyout.setAttribute('hidden', '');
     if (designerShell) {
       designerShell.classList.remove('nb-flyout-open');
@@ -2291,6 +2294,7 @@
       designerShell.classList.add('nb-flyout-open');
     }
     flyout.removeAttribute('hidden');
+    flyout.classList.add('is-open');
     flyoutState.activeKey = key;
     updateRailActiveState();
     const focusTarget = flyoutContent.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
@@ -2862,6 +2866,7 @@
     syncGroupButtons();
     syncAlignButtons();
     syncObjectAppearance();
+    updateLayerBadges();
     if (!layerListEl) return;
     const objects = designObjects();
     layerListEl.innerHTML = '';
