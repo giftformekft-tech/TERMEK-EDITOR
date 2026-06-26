@@ -178,10 +178,16 @@
               <span id="nb-font-size-value">24 px</span>
             </div>
           </label>
-          <label class="nb-field nb-field--color">
-            <span>Betűszín</span>
-            <input type="color" id="nb-font-color" value="#ff0000">
-          </label>
+          <div class="nb-field-row">
+            <label class="nb-field nb-field--color">
+              <span>Betűszín</span>
+              <input type="color" id="nb-font-color" value="#ff0000">
+            </label>
+            <label class="nb-field nb-field--color">
+              <span>Körvonal színe</span>
+              <input type="color" id="nb-font-stroke-color" value="#000000">
+            </label>
+          </div>
           <div class="nb-text-style">
             <button type="button" class="nb-toggle" id="nb-font-bold" aria-pressed="false">B</button>
             <button type="button" class="nb-toggle" id="nb-font-italic" aria-pressed="false"><em>I</em></button>
@@ -208,10 +214,6 @@
           <details class="nb-text-advanced">
             <summary class="nb-text-advanced-summary">Effektek</summary>
             <div class="nb-text-advanced-body">
-              <label class="nb-field nb-field--color">
-                <span>Körvonal színe</span>
-                <input type="color" id="nb-font-stroke-color" value="#000000">
-              </label>
               <label class="nb-field">
                 <span>Körvonal vastagsága</span>
                 <div class="nb-range">

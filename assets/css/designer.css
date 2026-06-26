@@ -32,6 +32,7 @@
 .nb-field-label{font-size:13px;font-weight:600;color:#1e293b}
 .nb-field--select select{border:1px solid rgba(148,163,184,.55);border-radius:12px;padding:10px 14px;font-size:14px;background:#fff;color:#0f172a;box-shadow:0 4px 10px rgba(148,163,184,.15)}
 .nb-field--color input[type=color]{width:48px;height:34px;border-radius:10px;border:1px solid rgba(148,163,184,.45);background:#fff;padding:0}
+.nb-field-row{display:flex;gap:20px;flex-wrap:wrap}
 .nb-range{display:flex;align-items:center;gap:12px}
 .nb-range input[type=range]{flex:1}
 .nb-range span{font-size:12px;color:#64748b}
