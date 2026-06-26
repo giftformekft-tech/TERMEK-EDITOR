@@ -662,9 +662,36 @@
     fontFamilySel.innerHTML = '';
     const defaults = [
       { label: 'Arial', family: 'Arial' },
+      // Sans (alap / UI)
       { label: 'Roboto', family: 'Roboto', url: 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap' },
       { label: 'Montserrat', family: 'Montserrat', url: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap' },
-      { label: 'Lato', family: 'Lato', url: 'https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap' }
+      { label: 'Lato', family: 'Lato', url: 'https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap' },
+      { label: 'Inter', family: 'Inter', url: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap' },
+      { label: 'Nunito', family: 'Nunito', url: 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap' },
+      { label: 'Work Sans', family: 'Work Sans', url: 'https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;600;700&display=swap' },
+      { label: 'Rubik', family: 'Rubik', url: 'https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;700&display=swap' },
+      // Geometrikus / display sans
+      { label: 'Poppins', family: 'Poppins', url: 'https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap' },
+      { label: 'Quicksand', family: 'Quicksand', url: 'https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap' },
+      { label: 'Josefin Sans', family: 'Josefin Sans', url: 'https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;600;700&display=swap' },
+      // Kondenzált / bold display (plakát, póló-felirat)
+      { label: 'Oswald', family: 'Oswald', url: 'https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&display=swap' },
+      { label: 'Anton', family: 'Anton', url: 'https://fonts.googleapis.com/css2?family=Anton&display=swap' },
+      { label: 'Bebas Neue', family: 'Bebas Neue', url: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap' },
+      { label: 'Archivo Black', family: 'Archivo Black', url: 'https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap' },
+      // Szerif (elegáns / klasszikus)
+      { label: 'Playfair Display', family: 'Playfair Display', url: 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap' },
+      { label: 'Merriweather', family: 'Merriweather', url: 'https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap' },
+      { label: 'Lora', family: 'Lora', url: 'https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&display=swap' },
+      // Script / kézírás
+      { label: 'Caveat', family: 'Caveat', url: 'https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap' },
+      { label: 'Dancing Script', family: 'Dancing Script', url: 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap' },
+      { label: 'Pacifico', family: 'Pacifico', url: 'https://fonts.googleapis.com/css2?family=Pacifico&display=swap' },
+      // Dekoratív / karakteres
+      { label: 'Bungee', family: 'Bungee', url: 'https://fonts.googleapis.com/css2?family=Bungee&display=swap' },
+      { label: 'Righteous', family: 'Righteous', url: 'https://fonts.googleapis.com/css2?family=Righteous&display=swap' },
+      { label: 'Lobster', family: 'Lobster', url: 'https://fonts.googleapis.com/css2?family=Lobster&display=swap' },
+      { label: 'Permanent Marker', family: 'Permanent Marker', url: 'https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap' }
     ];
     defaults.forEach(addFontOption);
     fontEntries().map(parseFontEntry).forEach(addFontOption);
