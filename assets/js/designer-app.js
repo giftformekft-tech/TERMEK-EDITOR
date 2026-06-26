@@ -8,6 +8,7 @@
     h: parseInt(canvasEl.getAttribute('height'), 10) || canvasEl.height || 640
   };
   const settings = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
+  let initialMockupOverrideUrl = (typeof NB_DESIGNER !== 'undefined' && typeof NB_DESIGNER.initial_mockup_url === 'string') ? NB_DESIGNER.initial_mockup_url.trim() : '';
   const c = new fabric.Canvas('nb-canvas', { preserveObjectStacking: true, backgroundColor: '#fff' });
   c.allowTouchScrolling = true;
 
@@ -3346,7 +3347,7 @@
     const loadToken = Symbol('mockup');
     c.__nb_bg_token = loadToken;
     c.setBackgroundImage(null, c.renderAll.bind(c));
-    const mockupUrl = mockupImageUrl(mk);
+    const mockupUrl = initialMockupOverrideUrl || mockupImageUrl(mk);
     if (mockupUrl) {
       loadMockupImage(mockupUrl).then(img => {
         if (c.__nb_bg_token !== loadToken) return;
@@ -4891,17 +4892,19 @@
       populateColorsSizes();
     }
     renderModalTypes();
+    initialMockupOverrideUrl = '';
     setMockupBgAndArea();
     updateSelectionSummary();
     markDesignDirty();
   };
   if (productSel) productSel.onchange = () => {
     populateColorsSizes();
+    initialMockupOverrideUrl = '';
     setMockupBgAndArea();
     updateSelectionSummary();
     markDesignDirty();
   };
-  if (colorSel) colorSel.onchange = () => { renderColorChoices(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
+  if (colorSel) colorSel.onchange = () => { renderColorChoices(); initialMockupOverrideUrl = ''; setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
   if (sizeSel) sizeSel.onchange = () => { renderSizeButtons(); updateSelectionSummary(); markDesignDirty(); };
 
   c.on('object:added', e => {
