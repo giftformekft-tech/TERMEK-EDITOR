@@ -55,17 +55,17 @@ add_action('wp_enqueue_scripts', function(){
         nb_sync_product_color_configuration($cfg, $settings);
       }
     }
-    $initial_mockup_url = '';
+    $initial_design_image_url = '';
     $nb_product_id = isset($_GET['nb_product']) ? absint($_GET['nb_product']) : 0;
     if ($nb_product_id) {
       $attachment_id = (int) get_post_meta($nb_product_id, '_mg_last_design_attachment', true);
       if ($attachment_id) {
         $attachment_url = wp_get_attachment_url($attachment_id);
         if ($attachment_url) {
-          $initial_mockup_url = $attachment_url;
+          $initial_design_image_url = $attachment_url;
         }
       }
-      if ($initial_mockup_url === '') {
+      if ($initial_design_image_url === '') {
         $design_path = get_post_meta($nb_product_id, '_mg_last_design_path', true);
         if ($design_path) {
           $upload_dir = wp_upload_dir();
@@ -73,7 +73,7 @@ add_action('wp_enqueue_scripts', function(){
           $normalized_base = wp_normalize_path($upload_dir['basedir']);
           if (strpos($normalized_path, $normalized_base) === 0) {
             $relative_path = ltrim(substr($normalized_path, strlen($normalized_base)), '/');
-            $initial_mockup_url = $upload_dir['baseurl'].'/'.$relative_path;
+            $initial_design_image_url = $upload_dir['baseurl'].'/'.$relative_path;
           }
         }
       }
@@ -82,7 +82,7 @@ add_action('wp_enqueue_scripts', function(){
       'rest'  => esc_url_raw( rest_url('nb/v1/') ),
       'nonce' => wp_create_nonce('wp_rest'),
       'settings' => $settings,
-      'initial_mockup_url' => $initial_mockup_url,
+      'initial_design_image_url' => $initial_design_image_url,
     ]);
   }
 });

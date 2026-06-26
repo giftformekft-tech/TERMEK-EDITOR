@@ -8,7 +8,7 @@
     h: parseInt(canvasEl.getAttribute('height'), 10) || canvasEl.height || 640
   };
   const settings = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.settings) ? NB_DESIGNER.settings : {};
-  let initialMockupOverrideUrl = (typeof NB_DESIGNER !== 'undefined' && typeof NB_DESIGNER.initial_mockup_url === 'string') ? NB_DESIGNER.initial_mockup_url.trim() : '';
+  let initialDesignImageUrl = (typeof NB_DESIGNER !== 'undefined' && typeof NB_DESIGNER.initial_design_image_url === 'string') ? NB_DESIGNER.initial_design_image_url.trim() : '';
   const c = new fabric.Canvas('nb-canvas', { preserveObjectStacking: true, backgroundColor: '#fff' });
   c.allowTouchScrolling = true;
 
@@ -3347,7 +3347,7 @@
     const loadToken = Symbol('mockup');
     c.__nb_bg_token = loadToken;
     c.setBackgroundImage(null, c.renderAll.bind(c));
-    const mockupUrl = initialMockupOverrideUrl || mockupImageUrl(mk);
+    const mockupUrl = mockupImageUrl(mk);
     if (mockupUrl) {
       loadMockupImage(mockupUrl).then(img => {
         if (c.__nb_bg_token !== loadToken) return;
@@ -4744,6 +4744,31 @@
     renderBulkSizeList();
   }
 
+  function loadInitialDesignImage() {
+    const url = initialDesignImageUrl;
+    initialDesignImageUrl = '';
+    if (!url) return;
+    loadMockupImage(url).then(img => {
+      const a = c.__nb_area || fallbackArea;
+      const maxW = a.w * 0.95;
+      const maxH = a.h * 0.95;
+      const scale = Math.min(1, maxW / img.width, maxH / img.height);
+      img.scale(scale);
+      img.set({
+        left: a.x + (a.w - img.getScaledWidth()) / 2,
+        top: a.y + (a.h - img.getScaledHeight()) / 2,
+        selectable: true,
+        cornerStyle: 'circle',
+        transparentCorners: false,
+        lockScalingFlip: true
+      });
+      img.__nb_layer_name = 'Minta';
+      c.add(img);
+      c.setActiveObject(img);
+      syncImageControls();
+    }).catch(() => {});
+  }
+
   // initial populate
   populateFontOptions();
   populateTypes();
@@ -4751,7 +4776,7 @@
   populateColorsSizes();
   initAlignDefault();
   setMockupBgAndArea();
-  requestAnimationFrame(() => { setMockupBgAndArea(); });
+  requestAnimationFrame(() => { setMockupBgAndArea(); loadInitialDesignImage(); });
   updateSelectionSummary();
   syncTextControls();
   syncImageControls();
@@ -4892,19 +4917,17 @@
       populateColorsSizes();
     }
     renderModalTypes();
-    initialMockupOverrideUrl = '';
     setMockupBgAndArea();
     updateSelectionSummary();
     markDesignDirty();
   };
   if (productSel) productSel.onchange = () => {
     populateColorsSizes();
-    initialMockupOverrideUrl = '';
     setMockupBgAndArea();
     updateSelectionSummary();
     markDesignDirty();
   };
-  if (colorSel) colorSel.onchange = () => { renderColorChoices(); initialMockupOverrideUrl = ''; setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
+  if (colorSel) colorSel.onchange = () => { renderColorChoices(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };
   if (sizeSel) sizeSel.onchange = () => { renderSizeButtons(); updateSelectionSummary(); markDesignDirty(); };
 
   c.on('object:added', e => {
