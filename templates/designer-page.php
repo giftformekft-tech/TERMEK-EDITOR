@@ -182,17 +182,15 @@
             <span>Betűszín</span>
             <input type="color" id="nb-font-color" value="#ff0000">
           </label>
-          <label class="nb-field nb-field--color">
-            <span>Körvonal színe</span>
-            <input type="color" id="nb-font-stroke-color" value="#000000">
-          </label>
-          <label class="nb-field">
-            <span>Körvonal vastagsága</span>
-            <div class="nb-range">
-              <input type="range" id="nb-font-stroke-width" min="0" max="10" step="0.5" value="0">
-              <span id="nb-font-stroke-width-value">0 px</span>
+          <div class="nb-text-style">
+            <button type="button" class="nb-toggle" id="nb-font-bold" aria-pressed="false">B</button>
+            <button type="button" class="nb-toggle" id="nb-font-italic" aria-pressed="false"><em>I</em></button>
+            <div class="nb-align-group">
+              <button type="button" class="nb-toggle" data-nb-align="left" aria-pressed="false">⟸</button>
+              <button type="button" class="nb-toggle" data-nb-align="center" aria-pressed="false">≡</button>
+              <button type="button" class="nb-toggle" data-nb-align="right" aria-pressed="false">⟹</button>
             </div>
-          </label>
+          </div>
           <label class="nb-field">
             <span>Betűköz</span>
             <div class="nb-range">
@@ -207,35 +205,42 @@
               <span id="nb-line-height-value">1.16</span>
             </div>
           </label>
-          <div class="nb-text-style">
-            <button type="button" class="nb-toggle" id="nb-font-bold" aria-pressed="false">B</button>
-            <button type="button" class="nb-toggle" id="nb-font-italic" aria-pressed="false"><em>I</em></button>
-            <div class="nb-align-group">
-              <button type="button" class="nb-toggle" data-nb-align="left" aria-pressed="false">⟸</button>
-              <button type="button" class="nb-toggle" data-nb-align="center" aria-pressed="false">≡</button>
-              <button type="button" class="nb-toggle" data-nb-align="right" aria-pressed="false">⟹</button>
-            </div>
-          </div>
-          <div class="nb-field nb-field--shadow">
-            <span>Szövegárnyék</span>
-            <div class="nb-shadow-controls">
-              <input type="color" id="nb-text-shadow-color" value="#000000">
-              <div class="nb-range">
-                <input type="range" id="nb-text-shadow-blur" min="0" max="30" step="1" value="0">
-                <span id="nb-text-shadow-blur-value">Nincs</span>
+          <details class="nb-text-advanced">
+            <summary class="nb-text-advanced-summary">Effektek</summary>
+            <div class="nb-text-advanced-body">
+              <label class="nb-field nb-field--color">
+                <span>Körvonal színe</span>
+                <input type="color" id="nb-font-stroke-color" value="#000000">
+              </label>
+              <label class="nb-field">
+                <span>Körvonal vastagsága</span>
+                <div class="nb-range">
+                  <input type="range" id="nb-font-stroke-width" min="0" max="10" step="0.5" value="0">
+                  <span id="nb-font-stroke-width-value">0 px</span>
+                </div>
+              </label>
+              <div class="nb-field nb-field--shadow">
+                <span>Szövegárnyék</span>
+                <div class="nb-shadow-controls">
+                  <input type="color" id="nb-text-shadow-color" value="#000000">
+                  <div class="nb-range">
+                    <input type="range" id="nb-text-shadow-blur" min="0" max="30" step="1" value="0">
+                    <span id="nb-text-shadow-blur-value">Nincs</span>
+                  </div>
+                </div>
+              </div>
+              <div class="nb-field nb-field--curve">
+                <span>Ívesség</span>
+                <div class="nb-curve-controls">
+                  <button type="button" class="nb-toggle nb-curve-toggle" id="nb-text-curve-toggle" aria-pressed="false">Íves felirat</button>
+                  <div class="nb-range nb-curve-range">
+                    <input type="range" id="nb-text-curve" min="-100" max="100" value="0" disabled>
+                    <span id="nb-text-curve-value">Egyenes</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="nb-field nb-field--curve">
-            <span>Ívesség</span>
-            <div class="nb-curve-controls">
-              <button type="button" class="nb-toggle nb-curve-toggle" id="nb-text-curve-toggle" aria-pressed="false">Íves felirat</button>
-              <div class="nb-range nb-curve-range">
-                <input type="range" id="nb-text-curve" min="-100" max="100" value="0" disabled>
-                <span id="nb-text-curve-value">Egyenes</span>
-              </div>
-            </div>
-          </div>
+          </details>
         </div>
       </div>
       <div class="nb-action-card nb-action-card--image" data-nb-sheet-source="image">
