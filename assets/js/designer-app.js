@@ -429,14 +429,25 @@
   const designerShell = document.querySelector('.nb-designer-shell');
   const flyoutState = { activeKey: '' };
   // Wrap the WooCommerce add-to-cart form so it integrates as a mobile sheet source.
+  // Try several selectors in order of specificity so Formi Mockup variations are covered.
   (function () {
-    const cartForm = document.querySelector('form.cart');
-    if (cartForm && !cartForm.closest('[data-nb-sheet-source]')) {
+    const cartTarget =
+      document.querySelector('form.cart') ||
+      (function () {
+        const btn = document.querySelector('.single_add_to_cart_button');
+        return btn ? (btn.closest('form') || btn.parentElement) : null;
+      }()) ||
+      (function () {
+        const btn = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"]'))
+          .find(el => !el.closest('#nb-mobile-toolbar') && /kos[aá]r/i.test(el.textContent + el.value));
+        return btn ? (btn.closest('form') || btn.parentElement) : null;
+      }());
+    if (cartTarget && !cartTarget.closest('[data-nb-sheet-source]')) {
       const wrapper = document.createElement('div');
       wrapper.setAttribute('data-nb-sheet-source', 'cart');
       wrapper.setAttribute('data-nb-sheet-title', 'Kosárba');
-      cartForm.parentNode.insertBefore(wrapper, cartForm);
-      wrapper.appendChild(cartForm);
+      cartTarget.parentNode.insertBefore(wrapper, cartTarget);
+      wrapper.appendChild(cartTarget);
     }
   }());
 
