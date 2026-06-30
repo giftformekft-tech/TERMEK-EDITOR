@@ -5971,16 +5971,16 @@
 
   const processingOverlay = document.createElement('div');
   processingOverlay.id = 'nb-processing-overlay';
-  processingOverlay.setAttribute('hidden', '');
   processingOverlay.setAttribute('role', 'status');
+  processingOverlay.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,.6);z-index:999999;align-items:center;justify-content:center;';
   processingOverlay.innerHTML = '<div class="nb-processing-box"><div class="nb-processing-spinner"></div><p class="nb-processing-text">Kis türelmet, terv feldolgozása…</p></div>';
   document.body.appendChild(processingOverlay);
 
   function showProcessingOverlay() {
-    processingOverlay.removeAttribute('hidden');
+    processingOverlay.style.display = 'flex';
   }
   function hideProcessingOverlay() {
-    processingOverlay.setAttribute('hidden', '');
+    processingOverlay.style.display = 'none';
   }
 
   if (addToCartBtn) {
@@ -5989,6 +5989,7 @@
       actionSubmitting = true;
       updateActionStates();
       showProcessingOverlay();
+      await new Promise(r => requestAnimationFrame(r));
       try {
         const designId = await ensureDesignSaved();
         let res;
