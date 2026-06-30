@@ -317,7 +317,8 @@ body.nb-modal-open{overflow:hidden}
   .nb-column--actions,.nb-column--summary{display:none}
   .nb-column--stage{flex:1;min-height:0;padding:16px;position:relative}
   .nb-stage-controls{display:none}
-  .nb-zoom-controls{display:none}
+  .nb-zoom-controls{display:flex}
+  .nb-zoom-controls .nb-zoom-level,.nb-zoom-controls .nb-zoom-btn--reset{display:none}
   .nb-product-stage{flex:1}
   .nb-product-frame{padding:0;margin:0 auto;max-width:100%;width:100%;display:flex;justify-content:center;align-items:center}
   .nb-product-frame .canvas-container{max-height:calc(100dvh - 220px);margin:auto}
