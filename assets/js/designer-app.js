@@ -4991,6 +4991,50 @@
   });
   c.on('mouse:up', () => clearSnapGuides());
   c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
+
+  // Gear control: appears on the top-right corner of any selected design object.
+  // Clicking/tapping opens Tulajdonságok (flyout on desktop, sheet on mobile).
+  (function () {
+    const SZ = 22;
+    function renderGear(ctx, left, top, styleOverride, fabricObject) {
+      if (!isDesignObject(fabricObject)) return;
+      ctx.save();
+      ctx.translate(left, top);
+      ctx.beginPath();
+      ctx.arc(0, 0, SZ / 2, 0, 2 * Math.PI);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = '#bbbbbb';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.font = Math.round(SZ * 0.62) + 'px sans-serif';
+      ctx.fillStyle = '#555555';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⚙', 0, 1);
+      ctx.restore();
+    }
+    fabric.Object.prototype.controls.nb_gear = new fabric.Control({
+      x: 0.5,
+      y: -0.5,
+      offsetX: 28,
+      offsetY: 0,
+      sizeX: SZ,
+      sizeY: SZ,
+      cursorStyle: 'pointer',
+      mouseUpHandler: (eventData, transform) => {
+        if (!isDesignObject(transform.target)) return false;
+        if (mobileUiEnabled()) {
+          openMobileSheet('properties');
+        } else {
+          openFlyout('properties');
+        }
+        return true;
+      },
+      render: renderGear
+    });
+  }());
+
   c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); if (!mobileUiEnabled() && activeDesignObject()) openFlyout('properties'); });
   c.on('selection:updated', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); if (!mobileUiEnabled() && activeDesignObject()) openFlyout('properties'); });
   c.on('selection:cleared', () => { maybeAutoApplyCrop(null); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); });
