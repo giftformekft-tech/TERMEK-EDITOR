@@ -426,7 +426,7 @@
     </div>
   </div>
 
-  <div class="nb-mobile-status" id="nb-mobile-status" hidden>
+  <div class="nb-mobile-status" id="nb-mobile-status" data-nb-sheet-source="cart" data-nb-sheet-title="Rendelés" data-nb-sheet-unhide hidden>
     <div class="nb-mobile-status-info">
       <span class="nb-mobile-selection" id="nb-mobile-selection-label">Nincs kiválasztott elem</span>
       <div class="nb-mobile-quick-actions">

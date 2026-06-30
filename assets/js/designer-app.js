@@ -428,28 +428,6 @@
   const propertiesEmptyEl = document.getElementById('nb-properties-empty');
   const designerShell = document.querySelector('.nb-designer-shell');
   const flyoutState = { activeKey: '' };
-  // Wrap the WooCommerce add-to-cart form so it integrates as a mobile sheet source.
-  // Try several selectors in order of specificity so Formi Mockup variations are covered.
-  (function () {
-    const cartTarget =
-      document.querySelector('form.cart') ||
-      (function () {
-        const btn = document.querySelector('.single_add_to_cart_button');
-        return btn ? (btn.closest('form') || btn.parentElement) : null;
-      }()) ||
-      (function () {
-        const btn = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"]'))
-          .find(el => !el.closest('#nb-mobile-toolbar') && /kos[aá]r/i.test(el.textContent + el.value));
-        return btn ? (btn.closest('form') || btn.parentElement) : null;
-      }());
-    if (cartTarget && !cartTarget.closest('[data-nb-sheet-source]')) {
-      const wrapper = document.createElement('div');
-      wrapper.setAttribute('data-nb-sheet-source', 'cart');
-      wrapper.setAttribute('data-nb-sheet-title', 'Kosárba');
-      cartTarget.parentNode.insertBefore(wrapper, cartTarget);
-      wrapper.appendChild(cartTarget);
-    }
-  }());
 
   const sheetSources = new Map();
   Array.from(document.querySelectorAll('[data-nb-sheet-source]')).forEach(node => {
@@ -2049,6 +2027,10 @@
       } else {
         parent.appendChild(source.node);
       }
+      if (source._unhiddenForSheet) {
+        source.node.setAttribute('hidden', '');
+        source._unhiddenForSheet = false;
+      }
     });
   }
 
@@ -2231,6 +2213,10 @@
         titles.push(source.title);
       }
       mobileSheetContent.appendChild(source.node);
+      if (source.node.hasAttribute('data-nb-sheet-unhide') && source.node.hasAttribute('hidden')) {
+        source.node.removeAttribute('hidden');
+        source._unhiddenForSheet = true;
+      }
     });
     if (mobileSheetTitle) {
       const label = titles.length ? titles.join(' • ') : '';
@@ -2332,6 +2318,10 @@
         titles.push(source.title);
       }
       flyoutContent.appendChild(source.node);
+      if (source.node.hasAttribute('data-nb-sheet-unhide') && source.node.hasAttribute('hidden')) {
+        source.node.removeAttribute('hidden');
+        source._unhiddenForSheet = true;
+      }
     });
     if (flyoutTitle) {
       const label = titles.length ? titles.join(' • ') : '';
@@ -2364,13 +2354,6 @@
         mobileToolbar.removeAttribute('hidden');
       } else {
         mobileToolbar.setAttribute('hidden', '');
-      }
-    }
-    if (mobileStatusBar) {
-      if (enabled) {
-        mobileStatusBar.removeAttribute('hidden');
-      } else {
-        mobileStatusBar.setAttribute('hidden', '');
       }
     }
     if (!enabled) {
