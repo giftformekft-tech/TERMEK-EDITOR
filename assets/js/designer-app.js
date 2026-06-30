@@ -5969,12 +5969,18 @@
     };
   }
 
-  const processingOverlay = document.getElementById('nb-processing-overlay');
+  const processingOverlay = document.createElement('div');
+  processingOverlay.id = 'nb-processing-overlay';
+  processingOverlay.setAttribute('hidden', '');
+  processingOverlay.setAttribute('role', 'status');
+  processingOverlay.innerHTML = '<div class="nb-processing-box"><div class="nb-processing-spinner"></div><p class="nb-processing-text">Kis türelmet, terv feldolgozása…</p></div>';
+  document.body.appendChild(processingOverlay);
+
   function showProcessingOverlay() {
-    if (processingOverlay) processingOverlay.removeAttribute('hidden');
+    processingOverlay.removeAttribute('hidden');
   }
   function hideProcessingOverlay() {
-    if (processingOverlay) processingOverlay.setAttribute('hidden', '');
+    processingOverlay.setAttribute('hidden', '');
   }
 
   if (addToCartBtn) {

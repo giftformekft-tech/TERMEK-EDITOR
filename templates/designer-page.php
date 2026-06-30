@@ -545,10 +545,3 @@
     </div>
   </div>
 </div>
-
-<div id="nb-processing-overlay" hidden role="status" aria-live="polite" aria-label="Feldolgozás folyamatban">
-  <div class="nb-processing-box">
-    <div class="nb-processing-spinner"></div>
-    <p class="nb-processing-text">Kis türelmet, terv feldolgozása&hellip;</p>
-  </div>
-</div>
