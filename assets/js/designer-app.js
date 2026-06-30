@@ -469,6 +469,7 @@
   const designState = { savedDesignId: null, dirty: true };
   let saving = false;
   let savePromise = null;
+  let autoSaveTimer = null;
   let actionSubmitting = false;
   let layerIdSeq = 1;
   const availableSides = [
@@ -3315,6 +3316,16 @@
   c.upperCanvasEl.addEventListener('touchend', endTouchGesture);
   c.upperCanvasEl.addEventListener('touchcancel', endTouchGesture);
 
+  function scheduleAutoSave() {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+      autoSaveTimer = null;
+      if (!hasCompleteSelection()) return;
+      if (saving || savePromise) return;
+      persistCurrentDesign().catch(() => {});
+    }, 3000);
+  }
+
   function markDesignDirty() {
     if (sideLoading) return;
     designState.savedDesignId = null;
@@ -3326,6 +3337,7 @@
     updatePriceDisplay();
     updateActionStates();
     syncMobileSelectionUi();
+    scheduleAutoSave();
   }
 
   function setMockupBgAndArea() {
