@@ -4833,6 +4833,17 @@
   populateFontOptions();
   populateTypes();
   populateProducts();
+
+  // Pre-select product from URL ?nb_product=ID (set by "Tervezd meg!" button on product page)
+  const urlNbProductId = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.nb_product_id) ? String(NB_DESIGNER.nb_product_id) : '';
+  if (urlNbProductId && productSel) {
+    const matchOpt = Array.from(productSel.options).find(o => o.value === urlNbProductId);
+    if (matchOpt) {
+      productSel.value = urlNbProductId;
+      dispatchChangeEvent(productSel);
+    }
+  }
+
   populateColorsSizes();
   initAlignDefault();
   setMockupBgAndArea();
@@ -4846,6 +4857,39 @@
   updateSideStatus();
   updatePrintSummary();
   refreshMobileUi();
+
+  // Auto-load saved design from URL ?nb_design_id=ID (set by "Saját Terveim" edit button)
+  const urlNbDesignId = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.nb_design_id) ? parseInt(NB_DESIGNER.nb_design_id, 10) : 0;
+  if (urlNbDesignId) {
+    fetch(NB_DESIGNER.rest + 'load-design?id=' + urlNbDesignId, { headers: { 'X-WP-Nonce': NB_DESIGNER.nonce } })
+      .then(r => r.json())
+      .then(data => {
+        if (!data || !data.layers) return;
+        // Restore product/type/color/size from saved attributes before loading canvas
+        const attrs = (data.meta && data.meta.attributes_json) ? data.meta.attributes_json : null;
+        const savedPid = data.meta && data.meta.product_id ? String(data.meta.product_id) : '';
+        if (savedPid && productSel) {
+          const opt = Array.from(productSel.options).find(o => o.value === savedPid);
+          if (opt) { productSel.value = savedPid; dispatchChangeEvent(productSel); }
+        }
+        if (attrs && typeSel && attrs.pa_type) {
+          const tOpt = Array.from(typeSel.options).find(o => o.value === attrs.pa_type || o.textContent.trim() === attrs.type_label);
+          if (tOpt) { typeSel.value = tOpt.value; dispatchChangeEvent(typeSel); }
+        }
+        if (attrs && colorSel && attrs.pa_color) {
+          const cOpt = Array.from(colorSel.options).find(o => o.value === attrs.pa_color || o.dataset.original === attrs.pa_color);
+          if (cOpt) { colorSel.value = cOpt.value; dispatchChangeEvent(colorSel); }
+        }
+        if (attrs && sizeSel && attrs.pa_size) {
+          const sOpt = Array.from(sizeSel.options).find(o => o.value === attrs.pa_size);
+          if (sOpt) { sizeSel.value = sOpt.value; dispatchChangeEvent(sizeSel); }
+        }
+        loadDesign(data);
+        designState.savedDesignId = urlNbDesignId;
+        designState.dirty = false;
+      })
+      .catch(() => {});
+  }
 
   sideButtons.forEach(btn => {
     btn.addEventListener('click', () => {

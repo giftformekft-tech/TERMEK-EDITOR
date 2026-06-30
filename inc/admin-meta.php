@@ -1286,3 +1286,16 @@ add_action('admin_head', function(){
 .nb-order-designs .nb-order-design__download .nb-design-download{display:inline-block;margin-top:2px;}
 </style>';
 });
+
+// "Tervezd meg!" gomb a WooCommerce termék oldalon, ha a termék a katalógusban szerepel
+add_action('woocommerce_after_add_to_cart_button', function() {
+  if (!is_product()) return;
+  $product_id = get_the_ID();
+  $settings = nb_designer_settings_cache();
+  $catalog = $settings['catalog'] ?? [];
+  if (empty($catalog[$product_id])) return;
+  $designer_page = get_page_by_path('tervezd-meg');
+  if (!$designer_page) return;
+  $designer_url = add_query_arg('nb_product', $product_id, get_permalink($designer_page));
+  echo '<a href="' . esc_url($designer_url) . '" class="button nb-designer-cta">Tervezd meg!</a>';
+});
