@@ -5683,7 +5683,7 @@
     const height = Math.max(1, area.h || c.height || 1);
     const left = Math.max(0, area.x || 0);
     const top = Math.max(0, area.y || 0);
-    const targetWidth = 3000;
+    const targetWidth = 2000;
     const multiplierRaw = targetWidth / width;
     const multiplier = Number.isFinite(multiplierRaw) && multiplierRaw > 0 ? multiplierRaw : 1;
 
@@ -5743,7 +5743,7 @@
     let preview = '';
     let printData = { dataUrl: '', width: 0, height: 0 };
     if (hasContent && canRender) {
-      preview = withResetViewport(() => c.toDataURL({ format: 'png', multiplier: 2, left: 0, top: 0 }));
+      preview = withResetViewport(() => c.toDataURL({ format: 'png', multiplier: 1, left: 0, top: 0 }));
       printData = exportPrintImage();
     }
     return {
@@ -5773,13 +5773,14 @@
     saving = true;
     updateActionStates();
     const saveTask = (async () => {
+      await new Promise(r => setTimeout(r, 0));
       captureActiveSideState();
       const previousSide = activeSideKey;
       const frontData = await exportSideForSaving('front');
       const backData = await exportSideForSaving('back');
       await setActiveSide(previousSide);
       const shouldIncludeBack = doubleSidedEnabled && backData.hasContent;
-      const previewPng = frontData.preview || withResetViewport(() => c.toDataURL({ format: 'png', multiplier: 2, left: 0, top: 0 }));
+      const previewPng = frontData.preview || withResetViewport(() => c.toDataURL({ format: 'png', multiplier: 1, left: 0, top: 0 }));
       const printExport = frontData.printData || exportPrintImage();
       if (!printExport.dataUrl) {
         const err = new Error('print-export-failed');
