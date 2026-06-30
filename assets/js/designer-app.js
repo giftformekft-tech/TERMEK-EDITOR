@@ -2891,15 +2891,11 @@
 
   function syncPropertiesEmptyState() {
     if (!propertiesEmptyEl) return;
-    const textSection = sheetSources.get('text');
-    const textBody = textSection && textSection.node ? textSection.node.querySelector('.nb-card-body--text') : null;
-    const textHidden = !textBody || textBody.hidden;
-    const otherKeys = ['image', 'align', 'appearance'];
-    const otherHidden = otherKeys.every(key => {
+    const allHidden = ['text', 'image', 'align', 'appearance'].every(key => {
       const source = sheetSources.get(key);
       return !source || !source.node || source.node.hidden;
     });
-    propertiesEmptyEl.hidden = !(textHidden && otherHidden);
+    propertiesEmptyEl.hidden = !allHidden;
   }
 
   function syncLayerList() {
@@ -4576,8 +4572,7 @@
     const textbox = activeTextbox();
     const hasTextbox = !!textbox;
     const textSection = sheetSources.get('text');
-    const textBody = textSection && textSection.node ? textSection.node.querySelector('.nb-card-body--text') : null;
-    if (textBody) textBody.hidden = !hasTextbox;
+    if (textSection && textSection.node) textSection.node.hidden = !hasTextbox;
     if (textbox) initializeTextboxCurve(textbox);
     const controls = [
       fontFamilySel,
