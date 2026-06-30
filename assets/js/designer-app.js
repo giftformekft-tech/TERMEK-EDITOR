@@ -4991,8 +4991,8 @@
   });
   c.on('mouse:up', () => clearSnapGuides());
   c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
-  c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); });
-  c.on('selection:updated', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); });
+  c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); if (!mobileUiEnabled() && activeDesignObject()) openFlyout('properties'); });
+  c.on('selection:updated', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); if (!mobileUiEnabled() && activeDesignObject()) openFlyout('properties'); });
   c.on('selection:cleared', () => { maybeAutoApplyCrop(null); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); });
   c.on('text:changed', e => {
     if (!isDesignObject(e.target)) return;
