@@ -5073,7 +5073,7 @@
     });
   }());
 
-  c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); if (!mobileUiEnabled() && activeDesignObject()) openFlyout('properties'); });
+  c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); const _obj = activeDesignObject(); if (_obj) { if (!mobileUiEnabled()) { openFlyout('properties'); } else if (_obj.type === 'textbox' || _obj.type === 'image') { openMobileSheet('properties'); } } });
   c.on('selection:updated', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); if (!mobileUiEnabled() && activeDesignObject()) openFlyout('properties'); });
   c.on('selection:cleared', () => { maybeAutoApplyCrop(null); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); });
   c.on('text:changed', e => {
