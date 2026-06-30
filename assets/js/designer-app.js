@@ -428,6 +428,18 @@
   const propertiesEmptyEl = document.getElementById('nb-properties-empty');
   const designerShell = document.querySelector('.nb-designer-shell');
   const flyoutState = { activeKey: '' };
+  // Wrap the WooCommerce add-to-cart form so it integrates as a mobile sheet source.
+  (function () {
+    const cartForm = document.querySelector('form.cart');
+    if (cartForm && !cartForm.closest('[data-nb-sheet-source]')) {
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('data-nb-sheet-source', 'cart');
+      wrapper.setAttribute('data-nb-sheet-title', 'Kosárba');
+      cartForm.parentNode.insertBefore(wrapper, cartForm);
+      wrapper.appendChild(cartForm);
+    }
+  }());
+
   const sheetSources = new Map();
   Array.from(document.querySelectorAll('[data-nb-sheet-source]')).forEach(node => {
     const key = node.dataset.nbSheetSource;
@@ -453,7 +465,8 @@
     addtext: ['addtext'],
     product: ['product', 'color', 'size', 'double'],
     layers: ['layers'],
-    properties: ['text', 'image', 'align', 'appearance', 'properties-empty']
+    properties: ['text', 'image', 'align', 'appearance', 'properties-empty'],
+    cart: ['cart']
   };
   const sheetState = {
     activeKey: '',

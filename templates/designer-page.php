@@ -419,6 +419,10 @@
         <span class="nb-mobile-icon-symbol">⚙</span>
         <span class="nb-mobile-icon-label">Tulajdonságok</span>
       </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="cart" aria-label="Kosárba">
+        <span class="nb-mobile-icon-symbol">🛒</span>
+        <span class="nb-mobile-icon-label">Kosárba</span>
+      </button>
     </div>
   </div>
 
