@@ -469,7 +469,8 @@
   const designState = { savedDesignId: null, dirty: true };
   let saving = false;
   let savePromise = null;
-  let autoSaveTimer = null;
+  let imageCache = null;
+  let imagePregeneTimer = null;
   let actionSubmitting = false;
   let layerIdSeq = 1;
   const availableSides = [
@@ -3316,14 +3317,29 @@
   c.upperCanvasEl.addEventListener('touchend', endTouchGesture);
   c.upperCanvasEl.addEventListener('touchcancel', endTouchGesture);
 
-  function scheduleAutoSave() {
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(() => {
-      autoSaveTimer = null;
-      if (!hasCompleteSelection()) return;
-      if (saving || savePromise) return;
-      persistCurrentDesign().catch(() => {});
-    }, 3000);
+  function scheduleImagePregen() {
+    if (imagePregeneTimer) clearTimeout(imagePregeneTimer);
+    imageCache = null;
+    imagePregeneTimer = setTimeout(() => {
+      imagePregeneTimer = null;
+      if (!hasCompleteSelection() || saving || activeSideKey !== 'front') return;
+      const state = ensureSideState('front');
+      if (!state || !state.hasContent) return;
+      try {
+        const preview = withResetViewport(() => c.toDataURL({ format: 'png', multiplier: 1, left: 0, top: 0 }));
+        const printData = exportPrintImage();
+        imageCache = {
+          frontData: {
+            key: 'front',
+            hasContent: state.hasContent,
+            preview,
+            printData,
+            json: cloneSideJson(state),
+            objectCount: state.objectCount || 0
+          }
+        };
+      } catch(e) { imageCache = null; }
+    }, 2000);
   }
 
   function markDesignDirty() {
@@ -3337,7 +3353,7 @@
     updatePriceDisplay();
     updateActionStates();
     syncMobileSelectionUi();
-    scheduleAutoSave();
+    scheduleImagePregen();
   }
 
   function setMockupBgAndArea() {
@@ -5788,7 +5804,18 @@
       await new Promise(r => setTimeout(r, 0));
       captureActiveSideState();
       const previousSide = activeSideKey;
-      const frontData = await exportSideForSaving('front');
+      let frontData;
+      if (imageCache && previousSide === 'front') {
+        const freshState = ensureSideState('front');
+        frontData = {
+          ...imageCache.frontData,
+          json: cloneSideJson(freshState || {}),
+          hasContent: freshState ? freshState.hasContent : imageCache.frontData.hasContent,
+          objectCount: freshState ? (freshState.objectCount || 0) : imageCache.frontData.objectCount
+        };
+      } else {
+        frontData = await exportSideForSaving('front');
+      }
       const backData = await exportSideForSaving('back');
       await setActiveSide(previousSide);
       const shouldIncludeBack = doubleSidedEnabled && backData.hasContent;
