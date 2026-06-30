@@ -11,6 +11,9 @@
   let initialDesignImageUrl = (typeof NB_DESIGNER !== 'undefined' && typeof NB_DESIGNER.initial_design_image_url === 'string') ? NB_DESIGNER.initial_design_image_url.trim() : '';
   const c = new fabric.Canvas('nb-canvas', { preserveObjectStacking: true, backgroundColor: '#fff' });
   c.allowTouchScrolling = true;
+  // WebGL filter backend mishandles high-DPR (retina) mobile screens — only 1/4 of the
+  // filtered image renders. Canvas2D backend handles pixel ratio correctly on all devices.
+  fabric.filterBackend = new fabric.Canvas2dFilterBackend();
 
   function applyTouchAction(el) {
     if (!el || !el.style) return;
