@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Nano Banana – Terméktervező
  * Description: Terméktervező külön menüvel. Terméktípus (pl. póló/pulóver) + szín + méret, típus–szín → mockup és ár. A feltöltött képek nem mehetnek ki a print-area-ból.
- * Version: 1.6.4
+ * Version: 1.6.5
  * Author: Nano Banana
  * Requires Plugins: woocommerce
  * License: GPLv2 or later
@@ -11,7 +11,7 @@ if ( ! defined('ABSPATH') ) exit;
 
 define('NB_DESIGNER_PATH', plugin_dir_path(__FILE__));
 define('NB_DESIGNER_URL', plugin_dir_url(__FILE__));
-define('NB_DESIGNER_VERSION', '1.6.4');
+define('NB_DESIGNER_VERSION', '1.6.5');
 // A nyomdai terület fix mérete (mm), amivel a felár (terület × Ft/cm2) számolódik.
 // Szerver oldali konstans, hogy a kliens ne tudja a /save hívásban manipulálni.
 define('NB_DESIGNER_PRINT_AREA_WIDTH_MM', 300);

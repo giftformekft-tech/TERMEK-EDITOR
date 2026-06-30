@@ -247,6 +247,12 @@
 .nb-layer-controls button.nb-layer-delete:hover:not([disabled]){background:#fee2e2;border-color:#ef4444;color:#7f1d1d}
 .nb-layer-empty{font-size:12px;color:#6b7280}
 
+#nb-processing-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px)}
+#nb-processing-overlay[hidden]{display:none}
+.nb-processing-box{background:#ffffff;border-radius:20px;padding:32px 40px;display:flex;flex-direction:column;align-items:center;gap:18px;box-shadow:0 24px 48px rgba(15,23,42,.3);min-width:220px;text-align:center}
+.nb-processing-spinner{width:40px;height:40px;border:4px solid rgba(37,99,235,.15);border-top-color:#2563eb;border-radius:50%;animation:nb-spin .75s linear infinite}
+.nb-processing-text{margin:0;font-size:15px;font-weight:600;color:#1e293b;line-height:1.4}
+@keyframes nb-spin{to{transform:rotate(360deg)}}
 body.nb-modal-open{overflow:hidden}
 .nb-modal{position:fixed;inset:0;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;z-index:999}
 .nb-modal[hidden]{display:none}

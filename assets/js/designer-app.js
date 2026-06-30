@@ -5969,11 +5969,20 @@
     };
   }
 
+  const processingOverlay = document.getElementById('nb-processing-overlay');
+  function showProcessingOverlay() {
+    if (processingOverlay) processingOverlay.removeAttribute('hidden');
+  }
+  function hideProcessingOverlay() {
+    if (processingOverlay) processingOverlay.setAttribute('hidden', '');
+  }
+
   if (addToCartBtn) {
     addToCartBtn.onclick = async () => {
       if (addToCartBtn.disabled) return;
       actionSubmitting = true;
       updateActionStates();
+      showProcessingOverlay();
       try {
         const designId = await ensureDesignSaved();
         let res;
@@ -5997,6 +6006,7 @@
           window.location = j.redirect;
         }
       } catch (e) {
+        hideProcessingOverlay();
         if (e && e.userMessage) {
           alert(e.userMessage);
         } else {
