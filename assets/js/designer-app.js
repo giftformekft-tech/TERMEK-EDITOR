@@ -4369,14 +4369,19 @@
     let textValue = typeof textbox.text === 'string' ? textbox.text : '';
     const hasText = !!(textValue && textValue.length);
     const curveActive = cfg.enabled && Math.abs(cfg.amount) >= 1 && hasText;
-    // Remove collapse/restore logic to support true multi-line curved text
-    // if (curveActive) {
-    //   collapseTextboxMultilineForCurve(textbox);
-    //   textValue = typeof textbox.text === 'string' ? textbox.text : '';
-    // } else {
-    //   restoreTextboxMultilineFromCurve(textbox);
-    //   textValue = typeof textbox.text === 'string' ? textbox.text : '';
-    // }
+    // True multi-line curved text (each line on its own concentric arc) isn't implemented -
+    // the per-character deltaY stacking further below only works for fabric's normal top-down
+    // text flow, but path-mode positions every character along the SAME curve regardless of
+    // line index, so multiple lines rendered on top of one another, illegibly overlapping.
+    // Flattening to a single line while the curve is active (and restoring the original
+    // multi-line text once it's turned off) keeps curved text readable instead.
+    if (curveActive) {
+      collapseTextboxMultilineForCurve(textbox);
+      textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    } else {
+      restoreTextboxMultilineFromCurve(textbox);
+      textValue = typeof textbox.text === 'string' ? textbox.text : '';
+    }
 
     const baseStyles = baseTextboxStyles(textbox);
     const assignStyles = styles => {
@@ -4524,7 +4529,11 @@
     // Capture the visual center before mutating path/height so the object doesn't jump on
     // screen once its height is corrected below (see setPositionByOrigin call further down).
     const preCurveCenter = typeof textbox.getCenterPoint === 'function' ? textbox.getCenterPoint() : null;
-    assignPathProps(curvePath, cfg.amount >= 0 ? 'left' : 'right');
+    // pathSide:'right' isn't "bend the other way" - fabric adds a 180deg rotation to every
+    // character for it (see Text#_getCharBoundsForPath), which is what flipped negative-amount
+    // curves upside down. The bend direction is already encoded by amplitude's sign above, so
+    // pathSide should always stay 'left' (upright characters) regardless of curve direction.
+    assignPathProps(curvePath, 'left');
     // fabric's Text#initDimensions() (triggered internally by assignPathProps' set('path', ...))
     // sets width/height to the invisible curvePath's own bounding box - just the bend geometry,
     // not the rendered glyphs. That leaves the resize-handle box far smaller than the actual
