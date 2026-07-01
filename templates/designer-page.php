@@ -240,6 +240,7 @@
                     <span id="nb-text-curve-value">Egyenes</span>
                   </div>
                 </div>
+                <p class="nb-curve-hint" id="nb-text-curve-hint" hidden>Túl hosszú szöveghez nem elérhető az ívesítés – rövidítsd le a feliratot.</p>
               </div>
             </div>
           </details>

@@ -337,6 +337,7 @@
   const textCurveToggle = document.getElementById('nb-text-curve-toggle');
   const textCurveInput = document.getElementById('nb-text-curve');
   const textCurveValue = document.getElementById('nb-text-curve-value');
+  const textCurveHint = document.getElementById('nb-text-curve-hint');
   const clearButton = document.getElementById('nb-clear-design');
   const addToCartBtn = document.getElementById('nb-add-to-cart');
   const uploadInput = document.getElementById('nb-upload');
@@ -4092,6 +4093,13 @@
   }
 
   const TEXT_CURVE_MIN_FONT_SIZE = 12;
+  const TEXT_CURVE_MAX_WORDS = 6;
+
+  function textTooLongForCurve(textbox) {
+    if (!textbox || typeof textbox.text !== 'string') return false;
+    const words = textbox.text.split(/\s+/).filter(Boolean);
+    return words.length > TEXT_CURVE_MAX_WORDS;
+  }
 
   function measureTextboxWidth(textbox) {
     if (!textbox || textbox.type !== 'textbox') return 0;
@@ -4368,7 +4376,11 @@
     const cfg = state ? { enabled: !!state.enabled, amount: clampCurveAmount(state.amount) } : ensureTextboxCurveState(textbox);
     let textValue = typeof textbox.text === 'string' ? textbox.text : '';
     const hasText = !!(textValue && textValue.length);
-    const curveActive = cfg.enabled && Math.abs(cfg.amount) >= 1 && hasText;
+    // Above TEXT_CURVE_MAX_WORDS words, flattening to one line (below) would shrink the font
+    // to near-illegibility to fit the original width. Treat curve as inactive instead - the
+    // user's enabled/amount preference stays stored, so shortening the text back under the
+    // limit re-curves it automatically without needing to re-toggle anything.
+    const curveActive = cfg.enabled && Math.abs(cfg.amount) >= 1 && hasText && !textTooLongForCurve(textbox);
     // True multi-line curved text (each line on its own concentric arc) isn't implemented -
     // the per-character deltaY stacking further below only works for fabric's normal top-down
     // text flow, but path-mode positions every character along the SAME curve regardless of
@@ -4651,6 +4663,7 @@
         textCurveInput.disabled = true;
       }
       if (textCurveValue) textCurveValue.textContent = 'Egyenes';
+      if (textCurveHint) textCurveHint.hidden = true;
       return;
     }
     if (fontFamilySel) {
@@ -4704,17 +4717,19 @@
       setPressed(btn, textbox.textAlign === btn.dataset.nbAlign);
     });
     const curveState = ensureTextboxCurveState(textbox);
+    const curveTooLong = textTooLongForCurve(textbox);
     if (textCurveToggle) {
-      textCurveToggle.disabled = false;
+      textCurveToggle.disabled = curveTooLong;
       setPressed(textCurveToggle, !!curveState.enabled);
     }
     if (textCurveInput) {
-      textCurveInput.disabled = !(curveState.enabled && hasTextbox);
+      textCurveInput.disabled = curveTooLong || !(curveState.enabled && hasTextbox);
       textCurveInput.value = clampCurveAmount(curveState.amount).toString();
     }
     if (textCurveValue) {
-      textCurveValue.textContent = formatCurveLabel(curveState.amount, curveState.enabled && hasTextbox);
+      textCurveValue.textContent = formatCurveLabel(curveState.amount, curveState.enabled && hasTextbox && !curveTooLong);
     }
+    if (textCurveHint) textCurveHint.hidden = !curveTooLong;
   }
 
   function currentFontFamily() {
@@ -5170,6 +5185,7 @@
       c.requestRenderAll();
     }
     syncLayerList();
+    syncTextControls();
   });
 
   if (fontFamilySel) {
