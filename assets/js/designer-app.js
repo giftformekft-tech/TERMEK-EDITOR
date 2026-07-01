@@ -4517,8 +4517,22 @@
       curvePath.segmentsInfo = fabric.util.getPathSegmentsInfo(curvePath.path);
     }
     assignPathProps(curvePath, cfg.amount >= 0 ? 'left' : 'right');
-    const nextStyles = cloneTextboxStyles(baseStyles);
+    // fabric's Text#initDimensions() (triggered internally by assignPathProps' set('path', ...))
+    // sets width/height to the invisible curvePath's own bounding box - just the bend geometry,
+    // not the rendered glyphs. That leaves the resize-handle box far smaller than the actual
+    // text, worse with bigger fonts/more lines. Re-derive height from real text metrics so the
+    // control box tracks what's actually drawn.
     const lines = textValue.split('\n');
+    const curveFontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : DEFAULT_FONT_SIZE;
+    const curveLineHeight = Number.isFinite(textbox.lineHeight) ? textbox.lineHeight : 1.16;
+    const correctedHeight = Math.abs(amplitude) + curveFontSize * curveLineHeight * Math.max(1, lines.length);
+    if (typeof textbox.set === 'function') {
+      textbox.set('height', correctedHeight);
+    } else {
+      textbox.height = correctedHeight;
+    }
+    if (typeof textbox.setCoords === 'function') textbox.setCoords();
+    const nextStyles = cloneTextboxStyles(baseStyles);
     if (lines.length > 1) {
       const fontSize = Number.isFinite(textbox.fontSize) ? textbox.fontSize : DEFAULT_FONT_SIZE;
       const lineHeight = Number.isFinite(textbox.lineHeight) ? textbox.lineHeight : 1.16;
