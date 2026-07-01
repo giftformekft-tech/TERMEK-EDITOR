@@ -5091,7 +5091,7 @@
       ctx.fillText('⚙', 0, 1);
       ctx.restore();
     }
-    fabric.Object.prototype.controls.nb_gear = new fabric.Control({
+    const gearControl = new fabric.Control({
       x: 0.5,
       y: -0.5,
       offsetX: 28,
@@ -5110,6 +5110,12 @@
       },
       render: renderGear
     });
+    fabric.Object.prototype.controls.nb_gear = gearControl;
+    // fabric.Textbox defines its own `controls` object (does not inherit
+    // Object.prototype.controls by reference), so the gear must be added there too.
+    if (fabric.Textbox && fabric.Textbox.prototype.controls) {
+      fabric.Textbox.prototype.controls.nb_gear = gearControl;
+    }
   }());
 
   c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); if (!mobileUiEnabled() && activeDesignObject()) openFlyout('properties'); });
