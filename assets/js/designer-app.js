@@ -4508,7 +4508,12 @@
     }
 
     const amplitude = (cfg.amount / 100) * width * 0.8;
-    const curvePath = new fabric.Path(`M ${-width / 2} 0 Q 0 ${-amplitude} ${width / 2} 0`, {
+    // Bend the path symmetrically around y=0 (peak at -amplitude/2, endpoints at +amplitude/2)
+    // instead of 0..-amplitude. Combined with the height correction below (which produces a
+    // box centered on local y=0 too), this keeps the rendered glyphs roughly centered in the
+    // control box instead of hugging one edge with dead space on the other side.
+    const halfAmplitude = amplitude / 2;
+    const curvePath = new fabric.Path(`M ${-width / 2} ${halfAmplitude} Q 0 ${-halfAmplitude} ${width / 2} ${halfAmplitude}`, {
       visible: false,
       evented: false
     });
@@ -4516,6 +4521,9 @@
     if (!curvePath.segmentsInfo && fabric.util && typeof fabric.util.getPathSegmentsInfo === 'function') {
       curvePath.segmentsInfo = fabric.util.getPathSegmentsInfo(curvePath.path);
     }
+    // Capture the visual center before mutating path/height so the object doesn't jump on
+    // screen once its height is corrected below (see setPositionByOrigin call further down).
+    const preCurveCenter = typeof textbox.getCenterPoint === 'function' ? textbox.getCenterPoint() : null;
     assignPathProps(curvePath, cfg.amount >= 0 ? 'left' : 'right');
     // fabric's Text#initDimensions() (triggered internally by assignPathProps' set('path', ...))
     // sets width/height to the invisible curvePath's own bounding box - just the bend geometry,
@@ -4530,6 +4538,12 @@
       textbox.set('height', correctedHeight);
     } else {
       textbox.height = correctedHeight;
+    }
+    // Changing height shifts the object's computed center (top/left stay put), which would
+    // otherwise make the text jump on screen every time the curve amount changes. Re-anchor
+    // the center back to where it was so only the box grows/shrinks, not the visible position.
+    if (preCurveCenter && typeof textbox.setPositionByOrigin === 'function') {
+      textbox.setPositionByOrigin(preCurveCenter, 'center', 'center');
     }
     if (typeof textbox.setCoords === 'function') textbox.setCoords();
     const nextStyles = cloneTextboxStyles(baseStyles);
