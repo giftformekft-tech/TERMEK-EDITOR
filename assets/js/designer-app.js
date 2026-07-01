@@ -380,6 +380,9 @@
   const zoomOutBtn = document.getElementById('nb-zoom-out');
   const zoomResetBtn = document.getElementById('nb-zoom-reset');
   const zoomLevelEl = document.getElementById('nb-zoom-level');
+  const zoomControlsEl = document.getElementById('nb-zoom-controls');
+  const zoomControlsOriginalParent = zoomControlsEl ? zoomControlsEl.parentNode : null;
+  const zoomControlsOriginalNextSibling = zoomControlsEl ? zoomControlsEl.nextSibling : null;
   const doubleSidedToggle = document.getElementById('nb-double-sided-toggle');
   const sideStatusEl = document.getElementById('nb-side-status');
   const printSummaryEl = document.getElementById('nb-print-summary');
@@ -2353,8 +2356,29 @@
     }
   }
 
+  // Some WordPress themes apply a CSS transform/filter to a wrapper ancestor
+  // (e.g. for page transitions), which turns `position:fixed` descendants into
+  // relatively-positioned ones scoped to that ancestor instead of the viewport.
+  // Reparenting the zoom controls to document.body on mobile sidesteps that
+  // entirely, the same fix already used for the processing overlay.
+  function relocateZoomControls(mobileEnabled) {
+    if (!zoomControlsEl) return;
+    if (mobileEnabled) {
+      if (zoomControlsEl.parentNode !== document.body) {
+        document.body.appendChild(zoomControlsEl);
+      }
+    } else if (zoomControlsOriginalParent && zoomControlsEl.parentNode !== zoomControlsOriginalParent) {
+      if (zoomControlsOriginalNextSibling && zoomControlsOriginalNextSibling.parentNode === zoomControlsOriginalParent) {
+        zoomControlsOriginalParent.insertBefore(zoomControlsEl, zoomControlsOriginalNextSibling);
+      } else {
+        zoomControlsOriginalParent.appendChild(zoomControlsEl);
+      }
+    }
+  }
+
   function refreshMobileUi() {
     const enabled = mobileUiEnabled();
+    relocateZoomControls(enabled);
     if (mobileToolbar) {
       if (enabled) {
         mobileToolbar.removeAttribute('hidden');
