@@ -351,6 +351,7 @@
   const opacityValue = document.getElementById('nb-opacity-value');
   const flipHBtn = document.getElementById('nb-flip-h');
   const flipVBtn = document.getElementById('nb-flip-v');
+  const appearanceFillGroup = document.getElementById('nb-appearance-fill-group');
   const shapeFillInput = document.getElementById('nb-shape-fill');
   const patternUploadBtn = document.getElementById('nb-pattern-upload');
   const patternUploadInput = document.getElementById('nb-pattern-upload-input');
@@ -2854,6 +2855,7 @@
       if (opacityValue) opacityValue.textContent = '100%';
       setPressed(flipHBtn, false);
       setPressed(flipVBtn, false);
+      if (appearanceFillGroup) appearanceFillGroup.hidden = true;
       if (shapeFillInput) shapeFillInput.disabled = true;
       if (patternUploadBtn) patternUploadBtn.disabled = true;
       if (patternClearBtn) { patternClearBtn.disabled = true; patternClearBtn.hidden = true; }
@@ -2866,8 +2868,9 @@
     if (opacityValue) opacityValue.textContent = opacityPct + '%';
     setPressed(flipHBtn, !!primary.flipX);
     setPressed(flipVBtn, !!primary.flipY);
+    const allShapes = targets.every(isRecolorableShape);
+    if (appearanceFillGroup) appearanceFillGroup.hidden = !allShapes;
     if (shapeFillInput) {
-      const allShapes = targets.every(isRecolorableShape);
       shapeFillInput.disabled = !allShapes;
       if (patternUploadBtn) patternUploadBtn.disabled = !allShapes;
       const raw = allShapes ? primary[shapeColorProp(primary)] : null;
