@@ -106,6 +106,22 @@ function nb_home_block_render($attributes){
     'inkColor' => '#171717',
     'paperColor' => '#f5f1e8',
     'accentColor' => '#f4d35e',
+    'selectorEyebrowColor' => '#171717',
+    'selectorEyebrowSize' => 12,
+    'selectorHeadingColor' => '#171717',
+    'selectorHeadingSize' => 72,
+    'selectorIntroColor' => '#686868',
+    'selectorIntroSize' => 19,
+    'cardTitleColor' => '#171717',
+    'cardTitleSize' => 19,
+    'cardMetaColor' => '#666666',
+    'cardMetaSize' => 13,
+    'teamEyebrowColor' => '#ffffff',
+    'teamEyebrowSize' => 12,
+    'teamHeadingColor' => '#ffffff',
+    'teamHeadingSize' => 72,
+    'teamTextColor' => '#bfbfbf',
+    'teamTextSize' => 20,
     'mascotId' => 0,
     'mascotUrl' => '',
     'mascotAlt' => 'Céges kabalafigura',
@@ -123,16 +139,33 @@ function nb_home_block_render($attributes){
     return !in_array($type['key'], $hidden_keys, true);
   }));
   $team_url = $attributes['teamButtonUrl'] ?: nb_home_block_teamwear_url();
-  $block_style = sprintf(
-    '--nb-ink:%s;--nb-paper:%s;--nb-accent:%s;--nb-team-mascot-size:%dpx;--nb-header-mascot-size:%dpx;--nb-columns-desktop:%d;--nb-columns-mobile:%d;',
-    nb_home_block_color($attributes['inkColor'], '#171717'),
-    nb_home_block_color($attributes['paperColor'], '#f5f1e8'),
-    nb_home_block_color($attributes['accentColor'], '#f4d35e'),
-    nb_home_block_number($attributes['mascotSize'], 140, 560, 360),
-    nb_home_block_number($attributes['headerMascotSize'], 100, 420, 230),
-    nb_home_block_number($attributes['desktopColumns'], 1, 4, 2),
-    nb_home_block_number($attributes['mobileColumns'], 1, 2, 1)
-  );
+  $style_vars = [
+    '--nb-ink' => nb_home_block_color($attributes['inkColor'], '#171717'),
+    '--nb-paper' => nb_home_block_color($attributes['paperColor'], '#f5f1e8'),
+    '--nb-accent' => nb_home_block_color($attributes['accentColor'], '#f4d35e'),
+    '--nb-selector-eyebrow-color' => nb_home_block_color($attributes['selectorEyebrowColor'], '#171717'),
+    '--nb-selector-eyebrow-size' => nb_home_block_number($attributes['selectorEyebrowSize'], 9, 24, 12).'px',
+    '--nb-selector-heading-color' => nb_home_block_color($attributes['selectorHeadingColor'], '#171717'),
+    '--nb-selector-heading-size' => nb_home_block_number($attributes['selectorHeadingSize'], 28, 110, 72).'px',
+    '--nb-selector-intro-color' => nb_home_block_color($attributes['selectorIntroColor'], '#686868'),
+    '--nb-selector-intro-size' => nb_home_block_number($attributes['selectorIntroSize'], 12, 32, 19).'px',
+    '--nb-card-title-color' => nb_home_block_color($attributes['cardTitleColor'], '#171717'),
+    '--nb-card-title-size' => nb_home_block_number($attributes['cardTitleSize'], 12, 34, 19).'px',
+    '--nb-card-meta-color' => nb_home_block_color($attributes['cardMetaColor'], '#666666'),
+    '--nb-card-meta-size' => nb_home_block_number($attributes['cardMetaSize'], 10, 24, 13).'px',
+    '--nb-team-eyebrow-color' => nb_home_block_color($attributes['teamEyebrowColor'], '#ffffff'),
+    '--nb-team-eyebrow-size' => nb_home_block_number($attributes['teamEyebrowSize'], 9, 24, 12).'px',
+    '--nb-team-heading-color' => nb_home_block_color($attributes['teamHeadingColor'], '#ffffff'),
+    '--nb-team-heading-size' => nb_home_block_number($attributes['teamHeadingSize'], 28, 110, 72).'px',
+    '--nb-team-text-color' => nb_home_block_color($attributes['teamTextColor'], '#bfbfbf'),
+    '--nb-team-text-size' => nb_home_block_number($attributes['teamTextSize'], 12, 32, 20).'px',
+    '--nb-team-mascot-size' => nb_home_block_number($attributes['mascotSize'], 140, 560, 360).'px',
+    '--nb-header-mascot-size' => nb_home_block_number($attributes['headerMascotSize'], 100, 420, 230).'px',
+    '--nb-columns-desktop' => nb_home_block_number($attributes['desktopColumns'], 1, 4, 2),
+    '--nb-columns-mobile' => nb_home_block_number($attributes['mobileColumns'], 1, 2, 1),
+  ];
+  $block_style = '';
+  foreach ($style_vars as $property => $value) $block_style .= $property.':'.$value.';';
   $mascot_position = $attributes['mascotPosition'] === 'left' ? 'left' : 'right';
   $header_mascot_position = $attributes['headerMascotPosition'] === 'left' ? 'left' : 'right';
   $max_visible_types = nb_home_block_number($attributes['maxVisibleTypes'], 0, 100, 0);
@@ -204,7 +237,7 @@ function nb_home_block_render($attributes){
 }
 
 add_action('init', function(){
-  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.10.3';
+  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.11.0';
   wp_register_style('nb-home-block', NB_DESIGNER_URL.'assets/css/home-block.css', [], $version);
   wp_register_script(
     'nb-home-block-editor',
@@ -241,6 +274,22 @@ add_action('init', function(){
       'inkColor' => ['type' => 'string', 'default' => '#171717'],
       'paperColor' => ['type' => 'string', 'default' => '#f5f1e8'],
       'accentColor' => ['type' => 'string', 'default' => '#f4d35e'],
+      'selectorEyebrowColor' => ['type' => 'string', 'default' => '#171717'],
+      'selectorEyebrowSize' => ['type' => 'number', 'default' => 12],
+      'selectorHeadingColor' => ['type' => 'string', 'default' => '#171717'],
+      'selectorHeadingSize' => ['type' => 'number', 'default' => 72],
+      'selectorIntroColor' => ['type' => 'string', 'default' => '#686868'],
+      'selectorIntroSize' => ['type' => 'number', 'default' => 19],
+      'cardTitleColor' => ['type' => 'string', 'default' => '#171717'],
+      'cardTitleSize' => ['type' => 'number', 'default' => 19],
+      'cardMetaColor' => ['type' => 'string', 'default' => '#666666'],
+      'cardMetaSize' => ['type' => 'number', 'default' => 13],
+      'teamEyebrowColor' => ['type' => 'string', 'default' => '#ffffff'],
+      'teamEyebrowSize' => ['type' => 'number', 'default' => 12],
+      'teamHeadingColor' => ['type' => 'string', 'default' => '#ffffff'],
+      'teamHeadingSize' => ['type' => 'number', 'default' => 72],
+      'teamTextColor' => ['type' => 'string', 'default' => '#bfbfbf'],
+      'teamTextSize' => ['type' => 'number', 'default' => 20],
       'mascotId' => ['type' => 'number', 'default' => 0],
       'mascotUrl' => ['type' => 'string', 'default' => ''],
       'mascotAlt' => ['type' => 'string', 'default' => 'Céges kabalafigura'],
