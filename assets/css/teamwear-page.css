@@ -77,11 +77,17 @@
 .nb-teamwear-tier--empty { padding: 28px 0; }
 
 .nb-teamwear-types { background: var(--nbtw-white); }
-.nb-teamwear-type-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 56px; }
+.nb-teamwear-type-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 240px));
+  justify-content: start;
+  margin-top: 56px;
+}
 .nb-teamwear-type { background: var(--nbtw-paper); color: var(--nbtw-ink); display: flex; flex-direction: column; overflow: hidden; text-decoration: none; transition: transform .2s ease; }
 .nb-teamwear-type:hover { transform: translateY(-4px); }
-.nb-teamwear-type__image { align-items: center; aspect-ratio: 4/3.5; display: flex; justify-content: center; overflow: hidden; padding: 20px; }
-.nb-teamwear-type__image img { height: 100%; object-fit: contain; width: 100%; }
+.nb-teamwear-type__image { align-items: center; display: flex; height: 190px; justify-content: center; overflow: hidden; padding: 16px; }
+.nb-teamwear-type__image img { height: 100%; max-height: 160px; object-fit: contain; width: 100%; }
 .nb-teamwear-type__image svg { color: #cfc8bb; max-width: 130px; width: 45%; }
 .nb-teamwear-type__body { align-items: center; border-top: 1px solid var(--nbtw-line); display: flex; justify-content: space-between; padding: 18px; }
 .nb-teamwear-type__body strong { font-size: 18px; }
@@ -108,6 +114,7 @@
   .nb-teamwear-audiences article > span { margin-bottom: 22px; }
   .nb-teamwear-mascot--discount { margin-bottom: 0; }
   .nb-teamwear-mascot--final { opacity: .24; right: -50px; width: 280px; }
+  .nb-teamwear-type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 480px) {
@@ -115,6 +122,8 @@
   .nb-teamwear-actions { align-items: stretch; flex-direction: column; }
   .nb-teamwear-button { width: 100%; }
   .nb-teamwear-type-grid { grid-template-columns: 1fr 1fr; }
+  .nb-teamwear-type__image { height: 145px; padding: 10px; }
+  .nb-teamwear-type__image img { max-height: 125px; }
   .nb-teamwear-type__body { align-items: start; flex-direction: column; gap: 8px; }
   .nb-teamwear-steps li { grid-template-columns: 48px 1fr; }
 }

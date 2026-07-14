@@ -204,7 +204,7 @@ function nb_home_block_render($attributes){
 }
 
 add_action('init', function(){
-  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.10.2';
+  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.10.3';
   wp_register_style('nb-home-block', NB_DESIGNER_URL.'assets/css/home-block.css', [], $version);
   wp_register_script(
     'nb-home-block-editor',

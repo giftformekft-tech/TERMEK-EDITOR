@@ -63,7 +63,7 @@ function nb_teamwear_block_defaults(){
 }
 
 add_action('init', function(){
-  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.10.2';
+  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.10.3';
   wp_register_style('nb-teamwear-page', NB_DESIGNER_URL.'assets/css/teamwear-page.css', [], $version);
   wp_register_script(
     'nb-teamwear-block-editor',
@@ -100,7 +100,7 @@ add_action('init', function(){
 
 add_action('wp_enqueue_scripts', function(){
   if (!nb_teamwear_is_page()) return;
-  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.10.2';
+  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.10.3';
   wp_enqueue_style('nb-teamwear-page', NB_DESIGNER_URL.'assets/css/teamwear-page.css', [], $version);
 });
 
