@@ -9,6 +9,7 @@
   var ToggleControl = components.ToggleControl;
   var TextControl = components.TextControl;
   var SelectControl = components.SelectControl;
+  var RangeControl = components.RangeControl;
   var ColorPalette = components.ColorPalette;
   var Button = components.Button;
   var MediaUpload = blockEditor.MediaUpload;
@@ -22,6 +23,8 @@
     var visible = types.filter(function (type) {
       return hidden.indexOf(type.key) === -1;
     });
+    var limit = Number(props.maxVisibleTypes) || 0;
+    if (limit > 0) visible = visible.slice(0, limit);
 
     if (!visible.length) {
       return el('p', { className: 'nb-home-showcase__empty' }, 'Jelenleg nincs megjeleníthető terméktípus.');
@@ -58,6 +61,9 @@
       heading: { type: 'string', default: 'Válassz terméket, és tervezd meg' },
       intro: { type: 'string', default: 'Tölts fel képet vagy logót, adj hozzá szöveget, és nézd meg az eredményt azonnal.' },
       hiddenTypeKeys: { type: 'array', default: [], items: { type: 'string' } },
+      maxVisibleTypes: { type: 'number', default: 0 },
+      desktopColumns: { type: 'number', default: 2 },
+      mobileColumns: { type: 'number', default: 1 },
       showTeamSection: { type: 'boolean', default: true },
       teamEyebrow: { type: 'string', default: 'CSAPATOKNAK ÉS CÉGEKNEK' },
       teamHeading: { type: 'string', default: 'Egységes megjelenés, kedvezőbb darabár' },
@@ -70,7 +76,13 @@
       mascotId: { type: 'number', default: 0 },
       mascotUrl: { type: 'string', default: '' },
       mascotAlt: { type: 'string', default: 'Céges kabalafigura' },
-      mascotPosition: { type: 'string', default: 'right' }
+      mascotPosition: { type: 'string', default: 'right' },
+      mascotSize: { type: 'number', default: 360 },
+      headerMascotId: { type: 'number', default: 0 },
+      headerMascotUrl: { type: 'string', default: '' },
+      headerMascotAlt: { type: 'string', default: 'Céges kabalafigura a terméktípusok mellett' },
+      headerMascotPosition: { type: 'string', default: 'right' },
+      headerMascotSize: { type: 'number', default: 230 }
     },
 
     edit: function (props) {
@@ -137,6 +149,59 @@
               value: attributes.mascotPosition || 'right',
               options: [{ label: 'Jobb oldal', value: 'right' }, { label: 'Bal oldal', value: 'left' }],
               onChange: function (value) { setAttributes({ mascotPosition: value }); }
+            }),
+            el(RangeControl, {
+              label: 'Kabala mérete',
+              value: attributes.mascotSize || 360,
+              min: 140,
+              max: 560,
+              step: 10,
+              onChange: function (value) { setAttributes({ mascotSize: value }); }
+            })
+          ),
+          el(PanelBody, { title: 'Kabala a termékek felett', initialOpen: false },
+            attributes.headerMascotUrl
+              ? el('img', { src: attributes.headerMascotUrl, alt: attributes.headerMascotAlt || '', style: { maxWidth: '100%', maxHeight: '180px', objectFit: 'contain' } })
+              : el('p', null, 'Ez a figura a „Válassz terméktípust” cím mellett jelenik meg.'),
+            el(MediaUploadCheck, null,
+              el(MediaUpload, {
+                allowedTypes: ['image'],
+                value: attributes.headerMascotId,
+                onSelect: function (media) {
+                  setAttributes({
+                    headerMascotId: Number(media.id) || 0,
+                    headerMascotUrl: media.url || '',
+                    headerMascotAlt: media.alt || 'Céges kabalafigura a terméktípusok mellett'
+                  });
+                },
+                render: function (mediaProps) {
+                  return el(Button, { variant: 'secondary', onClick: mediaProps.open }, attributes.headerMascotUrl ? 'PNG cseréje' : 'PNG kiválasztása');
+                }
+              })
+            ),
+            attributes.headerMascotUrl && el(Button, {
+              variant: 'tertiary',
+              isDestructive: true,
+              onClick: function () { setAttributes({ headerMascotId: 0, headerMascotUrl: '' }); }
+            }, 'Kabala eltávolítása'),
+            el(TextControl, {
+              label: 'Helyettesítő szöveg',
+              value: attributes.headerMascotAlt || '',
+              onChange: function (value) { setAttributes({ headerMascotAlt: value }); }
+            }),
+            el(SelectControl, {
+              label: 'Kabala pozíciója',
+              value: attributes.headerMascotPosition || 'right',
+              options: [{ label: 'Jobb oldal', value: 'right' }, { label: 'Bal oldal', value: 'left' }],
+              onChange: function (value) { setAttributes({ headerMascotPosition: value }); }
+            }),
+            el(RangeControl, {
+              label: 'Kabala mérete',
+              value: attributes.headerMascotSize || 230,
+              min: 100,
+              max: 420,
+              step: 10,
+              onChange: function (value) { setAttributes({ headerMascotSize: value }); }
             })
           ),
           el(PanelBody, { title: 'Megjelenített terméktípusok', initialOpen: true },
@@ -150,6 +215,33 @@
                   });
                 })
               : el('p', null, 'Előbb vegyél fel terméktípusokat a Terméktervező beállításaiban.')
+          ),
+          el(PanelBody, { title: 'Csempeelrendezés', initialOpen: true },
+            el(RangeControl, {
+              label: 'Megjelenő csempék száma',
+              help: 'A 0 érték az összes bekapcsolt terméktípust megjeleníti.',
+              value: Number(attributes.maxVisibleTypes) || 0,
+              min: 0,
+              max: Math.max(types.length, 1),
+              step: 1,
+              onChange: function (value) { setAttributes({ maxVisibleTypes: value }); }
+            }),
+            el(RangeControl, {
+              label: 'Csempék egy sorban – PC',
+              value: Number(attributes.desktopColumns) || 2,
+              min: 1,
+              max: 4,
+              step: 1,
+              onChange: function (value) { setAttributes({ desktopColumns: value }); }
+            }),
+            el(RangeControl, {
+              label: 'Csempék egy sorban – mobil',
+              value: Number(attributes.mobileColumns) || 1,
+              min: 1,
+              max: 2,
+              step: 1,
+              onChange: function (value) { setAttributes({ mobileColumns: value }); }
+            })
           ),
           el(PanelBody, { title: 'Csapatok és munkaruha', initialOpen: false },
             el(ToggleControl, {
@@ -167,7 +259,15 @@
         ),
         el('section', {
           className: 'nb-home-showcase',
-          style: { '--nb-ink': attributes.inkColor, '--nb-paper': attributes.paperColor, '--nb-accent': attributes.accentColor }
+          style: {
+            '--nb-ink': attributes.inkColor,
+            '--nb-paper': attributes.paperColor,
+            '--nb-accent': attributes.accentColor,
+            '--nb-team-mascot-size': (attributes.mascotSize || 360) + 'px',
+            '--nb-header-mascot-size': (attributes.headerMascotSize || 230) + 'px',
+            '--nb-columns-desktop': Number(attributes.desktopColumns) || 2,
+            '--nb-columns-mobile': Number(attributes.mobileColumns) || 1
+          }
         },
           attributes.showTeamSection && el('div', {
             className: 'nb-home-team' + (attributes.mascotUrl ? ' has-mascot mascot-' + (attributes.mascotPosition || 'right') : '')
@@ -201,21 +301,30 @@
               el('div', null, el('strong', null, 'Tartós'), el('span', null, 'csapat- és munkaruházat'))
             )
           ),
-          el('header', { className: 'nb-home-showcase__header' },
-            el(RichText, {
-              tagName: 'p', className: 'nb-home-eyebrow', value: attributes.eyebrow,
-              allowedFormats: [], onChange: function (value) { setAttributes({ eyebrow: value }); }
-            }),
-            el(RichText, {
-              tagName: 'h2', value: attributes.heading,
-              allowedFormats: [], onChange: function (value) { setAttributes({ heading: value }); }
-            }),
-            el(RichText, {
-              tagName: 'p', value: attributes.intro,
-              allowedFormats: [], onChange: function (value) { setAttributes({ intro: value }); }
+          el('header', {
+            className: 'nb-home-showcase__header' + (attributes.headerMascotUrl ? ' has-mascot mascot-' + (attributes.headerMascotPosition || 'right') : '')
+          },
+            el('div', { className: 'nb-home-showcase__header-copy' },
+              el(RichText, {
+                tagName: 'p', className: 'nb-home-eyebrow', value: attributes.eyebrow,
+                allowedFormats: [], onChange: function (value) { setAttributes({ eyebrow: value }); }
+              }),
+              el(RichText, {
+                tagName: 'h2', value: attributes.heading,
+                allowedFormats: [], onChange: function (value) { setAttributes({ heading: value }); }
+              }),
+              el(RichText, {
+                tagName: 'p', value: attributes.intro,
+                allowedFormats: [], onChange: function (value) { setAttributes({ intro: value }); }
+              })
+            ),
+            attributes.headerMascotUrl && el('img', {
+              className: 'nb-home-showcase__header-mascot',
+              src: attributes.headerMascotUrl,
+              alt: attributes.headerMascotAlt || ''
             })
           ),
-          el(TypeCards, { hiddenTypeKeys: hidden })
+          el(TypeCards, { hiddenTypeKeys: hidden, maxVisibleTypes: attributes.maxVisibleTypes })
         )
       );
     },

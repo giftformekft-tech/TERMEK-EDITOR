@@ -83,12 +83,20 @@ function nb_home_block_color($value, $fallback){
   return $color ?: $fallback;
 }
 
+function nb_home_block_number($value, $min, $max, $fallback){
+  $number = is_numeric($value) ? intval($value) : intval($fallback);
+  return max(intval($min), min(intval($max), $number));
+}
+
 function nb_home_block_render($attributes){
   $defaults = [
     'eyebrow' => 'ALKOSS VALAMI SAJÁTOT',
     'heading' => 'Válassz terméket, és tervezd meg',
     'intro' => 'Tölts fel képet vagy logót, adj hozzá szöveget, és nézd meg az eredményt azonnal.',
     'hiddenTypeKeys' => [],
+    'maxVisibleTypes' => 0,
+    'desktopColumns' => 2,
+    'mobileColumns' => 1,
     'showTeamSection' => true,
     'teamEyebrow' => 'CSAPATOKNAK ÉS CÉGEKNEK',
     'teamHeading' => 'Egységes megjelenés, kedvezőbb darabár',
@@ -102,6 +110,12 @@ function nb_home_block_render($attributes){
     'mascotUrl' => '',
     'mascotAlt' => 'Céges kabalafigura',
     'mascotPosition' => 'right',
+    'mascotSize' => 360,
+    'headerMascotId' => 0,
+    'headerMascotUrl' => '',
+    'headerMascotAlt' => 'Céges kabalafigura a terméktípusok mellett',
+    'headerMascotPosition' => 'right',
+    'headerMascotSize' => 230,
   ];
   $attributes = wp_parse_args(is_array($attributes) ? $attributes : [], $defaults);
   $hidden_keys = array_map('nb_normalize_type_key', (array)$attributes['hiddenTypeKeys']);
@@ -110,12 +124,19 @@ function nb_home_block_render($attributes){
   }));
   $team_url = $attributes['teamButtonUrl'] ?: nb_home_block_teamwear_url();
   $block_style = sprintf(
-    '--nb-ink:%s;--nb-paper:%s;--nb-accent:%s;',
+    '--nb-ink:%s;--nb-paper:%s;--nb-accent:%s;--nb-team-mascot-size:%dpx;--nb-header-mascot-size:%dpx;--nb-columns-desktop:%d;--nb-columns-mobile:%d;',
     nb_home_block_color($attributes['inkColor'], '#171717'),
     nb_home_block_color($attributes['paperColor'], '#f5f1e8'),
-    nb_home_block_color($attributes['accentColor'], '#f4d35e')
+    nb_home_block_color($attributes['accentColor'], '#f4d35e'),
+    nb_home_block_number($attributes['mascotSize'], 140, 560, 360),
+    nb_home_block_number($attributes['headerMascotSize'], 100, 420, 230),
+    nb_home_block_number($attributes['desktopColumns'], 1, 4, 2),
+    nb_home_block_number($attributes['mobileColumns'], 1, 2, 1)
   );
   $mascot_position = $attributes['mascotPosition'] === 'left' ? 'left' : 'right';
+  $header_mascot_position = $attributes['headerMascotPosition'] === 'left' ? 'left' : 'right';
+  $max_visible_types = nb_home_block_number($attributes['maxVisibleTypes'], 0, 100, 0);
+  if ($max_visible_types > 0) $types = array_slice($types, 0, $max_visible_types);
 
   ob_start();
   ?>
@@ -142,10 +163,15 @@ function nb_home_block_render($attributes){
       </div>
     <?php endif; ?>
 
-    <header class="nb-home-showcase__header">
-      <p class="nb-home-eyebrow"><?php echo wp_kses_post($attributes['eyebrow']); ?></p>
-      <h2><?php echo wp_kses_post($attributes['heading']); ?></h2>
-      <p><?php echo wp_kses_post($attributes['intro']); ?></p>
+    <header class="nb-home-showcase__header<?php echo !empty($attributes['headerMascotUrl']) ? ' has-mascot mascot-'.$header_mascot_position : ''; ?>">
+      <div class="nb-home-showcase__header-copy">
+        <p class="nb-home-eyebrow"><?php echo wp_kses_post($attributes['eyebrow']); ?></p>
+        <h2><?php echo wp_kses_post($attributes['heading']); ?></h2>
+        <p><?php echo wp_kses_post($attributes['intro']); ?></p>
+      </div>
+      <?php if (!empty($attributes['headerMascotUrl'])): ?>
+        <img class="nb-home-showcase__header-mascot" src="<?php echo esc_url($attributes['headerMascotUrl']); ?>" alt="<?php echo esc_attr($attributes['headerMascotAlt']); ?>">
+      <?php endif; ?>
     </header>
 
     <?php if ($types): ?>
@@ -178,7 +204,7 @@ function nb_home_block_render($attributes){
 }
 
 add_action('init', function(){
-  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.10.0';
+  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.10.2';
   wp_register_style('nb-home-block', NB_DESIGNER_URL.'assets/css/home-block.css', [], $version);
   wp_register_script(
     'nb-home-block-editor',
@@ -203,6 +229,9 @@ add_action('init', function(){
       'heading' => ['type' => 'string', 'default' => 'Válassz terméket, és tervezd meg'],
       'intro' => ['type' => 'string', 'default' => 'Tölts fel képet vagy logót, adj hozzá szöveget, és nézd meg az eredményt azonnal.'],
       'hiddenTypeKeys' => ['type' => 'array', 'default' => [], 'items' => ['type' => 'string']],
+      'maxVisibleTypes' => ['type' => 'number', 'default' => 0],
+      'desktopColumns' => ['type' => 'number', 'default' => 2],
+      'mobileColumns' => ['type' => 'number', 'default' => 1],
       'showTeamSection' => ['type' => 'boolean', 'default' => true],
       'teamEyebrow' => ['type' => 'string', 'default' => 'CSAPATOKNAK ÉS CÉGEKNEK'],
       'teamHeading' => ['type' => 'string', 'default' => 'Egységes megjelenés, kedvezőbb darabár'],
@@ -216,6 +245,12 @@ add_action('init', function(){
       'mascotUrl' => ['type' => 'string', 'default' => ''],
       'mascotAlt' => ['type' => 'string', 'default' => 'Céges kabalafigura'],
       'mascotPosition' => ['type' => 'string', 'default' => 'right'],
+      'mascotSize' => ['type' => 'number', 'default' => 360],
+      'headerMascotId' => ['type' => 'number', 'default' => 0],
+      'headerMascotUrl' => ['type' => 'string', 'default' => ''],
+      'headerMascotAlt' => ['type' => 'string', 'default' => 'Céges kabalafigura a terméktípusok mellett'],
+      'headerMascotPosition' => ['type' => 'string', 'default' => 'right'],
+      'headerMascotSize' => ['type' => 'number', 'default' => 230],
     ],
     'supports' => [
       'align' => ['wide', 'full'],

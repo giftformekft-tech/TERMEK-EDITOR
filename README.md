@@ -8,6 +8,10 @@ A bővítmény az **„Egyedi terméktervező – főoldali blokk”** nevű din
 - A blokk oldalsávjában minden terméktípus külön megjeleníthető vagy elrejthető.
 - A sötét alapszín, a kártyák háttérszíne és a kiemelő szín a blokk oldalsávjában állítható.
 - A csapatruházati részhez átlátszó hátterű kabala-PNG tölthető fel, bal vagy jobb oldali elhelyezéssel.
+- A csapatruházati kabala mérete csúszkával állítható.
+- Külön kabala-PNG helyezhető a termékválasztó címe mellé, saját pozíció- és méretbeállítással.
+- Külön beállítható az összes megjelenő csempe száma, valamint az egy sorba kerülő csempék száma PC-n és mobilon.
+- A terméktípusok kompakt mockupképpel jelennek meg.
 - A csapatoknak, cégeknek és munkaruházathoz szóló ajánlati rész külön kapcsolható.
 - A címsorok és marketingszövegek közvetlenül a blokkszerkesztőben módosíthatók.
 - A kártyák a kiválasztott terméktípust és a hozzá rendelt WooCommerce-terméket előtöltve nyitják meg a `/tervezd-meg/` oldalt.
