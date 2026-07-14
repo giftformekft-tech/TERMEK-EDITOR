@@ -57,6 +57,7 @@ add_action('wp_enqueue_scripts', function(){
     }
     $initial_design_image_url = '';
     $nb_product_id = isset($_GET['nb_product']) ? absint($_GET['nb_product']) : 0;
+    $nb_type = isset($_GET['nb_type']) ? sanitize_text_field(wp_unslash($_GET['nb_type'])) : '';
     if ($nb_product_id) {
       $attachment_id = (int) get_post_meta($nb_product_id, '_mg_last_design_attachment', true);
       if ($attachment_id) {
@@ -94,6 +95,7 @@ add_action('wp_enqueue_scripts', function(){
       'settings' => $settings,
       'initial_design_image_url' => $initial_design_image_url,
       'nb_product_id' => $nb_product_id,
+      'nb_type' => $nb_type,
       'nb_design_id'  => $nb_design_id,
     ]);
   }

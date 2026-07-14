@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Nano Banana – Terméktervező
  * Description: Terméktervező külön menüvel. Terméktípus (pl. póló/pulóver) + szín + méret, típus–szín → mockup és ár. A feltöltött képek nem mehetnek ki a print-area-ból.
- * Version: 1.7.11
+ * Version: 1.10.0
  * Author: Nano Banana
  * Requires Plugins: woocommerce
  * License: GPLv2 or later
@@ -11,7 +11,7 @@ if ( ! defined('ABSPATH') ) exit;
 
 define('NB_DESIGNER_PATH', plugin_dir_path(__FILE__));
 define('NB_DESIGNER_URL', plugin_dir_url(__FILE__));
-define('NB_DESIGNER_VERSION', '1.7.11');
+define('NB_DESIGNER_VERSION', '1.10.0');
 // A nyomdai terület fix mérete (mm), amivel a felár (terület × Ft/cm2) számolódik.
 // Szerver oldali konstans, hogy a kliens ne tudja a /save hívásban manipulálni.
 define('NB_DESIGNER_PRINT_AREA_WIDTH_MM', 300);
@@ -22,6 +22,8 @@ require_once NB_DESIGNER_PATH.'inc/cpt.php';
 require_once NB_DESIGNER_PATH.'inc/rest.php';
 require_once NB_DESIGNER_PATH.'inc/enqueue.php';
 require_once NB_DESIGNER_PATH.'inc/shortcode.php';
+require_once NB_DESIGNER_PATH.'inc/home-block.php';
+require_once NB_DESIGNER_PATH.'inc/teamwear-page.php';
 require_once NB_DESIGNER_PATH.'inc/cart-fees.php';
 require_once NB_DESIGNER_PATH.'inc/admin-meta.php';
 require_once NB_DESIGNER_PATH.'inc/admin-menu.php';
@@ -54,4 +56,5 @@ register_activation_hook(__FILE__, function(){
       'bulk_discounts' => [],
     ]);
   }
+  if (function_exists('nb_teamwear_ensure_page')) nb_teamwear_ensure_page();
 });

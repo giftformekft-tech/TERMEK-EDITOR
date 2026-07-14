@@ -4899,6 +4899,17 @@
     }
   }
 
+  // Pre-select the configured designer type from homepage links (?nb_type=Label).
+  const urlNbType = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.nb_type) ? String(NB_DESIGNER.nb_type) : '';
+  if (urlNbType && typeSel) {
+    const normalizedUrlType = normalizedTypeValue(urlNbType);
+    const matchTypeOpt = Array.from(typeSel.options).find(o => normalizedTypeValue(o.value) === normalizedUrlType);
+    if (matchTypeOpt) {
+      typeSel.value = matchTypeOpt.value;
+      dispatchChangeEvent(typeSel);
+    }
+  }
+
   populateColorsSizes();
   initAlignDefault();
   setMockupBgAndArea();
