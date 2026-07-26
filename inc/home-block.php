@@ -7,8 +7,8 @@ if ( ! defined('ABSPATH') ) exit;
  */
 
 function nb_home_block_types(){
-  $settings = get_option('nb_settings', []);
-  $settings = nb_clean_settings_unicode(is_array($settings) ? $settings : []);
+  $settings = nb_get_settings([]);
+  $settings = nb_sync_mockup_references(nb_clean_settings_unicode(is_array($settings) ? $settings : []));
   $types = isset($settings['types']) ? nb_clean_label_list($settings['types']) : [];
   $catalog = isset($settings['catalog']) && is_array($settings['catalog']) ? $settings['catalog'] : [];
   $type_products = isset($settings['type_products']) && is_array($settings['type_products']) ? $settings['type_products'] : [];
@@ -39,9 +39,9 @@ function nb_home_block_types(){
       foreach ($catalog[$product_id]['map'] as $map_key => $mapping){
         $parts = explode('|', (string)$map_key, 2);
         if (count($parts) !== 2 || nb_normalize_type_key($parts[0]) !== $type_key) continue;
-        $mockup_index = isset($mapping['mockup_index']) ? intval($mapping['mockup_index']) : -1;
-        if ($mockup_index >= 0 && !empty($mockups[$mockup_index]['image_url'])){
-          $image_url = $mockups[$mockup_index]['image_url'];
+        $mockup = nb_mockup_by_reference($settings, $mapping, 'front');
+        if ($mockup && !empty($mockup['image_url'])){
+          $image_url = $mockup['image_url'];
           break;
         }
       }

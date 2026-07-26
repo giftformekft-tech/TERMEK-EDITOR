@@ -123,7 +123,7 @@ add_action('wp_head', function(){
 });
 
 function nb_teamwear_discount_tiers(){
-  $settings = get_option('nb_settings', []);
+  $settings = nb_get_settings([]);
   $raw = isset($settings['bulk_discounts']) ? $settings['bulk_discounts'] : [];
   return nb_normalize_bulk_discount_tiers(is_array($raw) ? $raw : []);
 }
