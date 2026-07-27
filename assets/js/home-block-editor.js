@@ -48,6 +48,34 @@
     }));
   }
 
+  function TextStyleControls(props) {
+    return el('div', { style: { marginBottom: '24px' } },
+      el('h4', null, props.label),
+      el('p', null, 'Szín'),
+      el(ColorPalette, {
+        value: props.attributes[props.colorKey],
+        clearable: false,
+        onChange: function (value) {
+          var next = {};
+          next[props.colorKey] = value || props.defaultColor;
+          props.setAttributes(next);
+        }
+      }),
+      el(RangeControl, {
+        label: 'Betűméret (px)',
+        value: Number(props.attributes[props.sizeKey]) || props.defaultSize,
+        min: props.min,
+        max: props.max,
+        step: 1,
+        onChange: function (value) {
+          var next = {};
+          next[props.sizeKey] = value;
+          props.setAttributes(next);
+        }
+      })
+    );
+  }
+
   registerBlockType('nano-banana/designer-showcase', {
     apiVersion: 2,
     title: 'Egyedi terméktervező – főoldali blokk',
@@ -73,6 +101,22 @@
       inkColor: { type: 'string', default: '#171717' },
       paperColor: { type: 'string', default: '#f5f1e8' },
       accentColor: { type: 'string', default: '#f4d35e' },
+      selectorEyebrowColor: { type: 'string', default: '#171717' },
+      selectorEyebrowSize: { type: 'number', default: 12 },
+      selectorHeadingColor: { type: 'string', default: '#171717' },
+      selectorHeadingSize: { type: 'number', default: 72 },
+      selectorIntroColor: { type: 'string', default: '#686868' },
+      selectorIntroSize: { type: 'number', default: 19 },
+      cardTitleColor: { type: 'string', default: '#171717' },
+      cardTitleSize: { type: 'number', default: 19 },
+      cardMetaColor: { type: 'string', default: '#666666' },
+      cardMetaSize: { type: 'number', default: 13 },
+      teamEyebrowColor: { type: 'string', default: '#ffffff' },
+      teamEyebrowSize: { type: 'number', default: 12 },
+      teamHeadingColor: { type: 'string', default: '#ffffff' },
+      teamHeadingSize: { type: 'number', default: 72 },
+      teamTextColor: { type: 'string', default: '#bfbfbf' },
+      teamTextSize: { type: 'number', default: 20 },
       mascotId: { type: 'number', default: 0 },
       mascotUrl: { type: 'string', default: '' },
       mascotAlt: { type: 'string', default: 'Céges kabalafigura' },
@@ -116,6 +160,42 @@
               value: attributes.accentColor,
               clearable: false,
               onChange: function (value) { setAttributes({ accentColor: value || '#f4d35e' }); }
+            })
+          ),
+          el(PanelBody, { title: 'Termékválasztó szövegei', initialOpen: false },
+            el(TextStyleControls, {
+              label: 'Felső címke', attributes: attributes, setAttributes: setAttributes,
+              colorKey: 'selectorEyebrowColor', sizeKey: 'selectorEyebrowSize', defaultColor: '#171717', defaultSize: 12, min: 9, max: 24
+            }),
+            el(TextStyleControls, {
+              label: 'Főcím', attributes: attributes, setAttributes: setAttributes,
+              colorKey: 'selectorHeadingColor', sizeKey: 'selectorHeadingSize', defaultColor: '#171717', defaultSize: 72, min: 28, max: 110
+            }),
+            el(TextStyleControls, {
+              label: 'Bevezető szöveg', attributes: attributes, setAttributes: setAttributes,
+              colorKey: 'selectorIntroColor', sizeKey: 'selectorIntroSize', defaultColor: '#686868', defaultSize: 19, min: 12, max: 32
+            }),
+            el(TextStyleControls, {
+              label: 'Termékcsempe címe', attributes: attributes, setAttributes: setAttributes,
+              colorKey: 'cardTitleColor', sizeKey: 'cardTitleSize', defaultColor: '#171717', defaultSize: 19, min: 12, max: 34
+            }),
+            el(TextStyleControls, {
+              label: 'Ár és tervezőlink', attributes: attributes, setAttributes: setAttributes,
+              colorKey: 'cardMetaColor', sizeKey: 'cardMetaSize', defaultColor: '#666666', defaultSize: 13, min: 10, max: 24
+            })
+          ),
+          el(PanelBody, { title: 'Csapatruházati szövegek', initialOpen: false },
+            el(TextStyleControls, {
+              label: 'Felső címke', attributes: attributes, setAttributes: setAttributes,
+              colorKey: 'teamEyebrowColor', sizeKey: 'teamEyebrowSize', defaultColor: '#ffffff', defaultSize: 12, min: 9, max: 24
+            }),
+            el(TextStyleControls, {
+              label: 'Főcím', attributes: attributes, setAttributes: setAttributes,
+              colorKey: 'teamHeadingColor', sizeKey: 'teamHeadingSize', defaultColor: '#ffffff', defaultSize: 72, min: 28, max: 110
+            }),
+            el(TextStyleControls, {
+              label: 'Leíró szöveg', attributes: attributes, setAttributes: setAttributes,
+              colorKey: 'teamTextColor', sizeKey: 'teamTextSize', defaultColor: '#bfbfbf', defaultSize: 20, min: 12, max: 32
             })
           ),
           el(PanelBody, { title: 'Kabalafigura PNG', initialOpen: false },
@@ -263,6 +343,22 @@
             '--nb-ink': attributes.inkColor,
             '--nb-paper': attributes.paperColor,
             '--nb-accent': attributes.accentColor,
+            '--nb-selector-eyebrow-color': attributes.selectorEyebrowColor,
+            '--nb-selector-eyebrow-size': (attributes.selectorEyebrowSize || 12) + 'px',
+            '--nb-selector-heading-color': attributes.selectorHeadingColor,
+            '--nb-selector-heading-size': (attributes.selectorHeadingSize || 72) + 'px',
+            '--nb-selector-intro-color': attributes.selectorIntroColor,
+            '--nb-selector-intro-size': (attributes.selectorIntroSize || 19) + 'px',
+            '--nb-card-title-color': attributes.cardTitleColor,
+            '--nb-card-title-size': (attributes.cardTitleSize || 19) + 'px',
+            '--nb-card-meta-color': attributes.cardMetaColor,
+            '--nb-card-meta-size': (attributes.cardMetaSize || 13) + 'px',
+            '--nb-team-eyebrow-color': attributes.teamEyebrowColor,
+            '--nb-team-eyebrow-size': (attributes.teamEyebrowSize || 12) + 'px',
+            '--nb-team-heading-color': attributes.teamHeadingColor,
+            '--nb-team-heading-size': (attributes.teamHeadingSize || 72) + 'px',
+            '--nb-team-text-color': attributes.teamTextColor,
+            '--nb-team-text-size': (attributes.teamTextSize || 20) + 'px',
             '--nb-team-mascot-size': (attributes.mascotSize || 360) + 'px',
             '--nb-header-mascot-size': (attributes.headerMascotSize || 230) + 'px',
             '--nb-columns-desktop': Number(attributes.desktopColumns) || 2,

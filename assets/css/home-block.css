@@ -59,7 +59,8 @@
 .nb-home-team.has-mascot.mascot-right .nb-home-team__benefits { margin-right: min(28%, 250px); }
 .nb-home-team.has-mascot.mascot-left .nb-home-team__copy { margin-left: min(28%, 250px); }
 .nb-home-eyebrow {
-  font-size: 12px;
+  color: var(--nb-selector-eyebrow-color, var(--nb-ink));
+  font-size: var(--nb-selector-eyebrow-size, 12px);
   font-weight: 800;
   letter-spacing: .16em;
   margin: 0 0 16px;
@@ -68,16 +69,28 @@
 
 .nb-home-team h2,
 .nb-home-showcase__header h2 {
-  font-size: clamp(36px, 5.2vw, 72px);
   letter-spacing: -.055em;
   line-height: .98;
   margin: 0;
   max-width: 880px;
 }
 
+.nb-home-team .nb-home-eyebrow {
+  color: var(--nb-team-eyebrow-color, #fff);
+  font-size: var(--nb-team-eyebrow-size, 12px);
+}
+.nb-home-team h2 {
+  color: var(--nb-team-heading-color, #fff);
+  font-size: clamp(28px, 5.2vw, var(--nb-team-heading-size, 72px));
+}
+.nb-home-showcase__header h2 {
+  color: var(--nb-selector-heading-color, var(--nb-ink));
+  font-size: clamp(28px, 5.2vw, var(--nb-selector-heading-size, 72px));
+}
+
 .nb-home-team__text {
-  color: rgba(255,255,255,.75);
-  font-size: clamp(16px, 1.5vw, 20px);
+  color: var(--nb-team-text-color, #bfbfbf);
+  font-size: clamp(12px, 1.5vw, var(--nb-team-text-size, 20px));
   line-height: 1.55;
   margin: 24px 0 32px;
   max-width: 680px;
@@ -136,8 +149,8 @@
 }
 .nb-home-showcase__header h2 { max-width: 760px; }
 .nb-home-showcase__header-copy > p:last-child {
-  color: rgba(23,23,23,.64);
-  font-size: clamp(16px, 1.4vw, 19px);
+  color: var(--nb-selector-intro-color, #686868);
+  font-size: clamp(12px, 1.4vw, var(--nb-selector-intro-size, 19px));
   line-height: 1.55;
   margin: 22px 0 0;
   max-width: 620px;
@@ -185,9 +198,9 @@
   padding: 20px;
 }
 
-.nb-home-product h3 { font-size: 19px; line-height: 1.2; margin: 0; }
-.nb-home-product__price { color: rgba(23,23,23,.6); font-size: 13px; margin: 7px 0 0; }
-.nb-home-product__link { color: var(--nb-ink); flex: 0 0 auto; font-size: 13px; font-weight: 800; text-decoration: none; }
+.nb-home-product h3 { color: var(--nb-card-title-color, var(--nb-ink)); font-size: var(--nb-card-title-size, 19px); line-height: 1.2; margin: 0; }
+.nb-home-product__price { color: var(--nb-card-meta-color, #666); font-size: var(--nb-card-meta-size, 13px); margin: 7px 0 0; }
+.nb-home-product__link { color: var(--nb-card-meta-color, var(--nb-ink)); flex: 0 0 auto; font-size: var(--nb-card-meta-size, 13px); font-weight: 800; text-decoration: none; }
 .nb-home-showcase__empty { background: var(--nb-paper); border-radius: 16px; padding: 24px; }
 
 @media (max-width: 760px) {

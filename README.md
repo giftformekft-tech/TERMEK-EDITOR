@@ -12,6 +12,8 @@ A bővítmény az **„Egyedi terméktervező – főoldali blokk”** nevű din
 - Külön kabala-PNG helyezhető a termékválasztó címe mellé, saját pozíció- és méretbeállítással.
 - Külön beállítható az összes megjelenő csempe száma, valamint az egy sorba kerülő csempék száma PC-n és mobilon.
 - A terméktípusok kompakt mockupképpel jelennek meg.
+- A termékválasztó címkéjének, főcímének, leírásának, a csempék címeinek és kisebb szövegeinek színe és betűmérete külön állítható.
+- A csapatruházati címke, főcím és leírás színe és betűmérete szintén külön szerkeszthető.
 - A csapatoknak, cégeknek és munkaruházathoz szóló ajánlati rész külön kapcsolható.
 - A címsorok és marketingszövegek közvetlenül a blokkszerkesztőben módosíthatók.
 - A kártyák a kiválasztott terméktípust és a hozzá rendelt WooCommerce-terméket előtöltve nyitják meg a `/tervezd-meg/` oldalt.
