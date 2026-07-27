@@ -263,7 +263,7 @@ if ( ! function_exists('nb_designer_settings_cache') ) {
       $cache = null;
     }
     if ($cache === null){
-      $stored = get_option('nb_settings', []);
+      $stored = nb_get_settings([]);
       $settings = is_array($stored) ? $stored : [];
 
       if (function_exists('nb_clean_settings_unicode')){
@@ -271,7 +271,7 @@ if ( ! function_exists('nb_designer_settings_cache') ) {
         $encoder = function_exists('wp_json_encode') ? 'wp_json_encode' : 'json_encode';
         if ($encoder($cleaned) !== $encoder($settings)){
           $settings = $cleaned;
-          update_option('nb_settings', $settings);
+          nb_update_settings($settings);
         } else {
           $settings = $cleaned;
         }

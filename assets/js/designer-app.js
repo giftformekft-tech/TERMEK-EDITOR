@@ -797,6 +797,10 @@
 
   function colorCodeFromText(str) {
     if (typeof str !== 'string') return '';
+    const configured = settings.color_meta && typeof settings.color_meta === 'object'
+      ? settings.color_meta[normalizedColorValue(str.replace(/\([^)]*\)/g, '').trim())]
+      : null;
+    if (configured && /^#[0-9a-f]{6}$/i.test(configured.hex || '')) return configured.hex;
     const hexMatch = str.match(/#([0-9a-f]{3,8})/i);
     if (hexMatch) return `#${hexMatch[1]}`;
     const cleaned = str.replace(/\([^)]*\)/g, '').trim().toLowerCase();
@@ -912,6 +916,12 @@
       }
       const label = opt.dataset.display || opt.textContent;
       btn.innerHTML = `<span class="nb-modal-swatch-color"></span><span class="nb-modal-swatch-label">${label}</span>`;
+      const colorMeta = settings.color_meta && settings.color_meta[normalizedColorValue(opt.dataset.rawColor || opt.dataset.original || opt.textContent)];
+      if (colorMeta && colorMeta.texture_url) {
+        const swatch = btn.querySelector('.nb-modal-swatch-color');
+        swatch.style.backgroundImage = `url("${String(colorMeta.texture_url).replace(/["\\]/g, '\\$&')}")`;
+        swatch.style.backgroundSize = 'cover';
+      }
       btn.onclick = () => {
         const previous = colorSel.value;
         colorSel.value = opt.value;
@@ -3370,7 +3380,12 @@
     c.getObjects().slice().forEach(obj => { if (obj.__nb_bg) c.remove(obj); });
     c.getObjects().slice().forEach(obj => { if (obj.__nb_area) c.remove(obj); });
 
-    const areaRaw = mk && mk.area ? Object.assign({}, mk.area) : Object.assign({}, fallbackArea);
+    const configuredAreas = mk && Array.isArray(mk.areas) ? mk.areas : [];
+    const roleArea = configuredAreas.find(candidate => candidate && candidate.role === activeSideKey);
+    const firstArea = configuredAreas.find(candidate => candidate && typeof candidate === 'object');
+    const areaRaw = roleArea
+      ? Object.assign({}, roleArea)
+      : (firstArea ? Object.assign({}, firstArea) : (mk && mk.area ? Object.assign({}, mk.area) : Object.assign({}, fallbackArea)));
     const refSize = referenceSizeForMockup(mk, areaRaw);
     const appliedSize = applyCanvasSize(refSize);
 
@@ -3407,6 +3422,13 @@
     printArea.__nb_area = true;
     c.add(printArea);
     c.__nb_area = area;
+    c.__nb_area_physical = {
+      width_mm: positiveNumberOr(areaRaw.width_mm, PRINT_AREA_WIDTH_MM),
+      height_mm: positiveNumberOr(areaRaw.height_mm, PRINT_AREA_HEIGHT_MM),
+      dpi: positiveNumberOr(areaRaw.dpi, 300),
+      id: areaRaw.id || '',
+      role: areaRaw.role || activeSideKey
+    };
     c.__nb_area_rect = printArea;
 
     const loadToken = Symbol('mockup');
@@ -3491,8 +3513,9 @@
     const displayedW = img.getScaledWidth();
     const displayedH = img.getScaledHeight();
     if (!displayedW || !displayedH) return null;
-    const widthInches = (displayedW / area.w) * PRINT_AREA_WIDTH_MM / 25.4;
-    const heightInches = (displayedH / area.h) * PRINT_AREA_HEIGHT_MM / 25.4;
+    const physical = c.__nb_area_physical || {};
+    const widthInches = (displayedW / area.w) * positiveNumberOr(physical.width_mm, PRINT_AREA_WIDTH_MM) / 25.4;
+    const heightInches = (displayedH / area.h) * positiveNumberOr(physical.height_mm, PRINT_AREA_HEIGHT_MM) / 25.4;
     const dpiX = widthInches > 0 ? nativeW / widthInches : Infinity;
     const dpiY = heightInches > 0 ? nativeH / heightInches : Infinity;
     return Math.min(dpiX, dpiY);
@@ -5957,10 +5980,11 @@
       if (typeLabel) attributes_json.type_label = typeLabel;
       if (colorLabel) attributes_json.color_label = colorLabel;
       if (sizeLabel) attributes_json.size_label = sizeLabel;
+      const physicalArea = c.__nb_area_physical || {};
       const meta = {
-        width_mm: PRINT_AREA_WIDTH_MM,
-        height_mm: PRINT_AREA_HEIGHT_MM,
-        dpi: 300,
+        width_mm: positiveNumberOr(physicalArea.width_mm, PRINT_AREA_WIDTH_MM),
+        height_mm: positiveNumberOr(physicalArea.height_mm, PRINT_AREA_HEIGHT_MM),
+        dpi: positiveNumberOr(physicalArea.dpi, 300),
         product_id: sel.pid,
         attributes_json,
         price_ctx,

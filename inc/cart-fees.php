@@ -2,7 +2,7 @@
 if ( ! defined('ABSPATH') ) exit;
 
 function nb_calc_fee_for_design($design_id, $override_ctx = []){
-  $settings = get_option('nb_settings',[]);
+  $settings = nb_get_settings([]);
   $global_per = isset($settings['fee_per_cm2']) ? floatval($settings['fee_per_cm2']) : 3;
   $global_min = isset($settings['min_fee']) ? floatval($settings['min_fee']) : 990;
 
@@ -108,10 +108,10 @@ add_action('woocommerce_cart_calculate_fees', function($cart){
     }
   }
   if ($has && $total_fee>0){
-    $cart->add_fee(__('Egyedi nyomat','nb'), $total_fee, true);
+    $cart->add_fee(__('Egyedi nyomat','nb-designer'), $total_fee, true);
   }
   if (!empty($discount_groups)){
-    $settings = get_option('nb_settings', []);
+    $settings = nb_get_settings([]);
     if (!is_array($settings)){
       $settings = [];
     }
@@ -138,7 +138,7 @@ add_action('woocommerce_cart_calculate_fees', function($cart){
       } elseif (function_exists('sanitize_text_field')) {
         $percent_label = sanitize_text_field($percent_label);
       }
-      $label = sprintf(__('Mennyiségi kedvezmény (−%s%%)','nb'), $percent_label);
+      $label = sprintf(__('Mennyiségi kedvezmény (−%s%%)','nb-designer'), $percent_label);
       $cart->add_fee($label, -$discount_amount, false);
     }
   }

@@ -9,11 +9,11 @@ add_action('wp_enqueue_scripts', function(){
     wp_enqueue_script('nb-qrcode', 'https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js', [], null, true);
     wp_enqueue_script('nb-qrcode-utf8', 'https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode_UTF8.js', ['nb-qrcode'], null, true);
     wp_enqueue_script('nb-designer', NB_DESIGNER_URL.'assets/js/designer-app.js', ['fabric','jquery','nb-qrcode-utf8'], $version, true);
-    $stored = get_option('nb_settings', []);
+    $stored = nb_get_settings([]);
     $settings = is_array($stored) ? $stored : [];
     $cleaned = nb_clean_settings_unicode($settings);
     // Clean settings but do not save on frontend load
-    $settings = $cleaned;
+    $settings = nb_sync_mockup_references($cleaned);
     if (!empty($settings['catalog']) && is_array($settings['catalog'])){
       foreach($settings['catalog'] as $pid=>&$cfg){
         if (empty($cfg['title'])) $cfg['title'] = get_the_title($pid);
@@ -102,20 +102,23 @@ add_action('wp_enqueue_scripts', function(){
 });
 
 add_action('admin_enqueue_scripts', function($hook){
-  if ( isset($_GET['page']) && $_GET['page']==='nb-designer' ) {
+  $adminPages = ['nb-designer','nb-designer-products','nb-designer-types','nb-designer-mockups','nb-designer-pricing','nb-designer-templates','nb-designer-designs','nb-designer-tools','nb-template-uploader'];
+  $currentPage = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
+  if ( in_array($currentPage, $adminPages, true) ) {
     wp_enqueue_media();
     $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.7.11';
     wp_enqueue_style('nb-admin', NB_DESIGNER_URL.'admin/css/admin.css', [], $version);
     wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
-    wp_enqueue_script('nb-admin', NB_DESIGNER_URL.'admin/js/admin.js', ['jquery','fabric'], $version, true);
-    $stored = get_option('nb_settings', []);
+    wp_enqueue_script('nb-admin', NB_DESIGNER_URL.'admin/js/admin.js', ['jquery','fabric','wp-i18n'], $version, true);
+    wp_set_script_translations('nb-admin', 'nb-designer', NB_DESIGNER_PATH.'languages');
+    $stored = nb_get_settings([]);
     $adminSettings = is_array($stored) ? $stored : [];
     $cleanedAdmin = nb_clean_settings_unicode($adminSettings);
     if (wp_json_encode($cleanedAdmin) !== wp_json_encode($adminSettings)){
-      $adminSettings = $cleanedAdmin;
-      update_option('nb_settings', $adminSettings);
+      $adminSettings = nb_sync_mockup_references($cleanedAdmin);
+      nb_update_settings($adminSettings);
     } else {
-      $adminSettings = $cleanedAdmin;
+      $adminSettings = nb_sync_mockup_references($cleanedAdmin);
     }
     if (!empty($adminSettings['catalog']) && is_array($adminSettings['catalog'])){
       foreach($adminSettings['catalog'] as $pid=>&$cfg){
@@ -160,6 +163,9 @@ add_action('admin_enqueue_scripts', function($hook){
     }
     wp_localize_script('nb-admin','NB_ADMIN',[
       'nonce' => wp_create_nonce('nb_admin'),
+      'restNonce' => wp_create_nonce('wp_rest'),
+      'rest' => esc_url_raw(rest_url('nb/v1/admin/')),
+      'historyUrl' => esc_url_raw(admin_url('admin.php?page=nb-designer-tools')),
       'ajax'  => admin_url('admin-ajax.php'),
       'settings' => $adminSettings,
     ]);

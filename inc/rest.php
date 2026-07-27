@@ -423,6 +423,11 @@ add_action('rest_api_init', function(){
       }
       $printed_sides = isset($meta['printed_sides']) ? $meta['printed_sides'] : [];
 
+      $storedSettings = nb_get_settings([]);
+      $serverSettings = nb_sync_mockup_references(is_array($storedSettings) ? $storedSettings : []);
+      $priceCtx = isset($meta['price_ctx']) && is_array($meta['price_ctx']) ? $meta['price_ctx'] : [];
+      $frontArea = nb_design_physical_area($serverSettings, $priceCtx, 'front');
+      $backArea = nb_design_physical_area($serverSettings, $priceCtx, 'back');
       $post_author = get_current_user_id();
       $post_id = wp_insert_post([
         'post_type'=>'nb_design','post_status'=>'publish',
@@ -432,9 +437,16 @@ add_action('rest_api_init', function(){
           'preview_url'     => esc_url_raw($upload['url']),
           'print_url'       => esc_url_raw($print_upload['url']),
           'layers_json'     => wp_json_encode($layers),
-          'width_mm'        => NB_DESIGNER_PRINT_AREA_WIDTH_MM,
-          'height_mm'       => NB_DESIGNER_PRINT_AREA_HEIGHT_MM,
-          'dpi'             => intval($meta['dpi']??300),
+          'width_mm'        => $frontArea['width_mm'],
+          'height_mm'       => $frontArea['height_mm'],
+          'dpi'             => $frontArea['dpi'],
+          'mockup_id'       => $frontArea['mockup_id'],
+          'print_area_id'   => $frontArea['area_id'],
+          'back_width_mm'   => $backArea['width_mm'],
+          'back_height_mm'  => $backArea['height_mm'],
+          'back_dpi'        => $backArea['dpi'],
+          'back_mockup_id'  => $backArea['mockup_id'],
+          'back_print_area_id' => $backArea['area_id'],
           'product_id'      => intval($meta['product_id']??0),
           'attributes_json' => wp_json_encode($meta['attributes_json']??[]),
           'price_ctx'       => wp_json_encode($meta['price_ctx']??[]),
@@ -473,7 +485,7 @@ add_action('rest_api_init', function(){
         return $prepared;
       }
 
-      $storedSettings = get_option('nb_settings', []);
+      $storedSettings = nb_get_settings([]);
       $settings = is_array($storedSettings) ? $storedSettings : [];
       $settings = nb_clean_settings_unicode($settings);
 
@@ -668,6 +680,6 @@ add_action('rest_api_init', function(){
 
   register_rest_route('nb/v1','/settings',[
     'methods'=>'GET','permission_callback'=>'__return_true',
-    'callback'=>function(){ return get_option('nb_settings',[]); }
+    'callback'=>function(){ return nb_public_settings(); }
   ]);
 });

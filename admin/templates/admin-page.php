@@ -1,386 +1,147 @@
-<div class="wrap nb-admin">
-  <h1>Terméktervező – Beállítások</h1>
-  <h2 class="nav-tab-wrapper">
-    <a href="?page=nb-designer&tab=products" class="nav-tab <?php echo ($tab==='products'?'nav-tab-active':''); ?>">Termékek & Típusok</a>
-    <a href="?page=nb-designer&tab=variants" class="nav-tab <?php echo ($tab==='variants'?'nav-tab-active':''); ?>">Típus–Szín mapping & Ár</a>
-    <a href="?page=nb-designer&tab=colors" class="nav-tab <?php echo ($tab==='colors'?'nav-tab-active':''); ?>">Színek</a>
-    <a href="?page=nb-designer&tab=mockups" class="nav-tab <?php echo ($tab==='mockups'?'nav-tab-active':''); ?>">Mockupok & Print-area</a>
-    <a href="?page=nb-designer&tab=fonts" class="nav-tab <?php echo ($tab==='fonts'?'nav-tab-active':''); ?>">Fontok</a>
-    <a href="?page=nb-designer&tab=pricing" class="nav-tab <?php echo ($tab==='pricing'?'nav-tab-active':''); ?>">Globális árak</a>
-  </h2>
+<?php
+if (!defined('ABSPATH')) exit;
+$settings = nb_sync_mockup_references(is_array($settings) ? $settings : []);
+$report = nb_configuration_report($settings);
+$mockups = $settings['mockups'] ?? [];
+$catalog = $settings['catalog'] ?? [];
+$selectedProducts = array_values(array_filter(array_map('intval', $settings['products'] ?? [])));
+$adminUrl = function($pageSlug, $args = []){
+  return add_query_arg(array_merge(['page'=>$pageSlug], $args), admin_url('admin.php'));
+};
+$statusLabel = empty($report['missing']) ? __('Rendben', 'nb-designer') : __('Teendő van', 'nb-designer');
+?>
+<div class="wrap nb-admin nb-admin-v2">
+  <header class="nb-page-header">
+    <div>
+      <p class="nb-eyebrow"><?php esc_html_e('Nano Banana Terméktervező · v2.0', 'nb-designer'); ?></p>
+      <h1><?php
+        $titles = [
+          'overview'=>__('Áttekintés','nb-designer'), 'products'=>__('Termékek','nb-designer'),
+          'variants'=>__('Termék konfiguráció','nb-designer'), 'colors'=>__('Típusok és színek','nb-designer'),
+          'mockups'=>__('Mockup könyvtár','nb-designer'), 'pricing'=>__('Árazás','nb-designer'),
+          'tools'=>__('Eszközök','nb-designer'),
+        ];
+        echo esc_html($titles[$tab] ?? __('Terméktervező','nb-designer'));
+      ?></h1>
+    </div>
+    <div class="nb-header-actions">
+      <span class="nb-status-pill <?php echo empty($report['missing']) ? 'is-ok' : 'is-warning'; ?>">
+        <span class="dashicons <?php echo empty($report['missing']) ? 'dashicons-yes-alt' : 'dashicons-warning'; ?>" aria-hidden="true"></span>
+        <?php echo esc_html($statusLabel); ?>
+      </span>
+      <a class="button" href="<?php echo esc_url(home_url('/tervezd-meg/')); ?>" target="_blank" rel="noopener"><?php esc_html_e('Tervező megnyitása','nb-designer'); ?></a>
+    </div>
+  </header>
 
-  <form method="post">
-    <?php wp_nonce_field('nb_save','nb_nonce'); ?>
+  <?php if ($tab === 'overview'): ?>
+    <section class="nb-stat-grid" aria-label="<?php esc_attr_e('Konfiguráció állapota','nb-designer'); ?>">
+      <article class="nb-stat-card"><span class="dashicons dashicons-products" aria-hidden="true"></span><p><?php esc_html_e('Tervezhető termék','nb-designer'); ?></p><strong><?php echo esc_html($report['products']); ?></strong><small><?php esc_html_e('publikált termék','nb-designer'); ?></small></article>
+      <article class="nb-stat-card"><span class="dashicons dashicons-screenoptions" aria-hidden="true"></span><p><?php esc_html_e('Típus–szín párosítás','nb-designer'); ?></p><strong><?php echo esc_html($report['mappings']); ?></strong><small><?php echo esc_html(sprintf(__('%1$d kész · %2$d hiányos','nb-designer'), $report['complete'], count($report['missing']))); ?></small></article>
+      <article class="nb-stat-card <?php echo !empty($report['missing']) ? 'is-danger' : ''; ?>"><span class="dashicons dashicons-format-image" aria-hidden="true"></span><p><?php esc_html_e('Hiányzó mockup','nb-designer'); ?></p><strong><?php echo esc_html(count($report['missing'])); ?></strong><small><?php esc_html_e('érintett kombináció','nb-designer'); ?></small></article>
+      <article class="nb-stat-card"><span class="dashicons dashicons-art" aria-hidden="true"></span><p><?php esc_html_e('Mockup könyvtár','nb-designer'); ?></p><strong><?php echo esc_html(count($mockups)); ?></strong><small><?php esc_html_e('stabil azonosítóval','nb-designer'); ?></small></article>
+    </section>
+    <section class="nb-panel">
+      <div class="nb-panel-heading"><div><h2><?php esc_html_e('Teendők','nb-designer'); ?></h2><p><?php esc_html_e('Determinista ellenőrzések a vásárlói útvonal alapján.','nb-designer'); ?></p></div><span class="nb-count-badge"><?php echo esc_html(count($report['missing']) + count($report['mockups_without_area']) + count($report['types_without_product']) + count($report['unused_colors'])); ?></span></div>
+      <div class="nb-task-list">
+        <?php if (!empty($report['missing'])): ?>
+          <a class="nb-task is-danger" href="<?php echo esc_url($adminUrl('nb-designer-products')); ?>"><span class="dashicons dashicons-warning"></span><span><strong><?php echo esc_html(sprintf(__('%d párosításhoz nincs előlapi mockup','nb-designer'), count($report['missing']))); ?></strong><small><?php esc_html_e('A vásárló ezeknél nem lát megfelelő termékképet.','nb-designer'); ?></small></span><span aria-hidden="true">→</span></a>
+        <?php endif; ?>
+        <?php if (!empty($report['mockups_without_area'])): ?>
+          <a class="nb-task is-warning" href="<?php echo esc_url($adminUrl('nb-designer-mockups')); ?>"><span class="dashicons dashicons-warning"></span><span><strong><?php echo esc_html(sprintf(__('%d mockup fizikai mérete hiányzik','nb-designer'), count($report['mockups_without_area']))); ?></strong><small><?php esc_html_e('Az árazás a kompatibilitási alapértékkel számol.','nb-designer'); ?></small></span><span aria-hidden="true">→</span></a>
+        <?php endif; ?>
+        <?php if (!empty($report['types_without_product'])): ?>
+          <a class="nb-task is-warning" href="<?php echo esc_url($adminUrl('nb-designer-products')); ?>"><span class="dashicons dashicons-cart"></span><span><strong><?php echo esc_html(sprintf(__('%d típushoz nincs WooCommerce termék rendelve','nb-designer'), count($report['types_without_product']))); ?></strong><small><?php echo esc_html(implode(', ', $report['types_without_product'])); ?></small></span><span aria-hidden="true">→</span></a>
+        <?php endif; ?>
+        <?php if (!empty($report['unused_colors'])): ?>
+          <a class="nb-task" href="<?php echo esc_url($adminUrl('nb-designer-types')); ?>"><span class="dashicons dashicons-art"></span><span><strong><?php echo esc_html(sprintf(__('%d szín nincs típushoz rendelve','nb-designer'), count($report['unused_colors']))); ?></strong><small><?php echo esc_html(implode(', ', $report['unused_colors'])); ?></small></span><span aria-hidden="true">→</span></a>
+        <?php endif; ?>
+        <?php if (empty($report['missing']) && empty($report['mockups_without_area']) && empty($report['types_without_product']) && empty($report['unused_colors'])): ?>
+          <div class="nb-empty-state"><span class="dashicons dashicons-yes-alt"></span><h3><?php esc_html_e('A konfiguráció teljes','nb-designer'); ?></h3><p><?php esc_html_e('Nem találtunk javítandó beállítást.','nb-designer'); ?></p></div>
+        <?php endif; ?>
+      </div>
+    </section>
 
-    <?php if ($tab==='products'): ?>
-      <h2>Tervezhető termékek</h2>
-      <div class="nb-products-toolbar">
-        <label for="nb-product-search">Keresés:</label>
-        <input type="search" id="nb-product-search" class="nb-product-search" placeholder="Keress terméknévre vagy azonosítóra..." autocomplete="off" />
-        <span class="nb-products-count" aria-live="polite"></span>
-      </div>
-      <div class="nb-products">
-        <?php
-          $product_query = new WP_Query([
-            'post_type'      => 'product',
-            'posts_per_page' => -1,
-            'post_status'    => 'publish',
-            'orderby'        => 'title',
-            'order'          => 'ASC',
-          ]);
-          $product_options = [];
-          while($product_query->have_posts()): $product_query->the_post();
-            $pid = get_the_ID();
-            $title = get_the_title();
-            $product_options[$pid] = $title;
-            $checked = in_array($pid, $settings['products'] ?? []) ? 'checked' : '';
-            echo '<label class="nb-prod"><input type="checkbox" name="products[]" value="'.$pid.'" '.$checked.'> '.esc_html($title).' (#'.$pid.')</label>';
-          endwhile;
-          wp_reset_postdata();
-        ?>
-      </div>
-      <p class="nb-products-empty" aria-live="polite" hidden>Nincs találat a keresésre.</p>
-      <script>
-        document.addEventListener('DOMContentLoaded', function(){
-          var searchInput = document.querySelector('.nb-product-search');
-          var productList = document.querySelector('.nb-products');
-          if (!searchInput || !productList) return;
-          var items = Array.prototype.slice.call(productList.querySelectorAll('.nb-prod'));
-          var countLabel = document.querySelector('.nb-products-count');
-          var emptyState = document.querySelector('.nb-products-empty');
-          function normalize(value){
-            return (value || '').toString().toLowerCase();
-          }
-          function update(){
-            var term = normalize(searchInput.value);
-            var visibleCount = 0;
-            items.forEach(function(item){
-              var match = normalize(item.textContent).indexOf(term) !== -1;
-              item.style.display = match ? '' : 'none';
-              if (match) visibleCount += 1;
-            });
-            if (countLabel){
-              countLabel.textContent = visibleCount + ' / ' + items.length;
-            }
-            if (emptyState){
-              emptyState.hidden = visibleCount !== 0;
-            }
-          }
-          searchInput.addEventListener('input', update);
-          update();
-        });
-      </script>
-      <h2>Globális terméktípusok</h2>
-      <p>Add meg külön a tervezőben látható és a rendelésben megjelenő elnevezést, valamint válassz alap WooCommerce terméket az árakhoz.</p>
+  <?php elseif ($tab === 'products'): ?>
+    <form method="post" class="nb-form" data-dirty-form>
+      <?php wp_nonce_field('nb_save','nb_nonce'); ?>
+      <section class="nb-panel">
+        <div class="nb-panel-heading"><div><h2><?php esc_html_e('Tervezhető termékek','nb-designer'); ?></h2><p><?php esc_html_e('Keress WooCommerce terméket, majd add a tervezőhöz.','nb-designer'); ?></p></div><span class="nb-count-badge" id="nb-selected-product-count"><?php echo esc_html(count($selectedProducts)); ?></span></div>
+        <label class="screen-reader-text" for="nb-product-search"><?php esc_html_e('Termék keresése','nb-designer'); ?></label>
+        <div class="nb-search-control"><span class="dashicons dashicons-search" aria-hidden="true"></span><input type="search" id="nb-product-search" placeholder="<?php esc_attr_e('Keress névre vagy azonosítóra…','nb-designer'); ?>" autocomplete="off"><span class="spinner" aria-hidden="true"></span></div>
+        <div id="nb-product-search-results" class="nb-search-results" aria-live="polite"></div>
+        <div id="nb-selected-products" class="nb-product-cards">
+          <?php foreach ($selectedProducts as $pid): ?>
+            <article class="nb-product-card" data-product-id="<?php echo esc_attr($pid); ?>">
+              <input type="hidden" name="products[]" value="<?php echo esc_attr($pid); ?>">
+              <div class="nb-product-thumb"><?php echo get_the_post_thumbnail($pid, 'thumbnail') ?: '<span class="dashicons dashicons-format-image"></span>'; ?></div>
+              <div><strong><?php echo esc_html(get_the_title($pid)); ?></strong><small>#<?php echo esc_html($pid); ?></small></div>
+              <a class="button" href="<?php echo esc_url($adminUrl('nb-designer-products',['product_id'=>$pid])); ?>"><?php esc_html_e('Szerkesztés','nb-designer'); ?></a>
+              <button type="button" class="button-link-delete nb-remove-product"><?php esc_html_e('Eltávolítás','nb-designer'); ?></button>
+            </article>
+          <?php endforeach; ?>
+        </div>
+      </section>
       <?php
-        $globalTypeOrderMap = isset($settings['type_order_labels']) && is_array($settings['type_order_labels']) ? $settings['type_order_labels'] : [];
-        $globalTypeProductMap = isset($settings['type_products']) && is_array($settings['type_products']) ? $settings['type_products'] : [];
-        $globalTypeRows = $settings['types'] ?? [];
-        if (!is_array($globalTypeRows)) {
-          $globalTypeRows = [];
-        }
-        if (empty($globalTypeRows)) {
-          $globalTypeRows = ['Póló','Pulóver'];
-        }
-        $typeRowCount = max(count($globalTypeRows) + 1, 3);
-        $selectedProductIds = isset($settings['products']) && is_array($settings['products']) ? array_map('intval', $settings['products']) : [];
+        $types = is_array($settings['types'] ?? null) ? $settings['types'] : [];
+        $typeOrders = is_array($settings['type_order_labels'] ?? null) ? $settings['type_order_labels'] : [];
+        $typeProducts = is_array($settings['type_products'] ?? null) ? $settings['type_products'] : [];
+        $typeRowCount = max(count($types) + 1, 2);
       ?>
-      <table class="widefat nb-label-table">
-        <thead>
-          <tr>
-            <th>Tervezőben megjelenő név</th>
-            <th>Rendelésben megjelenő név</th>
-            <th>WooCommerce termék</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php for ($i = 0; $i < $typeRowCount; $i++):
-            $designer = $globalTypeRows[$i] ?? '';
-            $order = '';
-            $productChoice = '';
-            if ($designer !== ''){
-              $typeKey = nb_normalize_type_key($designer);
-              if ($typeKey && !empty($globalTypeOrderMap[$typeKey])){
-                $order = $globalTypeOrderMap[$typeKey];
-              }
-              if ($typeKey && !empty($globalTypeProductMap[$typeKey])){
-                $productChoice = intval($globalTypeProductMap[$typeKey]);
-              }
-            }
-          ?>
-          <tr>
-            <td><input type="text" name="types_designer[]" value="<?php echo esc_attr($designer); ?>" placeholder="Póló" /></td>
-            <td><input type="text" name="types_order[]" value="<?php echo esc_attr($order); ?>" placeholder="polo" /></td>
-            <td>
-              <select name="types_product[]">
-                <option value="">— nincs kiválasztva —</option>
-                <?php
-                  foreach ($product_options as $pid => $title){
-                    $isActive = in_array($pid, $selectedProductIds, true);
-                    $labelText = esc_html($title);
-                    if (!empty($selectedProductIds) && ! $isActive){
-                      $labelText .= ' – nincs kijelölve';
-                    }
-                    printf(
-                      '<option value="%1$d" %3$s>%2$s (#%1$d)</option>',
-                      $pid,
-                      $labelText,
-                      selected($productChoice, $pid, false)
-                    );
-                  }
-                ?>
-              </select>
-            </td>
-          </tr>
+      <section class="nb-panel">
+        <div class="nb-panel-heading"><div><h2><?php esc_html_e('Globális terméktípusok','nb-designer'); ?></h2><p><?php esc_html_e('A megjelenő és rendelési név, valamint az alap WooCommerce termék.','nb-designer'); ?></p></div></div>
+        <div class="nb-repeater" data-repeater="types">
+          <?php for ($i=0; $i<$typeRowCount; $i++): $label=$types[$i]??''; $key=nb_normalize_type_key($label); ?>
+            <div class="nb-repeater-row">
+              <span class="dashicons dashicons-move" aria-hidden="true"></span>
+              <label><span><?php esc_html_e('Tervezői név','nb-designer'); ?></span><input type="text" name="types_designer[]" value="<?php echo esc_attr($label); ?>" placeholder="<?php esc_attr_e('Póló','nb-designer'); ?>"></label>
+              <label><span><?php esc_html_e('Rendelési név','nb-designer'); ?></span><input type="text" name="types_order[]" value="<?php echo esc_attr($typeOrders[$key]??''); ?>" placeholder="polo"></label>
+              <label><span><?php esc_html_e('WooCommerce termék','nb-designer'); ?></span><select name="types_product[]"><option value=""><?php esc_html_e('— nincs —','nb-designer'); ?></option><?php foreach($selectedProducts as $pid): ?><option value="<?php echo esc_attr($pid); ?>" <?php selected(intval($typeProducts[$key]??0),$pid); ?>><?php echo esc_html(get_the_title($pid).' (#'.$pid.')'); ?></option><?php endforeach; ?></select></label>
+              <button type="button" class="button-link-delete nb-remove-row" aria-label="<?php esc_attr_e('Sor törlése','nb-designer'); ?>">×</button>
+            </div>
           <?php endfor; ?>
-        </tbody>
-      </table>
-      <p class="description">Hagyd üresen a sort a típus törléséhez vagy új sorban add hozzá az újat.</p>
+        </div>
+        <button type="button" class="button nb-add-row" data-target="types">+ <?php esc_html_e('Típus hozzáadása','nb-designer'); ?></button>
+      </section>
+      <div class="nb-save-bar"><span class="nb-save-state" aria-live="polite"><?php esc_html_e('Nincs mentetlen módosítás','nb-designer'); ?></span><button class="button button-primary"><?php esc_html_e('Módosítások mentése','nb-designer'); ?></button></div>
+    </form>
 
-    <?php elseif ($tab==='variants'): ?>
-      <h2>Típus–Szín → Mockup & Ár</h2>
-      <?php
-        $mockups = $settings['mockups'] ?? [];
-        $catalog = $settings['catalog'] ?? [];
-        $global_types = $settings['types'] ?? ['Póló','Pulóver'];
-        foreach ($settings['products'] ?? [] as $pid):
-          $cfg = $catalog[$pid] ?? ['types'=>$global_types,'colors'=>[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
-          nb_sync_product_color_configuration($cfg, $settings);
-          $typeColorMap = $cfg['colors_by_type'] ?? [];
-          $colorSummary = [];
-          if (!empty($cfg['types'])){
-            foreach ($cfg['types'] as $typeLabel){
-              $typeKey = nb_normalize_type_key($typeLabel);
-              $colors = $typeColorMap[$typeKey] ?? [];
-              if (empty($colors)) continue;
-              $colorSummary[] = $typeLabel.': '.implode(', ', $colors);
-            }
-          }
-          if (empty($colorSummary) && !empty($cfg['colors'])){
-            $colorSummary[] = implode(', ', $cfg['colors']);
-          }
-      ?>
-      <div class="nb-var-card">
-        <h3><?php echo esc_html(get_the_title($pid)); ?> (#<?php echo $pid; ?>)</h3>
-        <input type="hidden" name="var_pid[]" value="<?php echo $pid; ?>">
-        <table class="form-table">
-          <tr>
-            <th>Típusok (vesszővel)</th>
-            <td><input type="text" name="types_<?php echo $pid; ?>" value="<?php echo esc_attr(implode(',', $cfg['types'] ?? $global_types)); ?>" size="60"></td>
-          </tr>
-          <tr>
-            <th>Színek</th>
-            <td>
-              <?php if (!empty($colorSummary)): ?>
-                <span><?php echo esc_html(implode(' | ', $colorSummary)); ?></span>
-              <?php else: ?>
-                <em>Nincs a típusokhoz szín rendelve. Állítsd be a <a href="?page=nb-designer&amp;tab=colors">Színek</a> fülön.</em>
-              <?php endif; ?>
-            </td>
-          </tr>
-          <tr>
-            <th>Méretek (vesszővel)</th>
-            <td><input type="text" name="sizes_<?php echo $pid; ?>" value="<?php echo esc_attr(implode(',', $cfg['sizes'] ?? [])); ?>" size="60"></td>
-          </tr>
-          <tr>
-            <th>Méret felárak</th>
-            <td><input type="text" name="size_surcharge_<?php echo $pid; ?>" value="<?php
-              $pairs=[]; foreach(($cfg['size_surcharge'] ?? []) as $k=>$v){ $pairs[] = $k.':'.$v; } echo esc_attr(implode(',', $pairs));
-            ?>" size="60"> <span class="description">pl. XL:300,XXL:600</span></td>
-          </tr>
-        </table>
-        <h4>Mapping (Típus × Szín)</h4>
-        <table class="widefat">
-          <thead><tr><th>Típus</th><th>Szín</th><th>Előlap mockup</th><th>Hátlap mockup</th><th>Ft/cm²</th><th>Min. felár</th><th>Alap felár</th></tr></thead>
-          <tbody>
-            <?php
-              $typeColors = $cfg['colors_by_type'] ?? [];
-              $renderedRows = 0;
-              foreach (($cfg['types'] ?? $global_types) as $type):
-                $typeKey = nb_normalize_type_key($type);
-                $colorList = $typeColors[$typeKey] ?? [];
-                if (empty($colorList)){
-                  echo '<tr><td>'.esc_html($type).'</td><td colspan="6"><em>Nincs szín beállítva ehhez a típushoz. Állítsd be a Színek fülön.</em></td></tr>';
-                  continue;
-                }
-                foreach ($colorList as $color):
-                  $colorKey = nb_normalize_color_key($color);
-                  if ($colorKey === '') continue;
-                  $key = $typeKey.'|'.$colorKey;
-                  $hash = md5($key);
-                  $map = $cfg['map'][$key] ?? ['mockup_index'=>-1,'mockup_back_index'=>-1,'fee_per_cm2'=>'','min_fee'=>'','base_fee'=>''];
-                  $renderedRows++;
-            ?>
-              <tr>
-                <td><?php echo esc_html($type); ?></td>
-                <td><?php echo esc_html($color); ?></td>
-                <td>
-                  <select name="mockup_<?php echo $pid; ?>_<?php echo esc_attr($hash); ?>">
-                    <option value="-1">— nincs —</option>
-                    <?php foreach($mockups as $i=>$m): ?>
-                      <option value="<?php echo $i; ?>" <?php selected(intval($map['mockup_index']),$i); ?>><?php echo esc_html($m['label'] ?? ('Mockup #'.$i)); ?></option>
-                    <?php endforeach; ?>
-                  </select>
-                </td>
-                <td>
-                  <select name="mockup_back_<?php echo $pid; ?>_<?php echo esc_attr($hash); ?>">
-                    <option value="-1">— nincs —</option>
-                    <?php foreach($mockups as $i=>$m): ?>
-                      <option value="<?php echo $i; ?>" <?php selected(intval($map['mockup_back_index'] ?? -1),$i); ?>><?php echo esc_html($m['label'] ?? ('Mockup #'.$i)); ?></option>
-                    <?php endforeach; ?>
-                  </select>
-                </td>
-                <td><input type="number" step="0.1" name="percm2_<?php echo $pid; ?>_<?php echo esc_attr($hash); ?>" value="<?php echo esc_attr($map['fee_per_cm2']); ?>" /></td>
-                <td><input type="number" step="1"   name="minfee_<?php echo $pid; ?>_<?php echo esc_attr($hash); ?>" value="<?php echo esc_attr($map['min_fee']); ?>" /></td>
-                <td><input type="number" step="1"   name="base_<?php echo $pid; ?>_<?php echo esc_attr($hash); ?>" value="<?php echo esc_attr($map['base_fee']); ?>" /></td>
-              </tr>
-            <?php endforeach; endforeach; if (!$renderedRows): ?>
-              <tr><td colspan="7"><em>Nincs olyan típus–szín kombináció, amelyhez mockupot vagy árat állíthatnál be. Adj hozzá színeket a Színek fülön.</em></td></tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-      <?php endforeach; ?>
+  <?php elseif ($tab === 'variants'): ?>
+    <?php
+      $pid = $focus_product_id;
+      $cfg = $catalog[$pid] ?? ['types'=>$settings['types']??[],'sizes'=>[],'map'=>[],'size_surcharge'=>[]];
+      nb_sync_product_color_configuration($cfg, $settings);
+      $product = function_exists('wc_get_product') ? wc_get_product($pid) : null;
+    ?>
+    <p><a href="<?php echo esc_url($adminUrl('nb-designer-products')); ?>">← <?php esc_html_e('Vissza a termékekhez','nb-designer'); ?></a></p>
+    <form method="post" class="nb-form" data-dirty-form>
+      <?php wp_nonce_field('nb_save','nb_nonce'); ?><input type="hidden" name="var_pid[]" value="<?php echo esc_attr($pid); ?>">
+      <section class="nb-panel nb-product-hero"><div class="nb-product-thumb is-large"><?php echo get_the_post_thumbnail($pid, 'medium') ?: '<span class="dashicons dashicons-format-image"></span>'; ?></div><div><p class="nb-eyebrow">#<?php echo esc_html($pid); ?></p><h2><?php echo esc_html(get_the_title($pid)); ?></h2><p><?php echo esc_html(sprintf(__('%1$d típus · %2$d szín · %3$d párosítás','nb-designer'), count($cfg['types']??[]), count($cfg['colors']??[]), count($cfg['map']??[]))); ?></p></div><?php if($product): ?><a class="button" target="_blank" rel="noopener" href="<?php echo esc_url(get_permalink($pid)); ?>"><?php esc_html_e('Előnézet','nb-designer'); ?></a><?php endif; ?></section>
+      <?php if(count($selectedProducts)>1): ?><section class="nb-copy-config"><label><span><?php esc_html_e('Konfiguráció másolása innen','nb-designer'); ?></span><select name="copy_from_product_id"><option value=""><?php esc_html_e('Válassz terméket…','nb-designer'); ?></option><?php foreach($selectedProducts as $sourcePid):if($sourcePid===$pid)continue;?><option value="<?php echo esc_attr($sourcePid); ?>"><?php echo esc_html(get_the_title($sourcePid)); ?></option><?php endforeach;?></select></label><label class="nb-inline-toggle"><input type="checkbox" name="copy_mappings" value="1"> <?php esc_html_e('Mockup-párosításokkal együtt','nb-designer'); ?></label><button class="button" name="nb_copy_product_config" value="1"><?php esc_html_e('Másolás','nb-designer'); ?></button></section><?php endif; ?>
+      <section class="nb-panel"><h2><?php esc_html_e('Variánsok','nb-designer'); ?></h2><div class="nb-two-columns"><div><label for="nb-types-chip"><strong><?php esc_html_e('Típusok','nb-designer'); ?></strong></label><div class="nb-chip-editor" data-chip-name="types_list_<?php echo esc_attr($pid); ?>[]"><?php foreach(($cfg['types']??[]) as $value): ?><span class="nb-chip"><input type="hidden" name="types_list_<?php echo esc_attr($pid); ?>[]" value="<?php echo esc_attr($value); ?>"><?php echo esc_html($value); ?><button type="button" aria-label="<?php esc_attr_e('Törlés','nb-designer'); ?>">×</button></span><?php endforeach; ?><input id="nb-types-chip" type="text" placeholder="<?php esc_attr_e('Írd be, majd Enter…','nb-designer'); ?>"></div></div><div><label for="nb-sizes-chip"><strong><?php esc_html_e('Méretek','nb-designer'); ?></strong></label><div class="nb-chip-editor" data-chip-name="sizes_list_<?php echo esc_attr($pid); ?>[]"><?php foreach(($cfg['sizes']??[]) as $value): ?><span class="nb-chip"><input type="hidden" name="sizes_list_<?php echo esc_attr($pid); ?>[]" value="<?php echo esc_attr($value); ?>"><?php echo esc_html($value); ?><button type="button" aria-label="<?php esc_attr_e('Törlés','nb-designer'); ?>">×</button></span><?php endforeach; ?><input id="nb-sizes-chip" type="text" placeholder="<?php esc_attr_e('Írd be, majd Enter…','nb-designer'); ?>"></div></div></div>
+        <h3><?php esc_html_e('Méretfelárak','nb-designer'); ?></h3><div class="nb-repeater" data-repeater="surcharges"><?php $surcharges=$cfg['size_surcharge']??[]; if(empty($surcharges))$surcharges=[''=>'']; foreach($surcharges as $size=>$amount): ?><div class="nb-repeater-row is-compact"><label><span><?php esc_html_e('Méret','nb-designer'); ?></span><input type="text" name="surcharge_size_<?php echo esc_attr($pid); ?>[]" value="<?php echo esc_attr($size); ?>"></label><label><span><?php esc_html_e('Felár (Ft)','nb-designer'); ?></span><input type="number" min="0" step="1" name="surcharge_value_<?php echo esc_attr($pid); ?>[]" value="<?php echo esc_attr($amount); ?>"></label><button type="button" class="button-link-delete nb-remove-row">×</button></div><?php endforeach; ?></div><button type="button" class="button nb-add-row" data-target="surcharges">+ <?php esc_html_e('Felár hozzáadása','nb-designer'); ?></button>
+      </section>
+      <section class="nb-panel"><div class="nb-panel-heading"><div><h2><?php esc_html_e('Mockup mátrix','nb-designer'); ?></h2><p><?php esc_html_e('A hiányzó és részleges párosítások ránézésre látszanak.','nb-designer'); ?></p></div><label class="nb-inline-toggle"><input type="checkbox" id="nb-only-missing"> <?php esc_html_e('Csak a hiányzók','nb-designer'); ?></label></div><div class="nb-bulk-toolbar"><label><span><?php esc_html_e('Mockup','nb-designer'); ?></span><select id="nb-bulk-mockup"><option value=""><?php esc_html_e('Válassz…','nb-designer'); ?></option><?php foreach($mockups as $mockup):?><option value="<?php echo esc_attr($mockup['id']); ?>"><?php echo esc_html($mockup['label']); ?></option><?php endforeach;?></select></label><button type="button" class="button" id="nb-fill-missing-front"><?php esc_html_e('Hiányzó előlapok kitöltése','nb-designer'); ?></button><label><span><?php esc_html_e('Egységes Ft/cm²','nb-designer'); ?></span><input id="nb-bulk-price" type="number" min="0" step="0.1"></label><button type="button" class="button" id="nb-apply-bulk-price"><?php esc_html_e('Ár alkalmazása','nb-designer'); ?></button></div><div class="nb-matrix-wrap"><table class="nb-matrix"><thead><tr><th><?php esc_html_e('Típus / szín','nb-designer'); ?></th><th><?php esc_html_e('Előlap','nb-designer'); ?></th><th><?php esc_html_e('Hátlap','nb-designer'); ?></th><th><?php esc_html_e('Ft/cm²','nb-designer'); ?></th><th><?php esc_html_e('Minimum','nb-designer'); ?></th><th><?php esc_html_e('Alap felár','nb-designer'); ?></th></tr></thead><tbody>
+      <?php foreach(($cfg['types']??[]) as $type): $typeKey=nb_normalize_type_key($type); foreach(($cfg['colors_by_type'][$typeKey]??[]) as $color): $colorKey=nb_normalize_color_key($color); $key=$typeKey.'|'.$colorKey; $hash=md5($key); $map=$cfg['map'][$key]??[]; $front=nb_mockup_by_reference($settings,$map,'front'); $back=nb_mockup_by_reference($settings,$map,'back'); ?>
+        <tr class="<?php echo $front ? '' : 'is-missing'; ?>"><th><strong><?php echo esc_html($type); ?></strong><span><?php echo esc_html($color); ?></span></th><td><?php echo nb_admin_mockup_select($mockups, $front['id']??'', 'mockup_id_'.$pid.'_'.$hash, __('Előlap mockup','nb-designer')); ?></td><td><?php echo nb_admin_mockup_select($mockups, $back['id']??'', 'mockup_back_id_'.$pid.'_'.$hash, __('Hátlap mockup','nb-designer')); ?></td><td><input type="number" step="0.1" min="0" name="percm2_<?php echo esc_attr($pid.'_'.$hash); ?>" value="<?php echo esc_attr($map['fee_per_cm2']??''); ?>" placeholder="<?php echo esc_attr($settings['fee_per_cm2']??3); ?>"></td><td><input type="number" step="1" min="0" name="minfee_<?php echo esc_attr($pid.'_'.$hash); ?>" value="<?php echo esc_attr($map['min_fee']??''); ?>" placeholder="<?php echo esc_attr($settings['min_fee']??990); ?>"></td><td><input type="number" step="1" min="0" name="base_<?php echo esc_attr($pid.'_'.$hash); ?>" value="<?php echo esc_attr($map['base_fee']??''); ?>"></td></tr>
+      <?php endforeach; endforeach; ?>
+      </tbody></table></div></section>
+      <div class="nb-save-bar"><span class="nb-save-state" aria-live="polite"><?php esc_html_e('Nincs mentetlen módosítás','nb-designer'); ?></span><button class="button button-primary"><?php esc_html_e('Módosítások mentése','nb-designer'); ?></button></div>
+    </form>
 
-    <?php elseif ($tab==='colors'): ?>
-      <?php
-        $catalog = $settings['catalog'] ?? [];
-        $products = $settings['products'] ?? [];
-        $savedPalette = $settings['color_palette'] ?? [];
-        if (!is_array($savedPalette)) $savedPalette = [];
-        if (empty($savedPalette)){
-          foreach ($catalog as $cfg){
-            if (empty($cfg['colors']) || !is_array($cfg['colors'])) continue;
-            foreach ($cfg['colors'] as $color){
-              $color = trim($color);
-              if ($color === '') continue;
-              if (!in_array($color, $savedPalette, true)) $savedPalette[] = $color;
-            }
-          }
-        }
-        $colorOrderMap = isset($settings['color_order_labels']) && is_array($settings['color_order_labels']) ? $settings['color_order_labels'] : [];
-        $paletteRows = $savedPalette;
-        $paletteRowCount = max(count($paletteRows) + 2, 4);
-        $typeColors = $settings['type_colors'] ?? [];
-        if (!is_array($typeColors)) $typeColors = [];
-        $globalTypes = $settings['types'] ?? [];
-        if (!is_array($globalTypes)) $globalTypes = [];
-      ?>
-      <h2>Szín elérhetőség</h2>
-      <p>Add meg a színek tervezőben és rendelésben használt nevét. Hagyd üresen a sort a törléshez.</p>
-      <table class="widefat nb-label-table">
-        <thead>
-          <tr>
-            <th>Tervezőben megjelenő név</th>
-            <th>Rendelésben megjelenő név</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php for ($i = 0; $i < $paletteRowCount; $i++):
-            $designer = $paletteRows[$i] ?? '';
-            $order = '';
-            if ($designer !== ''){
-              $colorKey = nb_normalize_color_key($designer);
-              if ($colorKey && !empty($colorOrderMap[$colorKey])){
-                $order = $colorOrderMap[$colorKey];
-              }
-            }
-          ?>
-          <tr>
-            <td><input type="text" name="color_designer[]" value="<?php echo esc_attr($designer); ?>" placeholder="Fekete" /></td>
-            <td><input type="text" name="color_order[]" value="<?php echo esc_attr($order); ?>" placeholder="fekete" /></td>
-          </tr>
-          <?php endfor; ?>
-        </tbody>
-      </table>
-      <?php if (!empty($globalTypes)): ?>
-        <h3>Színek típusonként</h3>
-        <?php foreach ($globalTypes as $typeLabel):
-          $typeKey = nb_normalize_type_key($typeLabel);
-          if ($typeKey === '') continue;
-          $selected = $typeColors[$typeKey] ?? [];
-          if (!is_array($selected)) $selected = [];
-        ?>
-          <div class="nb-color-card">
-            <h4><?php echo esc_html($typeLabel); ?></h4>
-            <?php if (!empty($savedPalette)): ?>
-              <div class="nb-color-grid">
-                <?php foreach ($savedPalette as $color):
-                  $value = trim($color);
-                  if ($value === '') continue;
-                  $id = 'type_color_'.md5($typeKey.'|'.$value);
-                  $checked = in_array($value, $selected, true) ? 'checked' : '';
-                ?>
-                  <label for="<?php echo esc_attr($id); ?>" class="nb-color-option">
-                    <input type="checkbox" id="<?php echo esc_attr($id); ?>" name="type_colors[<?php echo esc_attr($typeKey); ?>][]" value="<?php echo esc_attr($value); ?>" <?php echo $checked; ?>>
-                    <span><?php echo esc_html($value); ?></span>
-                  </label>
-                <?php endforeach; ?>
-              </div>
-            <?php else: ?>
-              <p class="nb-color-empty">Adj meg legalább egy színt a palettán, hogy kiválaszthasd az elérhető árnyalatokat.</p>
-            <?php endif; ?>
-          </div>
-        <?php endforeach; ?>
-      <?php else: ?>
-        <p>Először vegyél fel típusokat a <a href="?page=nb-designer&amp;tab=products">Termékek &amp; Típusok</a> fülön.</p>
-      <?php endif; ?>
+  <?php elseif ($tab === 'colors'): ?>
+    <?php $palette=$settings['color_palette']??[]; $meta=$settings['color_meta']??[]; $orders=$settings['color_order_labels']??[]; $rowCount=max(count($palette)+1,2); ?>
+    <form method="post" class="nb-form" data-dirty-form><?php wp_nonce_field('nb_save','nb_nonce'); ?><section class="nb-panel"><div class="nb-panel-heading"><div><h2><?php esc_html_e('Színpaletta','nb-designer'); ?></h2><p><?php esc_html_e('A HEX vagy textúra minden képes választóban azonos swatch-ot ad.','nb-designer'); ?></p></div></div><div class="nb-repeater" data-repeater="colors"><?php for($i=0;$i<$rowCount;$i++):$label=$palette[$i]??'';$key=nb_normalize_color_key($label);$row=$meta[$key]??[]; ?><div class="nb-repeater-row nb-color-row"><span class="nb-swatch" style="--swatch:<?php echo esc_attr($row['hex']??'#d1d5db'); ?>"></span><label><span><?php esc_html_e('Tervezői név','nb-designer'); ?></span><input type="text" name="color_designer[]" value="<?php echo esc_attr($label); ?>"></label><label><span><?php esc_html_e('Rendelési név','nb-designer'); ?></span><input type="text" name="color_order[]" value="<?php echo esc_attr($orders[$key]??''); ?>"></label><label><span>HEX</span><input type="color" name="color_hex[]" value="<?php echo esc_attr($row['hex']??'#d1d5db'); ?>"></label><label><span><?php esc_html_e('Textúra URL','nb-designer'); ?></span><input type="url" name="color_texture[]" value="<?php echo esc_attr($row['texture_url']??''); ?>"></label><button type="button" class="button-link-delete nb-remove-row">×</button></div><?php endfor; ?></div><button type="button" class="button nb-add-row" data-target="colors">+ <?php esc_html_e('Szín hozzáadása','nb-designer'); ?></button></section>
+      <section class="nb-panel"><h2><?php esc_html_e('Elérhetőség típusonként','nb-designer'); ?></h2><div class="nb-type-color-grid"><?php foreach(($settings['types']??[]) as $type):$typeKey=nb_normalize_type_key($type);$selected=$settings['type_colors'][$typeKey]??[]; ?><fieldset class="nb-color-group"><legend><?php echo esc_html($type); ?></legend><?php foreach($palette as $color):$key=nb_normalize_color_key($color);$row=$meta[$key]??[];$id='nb-color-'.md5($typeKey.'|'.$key); ?><label for="<?php echo esc_attr($id); ?>" class="nb-color-option"><input id="<?php echo esc_attr($id); ?>" type="checkbox" name="type_colors[<?php echo esc_attr($typeKey); ?>][]" value="<?php echo esc_attr($color); ?>" <?php checked(in_array($color,$selected,true)); ?>><span class="nb-swatch" style="--swatch:<?php echo esc_attr($row['hex']??'#d1d5db'); ?>"></span><span><?php echo esc_html($color); ?></span></label><?php endforeach; ?></fieldset><?php endforeach; ?></div></section><div class="nb-save-bar"><span class="nb-save-state" aria-live="polite"><?php esc_html_e('Nincs mentetlen módosítás','nb-designer'); ?></span><button class="button button-primary"><?php esc_html_e('Módosítások mentése','nb-designer'); ?></button></div></form>
 
-    <?php elseif ($tab==='mockups'): ?>
-      <h2>Mockupok & print-area</h2>
-      <input type="hidden" id="nb-mockups-json" name="mockups_json" value="<?php echo esc_attr(json_encode($settings['mockups'] ?? [])); ?>">
-      <div id="nb-mockups-app" class="nb-mockups-app"></div>
-      <p><button type="button" class="button" id="nb-add-mockup">+ Mockup hozzáadása</button></p>
+  <?php elseif ($tab === 'mockups'): ?>
+    <form method="post" class="nb-form" data-dirty-form><?php wp_nonce_field('nb_save','nb_nonce'); ?><input type="hidden" id="nb-mockups-json" name="mockups_json" value="<?php echo esc_attr(wp_json_encode($mockups)); ?>"><section class="nb-panel"><div class="nb-panel-heading"><div><h2><?php esc_html_e('Mockup könyvtár','nb-designer'); ?></h2><p><?php esc_html_e('Kép, stabil azonosító és mockuponkénti nyomtatási felületek.','nb-designer'); ?></p></div><button type="button" class="button button-primary" id="nb-add-mockup">+ <?php esc_html_e('Mockup hozzáadása','nb-designer'); ?></button></div><div id="nb-mockups-app" class="nb-mockups-app"></div></section><div class="nb-save-bar"><span class="nb-save-state" aria-live="polite"><?php esc_html_e('Nincs mentetlen módosítás','nb-designer'); ?></span><button class="button button-primary"><?php esc_html_e('Módosítások mentése','nb-designer'); ?></button></div></form>
 
-    <?php elseif ($tab==='fonts'): ?>
-      <h2>Betűtípusok</h2>
-      <div id="nb-fonts">
-        <?php foreach(($settings['fonts'] ?? []) as $url): ?>
-          <div class="nb-font"><input type="text" name="fonts[]" value="<?php echo esc_attr($url); ?>" size="80"> <button class="button nb-remove-font">Eltávolítás</button></div>
-        <?php endforeach; ?>
-      </div>
-      <p><button type="button" class="button" id="nb-add-font">+ Font mező</button></p>
+  <?php elseif ($tab === 'pricing'): ?>
+    <?php $tiers=$settings['bulk_discounts']??[]; $rowCount=max(count($tiers)+1,2); ?>
+    <form method="post" class="nb-form nb-pricing-layout" data-dirty-form data-pricing-form><?php wp_nonce_field('nb_save','nb_nonce'); ?><div><section class="nb-panel"><h2><?php esc_html_e('Globális alapértékek','nb-designer'); ?></h2><div class="nb-field-grid"><label><span><?php esc_html_e('Ár négyzetcentiméterenként','nb-designer'); ?></span><input type="number" min="0" step="0.1" name="fee_per_cm2" value="<?php echo esc_attr($settings['fee_per_cm2']??3); ?>"><small><?php esc_html_e('Ft/cm²','nb-designer'); ?></small></label><label><span><?php esc_html_e('Minimum felár','nb-designer'); ?></span><input type="number" min="0" step="1" name="min_fee" value="<?php echo esc_attr($settings['min_fee']??990); ?>"><small>Ft</small></label><label><span><?php esc_html_e('Kétoldalas felár','nb-designer'); ?></span><input type="number" min="0" step="1" name="double_sided_fee" value="<?php echo esc_attr($settings['double_sided_fee']??0); ?>"><small>Ft</small></label></div></section><section class="nb-panel"><h2><?php esc_html_e('Mennyiségi kedvezmények','nb-designer'); ?></h2><div class="nb-repeater" data-repeater="discounts"><?php for($i=0;$i<$rowCount;$i++):$tier=$tiers[$i]??[]; ?><div class="nb-repeater-row is-compact"><label><span><?php esc_html_e('Darabtól','nb-designer'); ?></span><input type="number" min="1" name="bulk_from[]" value="<?php echo esc_attr($tier['min_qty']??''); ?>"></label><label><span><?php esc_html_e('Darabig','nb-designer'); ?></span><input type="number" min="0" name="bulk_to[]" value="<?php echo esc_attr(!empty($tier['max_qty'])?$tier['max_qty']:''); ?>"></label><label><span><?php esc_html_e('Kedvezmény','nb-designer'); ?></span><input type="number" min="0" max="99.9" step="0.1" name="bulk_discount[]" value="<?php echo esc_attr($tier['percent']??''); ?>"></label><button type="button" class="button-link-delete nb-remove-row">×</button></div><?php endfor; ?></div><div class="nb-validation-message" aria-live="polite"></div><button type="button" class="button nb-add-row" data-target="discounts">+ <?php esc_html_e('Sáv hozzáadása','nb-designer'); ?></button></section></div><aside class="nb-panel nb-calculator"><h2><?php esc_html_e('Élő kalkuláció','nb-designer'); ?></h2><div class="nb-field-grid is-single"><label><span><?php esc_html_e('Termék','nb-designer'); ?></span><select data-calc="product_id"><?php foreach($selectedProducts as $pid):?><option value="<?php echo esc_attr($pid); ?>" data-price="<?php $p=wc_get_product($pid);echo esc_attr($p?$p->get_price():0); ?>"><?php echo esc_html(get_the_title($pid)); ?></option><?php endforeach;?></select></label><label><span><?php esc_html_e('Típus','nb-designer'); ?></span><select data-calc="type"><?php foreach(($settings['types']??[]) as $type):?><option value="<?php echo esc_attr(nb_normalize_type_key($type)); ?>"><?php echo esc_html($type); ?></option><?php endforeach;?></select></label><label><span><?php esc_html_e('Szín','nb-designer'); ?></span><select data-calc="color"><?php foreach(($settings['color_palette']??[]) as $color):?><option value="<?php echo esc_attr(nb_normalize_color_key($color)); ?>"><?php echo esc_html($color); ?></option><?php endforeach;?></select></label><label><span><?php esc_html_e('Mennyiség','nb-designer'); ?></span><input type="number" min="1" value="1" data-calc="quantity"></label><label class="nb-inline-toggle"><input type="checkbox" data-calc="two_sided"> <?php esc_html_e('Kétoldalas','nb-designer'); ?></label></div><div id="nb-price-breakdown" class="nb-price-breakdown" aria-live="polite"><p><?php esc_html_e('Válassz értékeket a kalkulációhoz.','nb-designer'); ?></p></div></aside><div class="nb-save-bar"><span class="nb-save-state" aria-live="polite"><?php esc_html_e('Nincs mentetlen módosítás','nb-designer'); ?></span><button class="button button-primary"><?php esc_html_e('Módosítások mentése','nb-designer'); ?></button></div></form>
 
-    <?php elseif ($tab==='pricing'): ?>
-      <h2>Globális ár</h2>
-      <table class="form-table">
-        <tr><th>Ft / cm²</th><td><input type="number" step="0.1" name="fee_per_cm2" value="<?php echo esc_attr($settings['fee_per_cm2'] ?? 3); ?>"></td></tr>
-        <tr><th>Minimum felár (Ft)</th><td><input type="number" step="1" name="min_fee" value="<?php echo esc_attr($settings['min_fee'] ?? 990); ?>"></td></tr>
-        <tr><th>Kétoldalas felár (Ft)</th><td><input type="number" step="1" name="double_sided_fee" value="<?php echo esc_attr($settings['double_sided_fee'] ?? 0); ?>"></td></tr>
-      </table>
-      <?php
-        $bulkTiers = isset($settings['bulk_discounts']) && is_array($settings['bulk_discounts']) ? $settings['bulk_discounts'] : [];
-        $rowCount = max(count($bulkTiers) + 1, 3);
-      ?>
-      <h3>Mennyiségi kedvezmények</h3>
-      <p>Add meg, hogy hány darabtól hány darabig milyen százalékos kedvezményt kapjon a több darabos vásárlás. A felső határ üresen hagyható, ha nincs maximum.</p>
-      <table class="widefat nb-label-table nb-bulk-table">
-        <thead>
-          <tr>
-            <th>Darabtól</th>
-            <th>Darabig</th>
-            <th>Kedvezmény (%)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php for ($i = 0; $i < $rowCount; $i++):
-            $tier = $bulkTiers[$i] ?? ['min_qty'=>'','max_qty'=>'','percent'=>''];
-            $from = $tier['min_qty'] ?? '';
-            $to   = $tier['max_qty'] ?? '';
-            $pct  = $tier['percent'] ?? '';
-            if ($to === 0) { $to = ''; }
-          ?>
-          <tr>
-            <td><input type="number" min="1" step="1" name="bulk_from[]" value="<?php echo esc_attr($from); ?>" placeholder="5"></td>
-            <td><input type="number" min="0" step="1" name="bulk_to[]" value="<?php echo esc_attr($to); ?>" placeholder="10"></td>
-            <td><input type="number" min="0" step="0.1" name="bulk_discount[]" value="<?php echo esc_attr($pct); ?>" placeholder="5"></td>
-          </tr>
-          <?php endfor; ?>
-        </tbody>
-      </table>
-      <p class="description">A sorok üresen hagyásával törölheted a kedvezményt. A kedvezmények a "Többet vennék" kosárba helyezéskor lépnek életbe.</p>
-    <?php endif; ?>
-
-    <p><button class="button button-primary">Mentés</button></p>
-  </form>
+  <?php elseif ($tab === 'tools'): ?>
+    <div class="nb-tools-grid"><form method="post" class="nb-form" data-dirty-form><?php wp_nonce_field('nb_save','nb_nonce'); ?><section class="nb-panel"><h2><?php esc_html_e('Betűtípusok','nb-designer'); ?></h2><p><?php esc_html_e('A tervezőben betölthető fontfájlok, azonnali előnézettel.','nb-designer'); ?></p><div id="nb-fonts"><?php foreach(($settings['fonts']??[]) as $url):?><div class="nb-font"><input type="url" name="fonts[]" value="<?php echo esc_attr($url); ?>"><span class="nb-font-preview" style="font-family:var(--nb-font-preview)">Árvíztűrő tükörfúrógép</span><button type="button" class="button nb-remove-font"><?php esc_html_e('Eltávolítás','nb-designer'); ?></button></div><?php endforeach;?></div><button type="button" class="button" id="nb-add-font">+ <?php esc_html_e('Font mező','nb-designer'); ?></button><p><button class="button button-primary"><?php esc_html_e('Fontok mentése','nb-designer'); ?></button></p></section></form><form method="post" class="nb-form" data-dirty-form><?php wp_nonce_field('nb_save','nb_nonce'); ?><section class="nb-panel"><h2><?php esc_html_e('Import / export','nb-designer'); ?></h2><p><?php esc_html_e('Migráció vagy környezetváltás előtt exportálj biztonsági mentést.','nb-designer'); ?></p><p><a class="button" href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=nb_export_settings'),'nb_export_settings')); ?>"><?php esc_html_e('Konfiguráció exportálása','nb-designer'); ?></a></p><label for="nb-import-json"><strong><?php esc_html_e('JSON import','nb-designer'); ?></strong></label><textarea id="nb-import-json" name="nb_import_json" rows="10" placeholder="{ … }"></textarea><p><button class="button button-primary"><?php esc_html_e('Importálás és ellenőrzés','nb-designer'); ?></button></p></section></form></div>
+    <section class="nb-panel"><h2><?php esc_html_e('Előzmények','nb-designer'); ?></h2><p><?php esc_html_e('Az utolsó 10 mentés visszaállítható. Visszaállítás előtt új pillanatkép készül.','nb-designer'); ?></p><div class="nb-history-list"><?php $history=get_option('nb_settings_history',[]); foreach((array)$history as $index=>$entry):?><form method="post" class="nb-history-row"><?php wp_nonce_field('nb_save','nb_nonce'); ?><span class="dashicons dashicons-backup"></span><span><strong><?php echo esc_html(wp_date('Y. m. d. H:i',intval($entry['saved_at']??0))); ?></strong><small><?php echo esc_html($entry['reason']??''); ?></small></span><button class="button" name="nb_restore_history" value="<?php echo esc_attr($index); ?>"><?php esc_html_e('Visszaállítás','nb-designer'); ?></button></form><?php endforeach; if(empty($history)):?><div class="nb-empty-state"><p><?php esc_html_e('Még nincs mentési előzmény.','nb-designer'); ?></p></div><?php endif;?></div></section>
+  <?php endif; ?>
 </div>
