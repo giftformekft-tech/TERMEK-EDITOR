@@ -1,35 +1,49 @@
 <div id="nb-designer">
+  <header class="nb-studio-header">
+    <div class="nb-studio-brand">
+      <span class="nb-studio-mark" aria-hidden="true"></span>
+      <div class="nb-studio-heading"><h1>Tervezd meg</h1><p>A te ötleted. A te stílusod.</p></div>
+    </div>
+    <div class="nb-studio-header-tools">
+      <span id="nb-studio-design-status" role="status">Mentés kosárba helyezéskor</span>
+      <button type="button" id="nb-studio-help-toggle" aria-expanded="false" aria-controls="nb-studio-help">Segítség</button>
+    </div>
+  </header>
+  <div class="nb-studio-help" id="nb-studio-help" hidden>
+    <p><strong>Így készül a saját terméked:</strong> válassz terméket, színt és méretet, majd tölts fel képet, adj hozzá szöveget vagy válassz sablont. A kijelölt elemet a Tulajdonságok és a Rétegek eszközzel szerkesztheted. A hátoldalhoz kapcsold be a kétoldalas nyomtatást.</p>
+    <p>A tervet kosárba helyezéskor mentjük. Több mérethez válaszd a „Többet vennék” lehetőséget. Mobilon az eszközsort oldalra húzva minden eszközt elérsz.</p>
+  </div>
   <div class="nb-designer-shell">
     <aside class="nb-column nb-column--actions">
       <nav class="nb-rail" id="nb-rail" aria-label="Eszközök">
         <button type="button" class="nb-rail-btn" data-nb-rail-target="product" aria-label="Termék">
-          <span class="nb-rail-icon" aria-hidden="true">👕</span>
+          <span class="nb-rail-icon" aria-hidden="true"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 3-5 3 2 5 3-1v11h8V10l3 1 2-5-5-3c-1 3-7 3-8 0Z"/></svg></span>
           <span class="nb-rail-label">Termék</span>
         </button>
         <button type="button" class="nb-rail-btn" data-nb-rail-target="upload" aria-label="Feltöltés">
-          <span class="nb-rail-icon" aria-hidden="true">⬆</span>
+          <span class="nb-rail-icon" aria-hidden="true"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6"/></svg></span>
           <span class="nb-rail-label">Feltöltés</span>
         </button>
         <button type="button" class="nb-rail-btn" data-nb-rail-target="addtext" aria-label="Szöveg">
-          <span class="nb-rail-icon" aria-hidden="true">✎</span>
+          <span class="nb-rail-icon" aria-hidden="true"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5V3h16v2M12 3v18m-4 0h8"/></svg></span>
           <span class="nb-rail-label">Szöveg</span>
         </button>
         <button type="button" class="nb-rail-btn" data-nb-rail-target="shapes" aria-label="Elemek">
-          <span class="nb-rail-icon" aria-hidden="true">★</span>
+          <span class="nb-rail-icon" aria-hidden="true"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></span>
           <span class="nb-rail-label">Elemek</span>
         </button>
         <button type="button" class="nb-rail-btn" data-nb-rail-target="templates" aria-label="Sablonok">
-          <span class="nb-rail-icon" aria-hidden="true">📄</span>
+          <span class="nb-rail-icon" aria-hidden="true"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
           <span class="nb-rail-label">Sablonok</span>
         </button>
         <button type="button" class="nb-rail-btn" data-nb-rail-target="layers" aria-label="Rétegek">
-          <span class="nb-rail-icon" aria-hidden="true">🧱</span>
+          <span class="nb-rail-icon" aria-hidden="true"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 9 5-9 5-9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg></span>
           <span class="nb-rail-label">Rétegek</span>
           <span class="nb-mobile-icon-badge" hidden></span>
         </button>
         <button type="button" class="nb-rail-btn" data-nb-rail-target="properties" aria-label="Tulajdonságok">
-          <span class="nb-rail-icon" aria-hidden="true">⚙</span>
-          <span class="nb-rail-label">Tulajdonságok</span>
+          <span class="nb-rail-icon" aria-hidden="true"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="var(--nb-surface,white)"/><circle cx="15" cy="17" r="3" fill="var(--nb-surface,white)"/></svg></span>
+          <span class="nb-rail-label">Formázás</span>
         </button>
       </nav>
 
@@ -41,17 +55,26 @@
         <div class="nb-flyout-content" id="nb-flyout-content"></div>
       </div>
 
+      <div class="nb-studio-idle">
+        <span class="nb-studio-eyebrow">Alkotóműhely</span>
+        <h2>Kezdődjön az alkotás.</h2>
+        <p>Válassz egy eszközt, és alakítsd a terméket a saját stílusodra.</p>
+        <button type="button" class="nb-hero-button" data-nb-open-tool="product">Termék beállításai</button>
+        <button type="button" class="nb-hero-button nb-hero-button--secondary" data-nb-open-tool="upload">Saját kép feltöltése</button>
+        <button type="button" class="nb-subtle-link" data-nb-open-tool="templates">Sablonból indulok</button>
+      </div>
+
       <div class="nb-rail-rest-state">
         <div class="nb-action-card nb-action-card--product">
           <div class="nb-sheet-section" data-nb-sheet-source="product" data-nb-sheet-title="Terméktípus">
             <button type="button" class="nb-hero-button" id="nb-product-modal-trigger">
-              <span class="nb-hero-icon">👕</span>
+              <span class="nb-hero-icon"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 3-5 3 2 5 3-1v11h8V10l3 1 2-5-5-3c-1 3-7 3-8 0Z"/></svg></span>
               <span>Válassz terméket</span>
             </button>
           </div>
           <div class="nb-sheet-section" data-nb-sheet-source="color" data-nb-sheet-title="Színválasztás">
             <button type="button" class="nb-hero-button nb-hero-button--secondary" id="nb-color-modal-trigger">
-              <span class="nb-hero-icon">🎨</span>
+              <span class="nb-hero-icon"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></span>
               <span id="nb-color-modal-label">Válassz színt</span>
             </button>
           </div>
@@ -82,7 +105,7 @@
 
         <div class="nb-action-card" data-nb-sheet-source="upload" data-nb-sheet-title="Saját képek">
           <label class="nb-hero-button nb-hero-button--upload">
-            <span class="nb-hero-icon">⬆</span>
+            <span class="nb-hero-icon"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6"/></svg></span>
             <span>Tölts fel saját képet</span>
             <input type="file" id="nb-upload" accept="image/png,image/jpeg,image/svg+xml" />
           </label>
@@ -122,7 +145,7 @@
 
         <div class="nb-action-card" data-nb-sheet-source="templates" data-nb-sheet-title="Sablonok">
           <button type="button" id="nb-templates-trigger" class="nb-hero-button nb-hero-button--secondary">
-            <span class="nb-hero-icon">📄</span>
+            <span class="nb-hero-icon"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
             <span>Sablon választása</span>
           </button>
         </div>
@@ -131,7 +154,7 @@
 
     <main class="nb-column nb-column--stage">
       <div class="nb-stage-controls" data-nb-sheet-source="sides" data-nb-sheet-title="Előlap / Hátlap">
-        <div class="nb-side-toggle" role="tablist" aria-label="Oldal választó">
+        <div class="nb-side-toggle" role="group" aria-label="Oldal választó">
           <button type="button" class="nb-side-button is-active" data-nb-side="front" aria-pressed="true">Előlap</button>
           <button type="button" class="nb-side-button" data-nb-side="back" aria-pressed="false">Hátlap</button>
         </div>
@@ -161,7 +184,7 @@
       <div class="nb-rail-rest-state" id="nb-properties-panel">
       <div class="nb-action-card" data-nb-sheet-source="addtext" data-nb-sheet-title="Szöveg">
         <button type="button" id="nb-add-text" class="nb-hero-button nb-hero-button--accent">
-          <span class="nb-hero-icon">✎</span>
+          <span class="nb-hero-icon"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5V3h16v2M12 3v18m-4 0h8"/></svg></span>
           <span>Írj saját feliratot</span>
         </button>
       </div>
@@ -353,6 +376,7 @@
         </div>
       </div>
       <div class="nb-summary-card">
+        <p class="nb-studio-eyebrow">A te összeállításod</p>
         <div class="nb-product-heading">
           <h2 id="nb-product-title">Termék</h2>
           <div class="nb-price-display nb-price-display--pending" id="nb-price-display">
@@ -375,6 +399,7 @@
           <div class="nb-print-summary" id="nb-print-summary">Nyomtatási oldalak: 0 / 1</div>
           <button id="nb-add-to-cart" class="nb-cart-button" disabled>Kosárba</button>
           <button type="button" id="nb-bulk-modal-trigger" class="nb-secondary-action">Többet vennék</button>
+          <p class="nb-studio-summary-note" id="nb-studio-selection-hint" role="status">Válassz terméket, színt és méretet a rendeléshez.</p>
         </div>
       </div>
     </aside>
@@ -385,48 +410,51 @@
   <select id="nb-color" class="nb-hidden"></select>
   <select id="nb-size" class="nb-hidden"></select>
 
-  <div class="nb-mobile-toolbar" id="nb-mobile-toolbar" hidden>
+  <div class="nb-mobile-toolbar" id="nb-mobile-toolbar" hidden aria-label="Tervező eszközei, oldalra görgethető">
     <div class="nb-mobile-toolbar-row">
-      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="sides" aria-label="Előlap / hátlap">
-        <span class="nb-mobile-icon-symbol">⇄½</span>
-        <span class="nb-mobile-icon-label">Oldalak</span>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="product" aria-label="Terméktípus">
+        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 3-5 3 2 5 3-1v11h8V10l3 1 2-5-5-3c-1 3-7 3-8 0Z"/></svg></span>
+        <span class="nb-mobile-icon-label">Termék</span>
       </button>
       <button type="button" class="nb-mobile-icon" data-nb-sheet-target="upload" aria-label="Feltöltés">
-        <span class="nb-mobile-icon-symbol">⬆</span>
+        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6"/></svg></span>
         <span class="nb-mobile-icon-label">Feltöltés</span>
       </button>
       <button type="button" class="nb-mobile-icon" data-nb-sheet-target="addtext" aria-label="Szöveg">
-        <span class="nb-mobile-icon-symbol">✎</span>
+        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5V3h16v2M12 3v18m-4 0h8"/></svg></span>
         <span class="nb-mobile-icon-label">Szöveg</span>
       </button>
-      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="product" aria-label="Terméktípus">
-        <span class="nb-mobile-icon-symbol">👕</span>
-        <span class="nb-mobile-icon-label">Termék</span>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="templates" aria-label="Sablonok">
+        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+        <span class="nb-mobile-icon-label">Sablonok</span>
       </button>
       <button type="button" class="nb-mobile-icon" data-nb-sheet-target="layers" aria-label="Rétegek">
-        <span class="nb-mobile-icon-symbol">🧱</span>
+        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 9 5-9 5-9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg></span>
         <span class="nb-mobile-icon-label">Rétegek</span>
         <span class="nb-mobile-icon-badge" hidden></span>
       </button>
-    </div>
-    <div class="nb-mobile-toolbar-row nb-mobile-toolbar-row--secondary">
       <button type="button" class="nb-mobile-icon" data-nb-sheet-target="shapes" aria-label="Elemek">
-        <span class="nb-mobile-icon-symbol">★</span>
+        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></span>
         <span class="nb-mobile-icon-label">Elemek</span>
       </button>
-      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="templates" aria-label="Sablonok">
-        <span class="nb-mobile-icon-symbol">📄</span>
-        <span class="nb-mobile-icon-label">Sablonok</span>
-      </button>
       <button type="button" class="nb-mobile-icon" data-nb-sheet-target="properties" aria-label="Tulajdonságok">
-        <span class="nb-mobile-icon-symbol">⚙</span>
-        <span class="nb-mobile-icon-label">Tulajdonságok</span>
+        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="var(--nb-surface,white)"/><circle cx="15" cy="17" r="3" fill="var(--nb-surface,white)"/></svg></span>
+        <span class="nb-mobile-icon-label">Formázás</span>
+      </button>
+      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="sides" aria-label="Előlap / hátlap">
+        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16l-4-4M20 17H4l4 4"/></svg></span>
+        <span class="nb-mobile-icon-label">Oldalak</span>
       </button>
       <button type="button" class="nb-mobile-icon" data-nb-sheet-target="cart" aria-label="Kosárba">
-        <span class="nb-mobile-icon-symbol">🛒</span>
+        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h2l3 12h10l3-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></span>
         <span class="nb-mobile-icon-label">Kosárba</span>
       </button>
     </div>
+  </div>
+
+  <div class="nb-studio-checkout" id="nb-studio-checkout" hidden>
+    <div><span>Termék ára</span><strong id="nb-studio-total">—</strong></div>
+    <button type="button" id="nb-studio-order">Rendelés <span aria-hidden="true">→</span></button>
   </div>
 
   <div class="nb-mobile-status" id="nb-mobile-status" data-nb-sheet-source="cart" data-nb-sheet-title="Rendelés" data-nb-sheet-unhide hidden>

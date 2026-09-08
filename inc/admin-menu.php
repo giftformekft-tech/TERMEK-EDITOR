@@ -103,6 +103,7 @@ add_action('admin_menu', function(){
   add_submenu_page('nb-designer', __('Típusok és színek','nb-designer'), __('Típusok és színek','nb-designer'), $capability, 'nb-designer-types', 'nb_admin_render');
   add_submenu_page('nb-designer', __('Mockup könyvtár','nb-designer'), __('Mockup könyvtár','nb-designer'), $capability, 'nb-designer-mockups', 'nb_admin_render');
   add_submenu_page('nb-designer', __('Árazás','nb-designer'), __('Árazás','nb-designer'), $capability, 'nb-designer-pricing', 'nb_admin_render');
+  add_submenu_page('nb-designer', __('Megjelenés','nb-designer'), __('Megjelenés','nb-designer'), $capability, 'nb-designer-appearance', 'nb_admin_render');
   add_submenu_page('nb-designer', __('Sablonok','nb-designer'), __('Sablonok','nb-designer'), $capability, 'nb-designer-templates', 'nb_templates_gallery_render');
   add_submenu_page('nb-designer', __('Mentett tervek','nb-designer'), __('Mentett tervek','nb-designer'), $capability, 'nb-designer-designs', 'nb_designs_gallery_render');
   add_submenu_page('nb-designer', __('Eszközök','nb-designer'), __('Eszközök','nb-designer'), $capability, 'nb-designer-tools', 'nb_admin_render');
@@ -118,6 +119,7 @@ function nb_admin_render(){
     'nb-designer-types'=>'colors',
     'nb-designer-mockups'=>'mockups',
     'nb-designer-pricing'=>'pricing',
+    'nb-designer-appearance'=>'appearance',
     'nb-designer-tools'=>'tools',
   ];
   $tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : ($pageTabs[$page] ?? 'overview');
@@ -125,6 +127,7 @@ function nb_admin_render(){
   if ($page === 'nb-designer-products' && $focus_product_id > 0) $tab = 'variants';
   $stored = nb_get_settings([]);
   $settings = is_array($stored) ? $stored : [];
+  $settings['appearance'] = nb_sanitize_designer_appearance($settings['appearance'] ?? []);
   $cleaned = nb_clean_settings_unicode($settings);
   if (wp_json_encode($cleaned) !== wp_json_encode($settings)){
     $settings = $cleaned;
@@ -270,6 +273,9 @@ function nb_admin_render(){
         $settings['bulk_discounts'] = [];
       }
       $saveErrors = array_merge($saveErrors, nb_validate_bulk_discount_tiers($settings['bulk_discounts']));
+    } elseif ($tab==='appearance'){
+      $rawAppearance = isset($_POST['appearance']) && is_array($_POST['appearance']) ? wp_unslash($_POST['appearance']) : [];
+      $settings['appearance'] = nb_sanitize_designer_appearance($rawAppearance);
     } elseif ($tab==='colors'){
       $designerInputs = isset($_POST['color_designer']) ? (array)$_POST['color_designer'] : [];
       $orderInputs    = isset($_POST['color_order']) ? (array)$_POST['color_order'] : [];
@@ -439,6 +445,7 @@ function nb_admin_render(){
       }
       $settings['catalog'] = $catalog;
     }
+    $settings['appearance'] = nb_sanitize_designer_appearance($settings['appearance'] ?? []);
     $settings = nb_clean_settings_unicode($settings);
     if (isset($settings['catalog']) && is_array($settings['catalog'])){
       foreach ($settings['catalog'] as &$catalogCfg){
