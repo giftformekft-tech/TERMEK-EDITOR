@@ -452,7 +452,7 @@
     </div>
   </div>
 
-  <div class="nb-studio-checkout" id="nb-studio-checkout" hidden>
+  <div class="nb-studio-checkout" id="nb-studio-checkout">
     <div><span>Termék ára</span><strong id="nb-studio-total">—</strong></div>
     <button type="button" id="nb-studio-order">Rendelés <span aria-hidden="true">→</span></button>
   </div>
