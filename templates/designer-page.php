@@ -450,7 +450,7 @@
   </div>
 
   <div class="nb-studio-checkout" id="nb-studio-checkout">
-    <div><span>Termék ára</span><strong id="nb-studio-total" aria-live="polite">Ár betöltése…</strong><button type="button" class="nb-studio-bulk-link" data-nb-open-tool="cart">Többet vennék</button></div>
+    <strong id="nb-studio-total" aria-label="Termék ára" aria-live="polite">Ár betöltése…</strong>
     <button type="button" id="nb-studio-order">Kosárba <svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h2l3 12h10l3-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></button>
   </div>
 

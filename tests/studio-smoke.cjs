@@ -110,10 +110,16 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
         }
         const before=cartRequests;
         await page.locator('#nb-studio-order').click();
+        await page.locator('#nb-mobile-complete').waitFor({state:'visible'});
+        await page.locator('#nb-mobile-bulk').waitFor({state:'visible'});
+        assert.equal(cartRequests,before,'bottom cart opens the panel without submitting at '+width);
+        assert.equal(await page.locator('#nb-studio-checkout').evaluate(e=>e.children.length),2,'bottom bar contains only price and cart button');
+        await page.screenshot({path:'tmp/ui-qa/cart-panel-'+width+'.png',fullPage:true});
+        await page.locator('#nb-mobile-complete').click();
         await page.locator('#nb-processing-overlay').waitFor({state:'hidden'});
-        await page.waitForTimeout(300);
-        assert.equal(cartRequests,before+1,'bottom cart submits exactly once at '+width);
-        assert.equal(await page.locator('#nb-mobile-sheet').isVisible(),false,'cart does not open an extra panel');
+        assert.equal(cartRequests,before+1,'panel confirmation submits exactly once at '+width);
+        await page.locator('#nb-mobile-sheet-close').click();
+        await page.locator('#nb-mobile-sheet').waitFor({state:'hidden'});
         assert.equal((await page.locator('#nb-studio-total').textContent()).replace(/\s/g,''),'6990Ft','mobile price at '+width);
         assert.equal(await page.locator('[data-nb-sheet-target="cart"]').count(),0,'cart removed from tool icons');
         const header=await page.locator('.nb-studio-header').boundingBox();
@@ -123,7 +129,7 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
         const scrollable=await row.evaluate(e=>e.scrollWidth>e.clientWidth+1);
         assert.equal(await page.locator('#nb-mobile-scroll-hint').isVisible(),scrollable,'visible scroll hint');
         await row.evaluate(e=>{e.scrollLeft=0;});
-        await page.locator('[data-nb-open-tool="cart"]').click();
+        await page.locator('#nb-studio-order').click();
         await page.locator('#nb-mobile-bulk').waitFor({state:'visible'});
         await page.locator('#nb-mobile-sheet-close').click();
         await page.locator('#nb-mobile-sheet').waitFor({state:'hidden'});
@@ -183,9 +189,12 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
     await page.locator('#nb-mobile-sheet-close').click();
     await page.locator('#nb-mobile-sheet').waitFor({state:'hidden'});
     const successfulCartBefore=cartRequests;
-    await Promise.all([page.waitForURL('http://nb.test/cart-confirmed'),page.locator('#nb-studio-order').click()]);
+    await page.locator('#nb-studio-order').click();
+    await page.locator('#nb-mobile-complete').waitFor({state:'visible'});
+    assert.equal(cartRequests,successfulCartBefore,'opening the panel does not submit');
+    await Promise.all([page.waitForURL('http://nb.test/cart-confirmed'),page.locator('#nb-mobile-complete').click()]);
     assert.equal(cartRequests,successfulCartBefore+1,'successful mobile cart redirects exactly once');
     assert.deepEqual(errors,[],'JavaScript errors across all interactions');
-    console.log('PASS: original tools, text, layers, undo/redo, sides, cart error recovery, mobile 8 tools and direct cart, cold-start price and numeric fallback, scroll hint and SVG alignment, responsive widths 1440/1024/768/390/320, desktop-mobile-desktop restoration.');
+    console.log('PASS: original tools, text, layers, undo/redo, sides, cart error recovery, mobile 8 tools and cart confirmation panel, cold-start price and numeric fallback, scroll hint and SVG alignment, responsive widths 1440/1024/768/390/320, desktop-mobile-desktop restoration.');
   }finally{await page.screenshot({path:'tmp/ui-qa/last-state.png',fullPage:true}).catch(()=>{});await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

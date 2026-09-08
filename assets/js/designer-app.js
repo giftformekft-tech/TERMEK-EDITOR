@@ -4992,11 +4992,7 @@
   });
   if (studioOrderBtn) studioOrderBtn.addEventListener('click', () => {
     if (!mobileUiEnabled()) return;
-    if (!hasCompleteSelection()) {
-      openMobileSheet('product');
-      return;
-    }
-    if (addToCartBtn && !addToCartBtn.disabled) addToCartBtn.click();
+    openMobileSheet(hasCompleteSelection() ? 'cart' : 'product');
   });
 
   // Auto-load saved design from URL ?nb_design_id=ID (set by "Saját Terveim" edit button)
