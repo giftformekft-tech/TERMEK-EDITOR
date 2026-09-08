@@ -165,14 +165,14 @@
           <canvas id="nb-canvas" width="480" height="640"></canvas>
         </div>
         <div class="nb-history-controls" id="nb-history-controls">
-          <button type="button" class="nb-history-btn" id="nb-undo-btn" aria-label="Visszavonás" title="Visszavonás (Ctrl+Z)" disabled>↺</button>
-          <button type="button" class="nb-history-btn" id="nb-redo-btn" aria-label="Ismétlés" title="Ismétlés (Ctrl+Shift+Z)" disabled>↻</button>
+          <button type="button" class="nb-history-btn" id="nb-undo-btn" aria-label="Visszavonás" title="Visszavonás (Ctrl+Z)" disabled><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10h10a7 7 0 0 1 0 14" transform="translate(0 -4)"/><path d="m7 2-4 4 4 4"/></svg></button>
+          <button type="button" class="nb-history-btn" id="nb-redo-btn" aria-label="Ismétlés" title="Ismétlés (Ctrl+Shift+Z)" disabled><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 6H11a7 7 0 0 0 0 14"/><path d="m17 2 4 4-4 4"/></svg></button>
         </div>
         <div class="nb-zoom-controls" id="nb-zoom-controls">
-          <button type="button" class="nb-zoom-btn" id="nb-zoom-out" aria-label="Kicsinyítés" title="Kicsinyítés (Ctrl+-)">−</button>
+          <button type="button" class="nb-zoom-btn" id="nb-zoom-out" aria-label="Kicsinyítés" title="Kicsinyítés (Ctrl+-)"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/></svg></button>
           <span class="nb-zoom-level" id="nb-zoom-level">100%</span>
-          <button type="button" class="nb-zoom-btn" id="nb-zoom-in" aria-label="Nagyítás" title="Nagyítás (Ctrl++)">+</button>
-          <button type="button" class="nb-zoom-btn nb-zoom-btn--reset" id="nb-zoom-reset" aria-label="Nagyítás visszaállítása" title="Visszaállítás (Ctrl+0)">⤢</button>
+          <button type="button" class="nb-zoom-btn" id="nb-zoom-in" aria-label="Nagyítás" title="Nagyítás (Ctrl++)"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M12 5v14"/></svg></button>
+          <button type="button" class="nb-zoom-btn nb-zoom-btn--reset" id="nb-zoom-reset" aria-label="Nagyítás visszaállítása" title="Visszaállítás (Ctrl+0)"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button>
         </div>
         <button type="button" class="nb-side-fab" id="nb-side-toggle-mobile" aria-label="Oldal váltása" hidden>
           ⟲
@@ -411,7 +411,8 @@
   <select id="nb-size" class="nb-hidden"></select>
 
   <div class="nb-mobile-toolbar" id="nb-mobile-toolbar" hidden aria-label="Tervező eszközei, oldalra görgethető">
-    <div class="nb-mobile-toolbar-row">
+    <p class="nb-mobile-scroll-hint" id="nb-mobile-scroll-hint" hidden>← Húzd oldalra a további eszközökért →</p>
+    <div class="nb-mobile-toolbar-row" tabindex="0" aria-label="Tervezőeszközök" aria-describedby="nb-mobile-scroll-hint">
       <button type="button" class="nb-mobile-icon" data-nb-sheet-target="product" aria-label="Terméktípus">
         <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 3-5 3 2 5 3-1v11h8V10l3 1 2-5-5-3c-1 3-7 3-8 0Z"/></svg></span>
         <span class="nb-mobile-icon-label">Termék</span>
@@ -445,16 +446,12 @@
         <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16l-4-4M20 17H4l4 4"/></svg></span>
         <span class="nb-mobile-icon-label">Oldalak</span>
       </button>
-      <button type="button" class="nb-mobile-icon" data-nb-sheet-target="cart" aria-label="Kosárba">
-        <span class="nb-mobile-icon-symbol"><svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h2l3 12h10l3-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></span>
-        <span class="nb-mobile-icon-label">Kosárba</span>
-      </button>
     </div>
   </div>
 
   <div class="nb-studio-checkout" id="nb-studio-checkout">
-    <div><span>Termék ára</span><strong id="nb-studio-total">—</strong></div>
-    <button type="button" id="nb-studio-order">Rendelés <span aria-hidden="true">→</span></button>
+    <div><span>Termék ára</span><strong id="nb-studio-total" aria-live="polite">Ár betöltése…</strong><button type="button" class="nb-studio-bulk-link" data-nb-open-tool="cart">Többet vennék</button></div>
+    <button type="button" id="nb-studio-order">Kosárba <svg class="nb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h2l3 12h10l3-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></button>
   </div>
 
   <div class="nb-mobile-status" id="nb-mobile-status" data-nb-sheet-source="cart" data-nb-sheet-title="Rendelés" data-nb-sheet-unhide hidden>

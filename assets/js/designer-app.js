@@ -315,6 +315,12 @@
   const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
   const studioTotalEl = document.getElementById('nb-studio-total');
   const studioCheckout = document.getElementById('nb-studio-checkout');
+  const studioStage = document.querySelector('#nb-designer .nb-column--stage');
+  const studioHeaderBlocks = Array.from(document.querySelectorAll('#nb-designer > .nb-studio-header, #nb-designer > .nb-studio-help')).map(element => {
+    const placeholder = document.createComment('Studio header position');
+    element.before(placeholder);
+    return { element, placeholder };
+  });
   const studioOrderBtn = document.getElementById('nb-studio-order');
   const studioDesignStatus = document.getElementById('nb-studio-design-status');
   const studioSelectionHint = document.getElementById('nb-studio-selection-hint');
@@ -1467,7 +1473,10 @@
     const sel = currentSelection();
     if (!sel || !sel.cfg) return null;
     const cfg = sel.cfg;
-    if (Number.isFinite(cfg.price_value)) return cfg.price_value;
+    if (cfg.price_value !== '' && cfg.price_value != null) {
+      const value = Number(cfg.price_value);
+      if (Number.isFinite(value)) return value;
+    }
     const priceText = currentProductPriceText();
     if (!priceText) return null;
     return parsePriceValue(priceText);
@@ -1523,19 +1532,18 @@
   }
 
   function updatePriceDisplay() {
-    if (!priceDisplayEl) return;
     const markup = currentProductPriceMarkup();
     const priceText = currentProductPriceText();
     const baseAmount = currentProductPriceValue();
     const surcharge = shouldApplyDoubleSidedSurcharge() ? doubleSidedFeeValue() : 0;
-    const hasBase = (markup && markup.trim()) || (priceText && priceText.trim());
+    const hasBase = Number.isFinite(baseAmount) || (markup && markup.trim()) || (priceText && priceText.trim());
     const totalTargets = [priceTotalEl, priceTotalMobileEl, studioTotalEl].filter(Boolean);
     const surchargeTargets = [];
     if (priceSurchargeRow && priceSurchargeValueEl) {
       surchargeTargets.push({ row: priceSurchargeRow, value: priceSurchargeValueEl });
     }
     if (!hasBase) {
-      priceDisplayEl.classList.add('nb-price-display--pending');
+      if (priceDisplayEl) priceDisplayEl.classList.add('nb-price-display--pending');
       if (priceBaseEl) priceBaseEl.textContent = '—';
       surchargeTargets.forEach(target => {
         target.row.hidden = true;
@@ -1547,15 +1555,15 @@
       return;
     }
 
-    priceDisplayEl.classList.remove('nb-price-display--pending');
+    if (priceDisplayEl) priceDisplayEl.classList.remove('nb-price-display--pending');
 
     if (priceBaseEl) {
       if (markup && markup !== priceText) {
         priceBaseEl.innerHTML = markup;
       } else {
-        priceBaseEl.textContent = priceText;
+        priceBaseEl.textContent = priceText || formatPrice(baseAmount);
       }
-    } else if (markup) {
+    } else if (markup && priceDisplayEl) {
       priceDisplayEl.innerHTML = markup;
     }
 
@@ -2366,9 +2374,21 @@
     }
   }
 
+  function updateMobileScrollHint() {
+    const row = mobileToolbar && mobileToolbar.querySelector('.nb-mobile-toolbar-row');
+    const hint = document.getElementById('nb-mobile-scroll-hint');
+    if (hint && row) hint.hidden = !mobileUiEnabled() || row.scrollWidth <= row.clientWidth + 1;
+  }
+
   function refreshMobileUi() {
     const enabled = mobileUiEnabled();
     if (studioCheckout) studioCheckout.hidden = !enabled;
+    studioHeaderBlocks.forEach(({ element, placeholder }) => {
+      if (enabled && studioStage) studioStage.appendChild(element);
+      else placeholder.after(element);
+    });
+    updatePriceDisplay();
+    requestAnimationFrame(updateMobileScrollHint);
     if (enabled && flyoutState.activeKey) closeFlyout({ skipFocus: true });
     if (mobileToolbar) {
       if (enabled) {
@@ -4972,7 +4992,11 @@
   });
   if (studioOrderBtn) studioOrderBtn.addEventListener('click', () => {
     if (!mobileUiEnabled()) return;
-    openMobileSheet(hasCompleteSelection() ? 'cart' : 'product');
+    if (!hasCompleteSelection()) {
+      openMobileSheet('product');
+      return;
+    }
+    if (addToCartBtn && !addToCartBtn.disabled) addToCartBtn.click();
   });
 
   // Auto-load saved design from URL ?nb_design_id=ID (set by "Saját Terveim" edit button)
@@ -5023,6 +5047,7 @@
     });
   }
 
+  window.addEventListener('resize', updateMobileScrollHint);
   if (mobileMedia) {
     const mobileListener = () => { refreshMobileUi(); };
     if (typeof mobileMedia.addEventListener === 'function') {

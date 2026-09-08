@@ -20,15 +20,29 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
 (async()=>{
   const browser = await chromium.launch({...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {channel:'chrome'}),headless:true});
   const page = await browser.newPage({viewport:{width:1440,height:1000}});
+  let cartRequests=0;
+  let cartSucceeds=false;
   const errors=[]; page.on('pageerror',e=>errors.push(e.message)); page.on('dialog',d=>d.dismiss());
   await page.route('**/*', async route=>{
     const u=new URL(route.request().url());
     if(u.hostname !== 'nb.test')return route.abort();
-    if(u.pathname==='/')return route.fulfill({contentType:'text/html',body:html});
+    if(u.pathname==='/') {
+      let body=html;
+      if(u.searchParams.has('numeric')) {
+        const numeric=JSON.parse(JSON.stringify(fixture));
+        delete numeric.settings.catalog[1].price_text;
+        numeric.settings.catalog[1].price_value='6990';
+        body=body.replace(JSON.stringify(fixture),JSON.stringify(numeric));
+        // Mobile totals must not depend on the desktop summary container.
+        body=body.replace('id="nb-price-display"','id="qa-omitted-desktop-price"');
+      }
+      return route.fulfill({contentType:'text/html',body});
+    }
     if(u.pathname==='/tmp/ui-qa/fabric.min.js')return route.fulfill({path:fabricPath,contentType:'application/javascript'});
     if(u.pathname==='/shirt.svg')return route.fulfill({contentType:'image/svg+xml',body:shirt});
     if(u.pathname==='/api/save')return route.fulfill({contentType:'application/json',body:JSON.stringify({design_id:77})});
-    if(u.pathname==='/api/add-to-cart')return route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({message:'Tesztelt kosárhiba'})});
+    if(u.pathname==='/api/add-to-cart'){cartRequests++;return route.fulfill({status:cartSucceeds?200:400,contentType:'application/json',body:JSON.stringify(cartSucceeds?{redirect:'http://nb.test/cart-confirmed'}:{message:'Tesztelt kosárhiba'})});}
+    if(u.pathname==='/cart-confirmed')return route.fulfill({contentType:'text/html',body:'<p>Kosár teszt</p>'});
     if(u.pathname.startsWith('/api/'))return route.fulfill({contentType:'application/json',body:'[]'});
     const file=path.join(root,u.pathname);if(fs.existsSync(file))return route.fulfill({path:file});
     return route.abort();
@@ -61,6 +75,11 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
     await page.locator('#nb-double-sided-toggle').check();
     await page.locator('.nb-side-button[data-nb-side="back"]').click();
     await page.waitForTimeout(200);
+    await page.locator('[data-nb-rail-target="addtext"]').click();
+    await page.locator('#nb-add-text').click();
+    assert.equal((await page.locator('#nb-studio-total').textContent()).replace(/\s/g,''),'8490Ft','back-side surcharge reaches mobile total');
+    await page.locator('#nb-undo-btn').click();
+    await page.waitForFunction(()=>document.getElementById('nb-studio-total').textContent.replace(/\s/g,'')==='6990Ft');
     await page.locator('.nb-side-button[data-nb-side="front"]').click();
     await page.waitForTimeout(200);
     for(const key of ['upload','shapes','templates','layers','properties','product']){
@@ -81,7 +100,7 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
       if(width<=768){
         await page.locator('#nb-studio-checkout').waitFor({state:'visible'});
         assert.ok(await page.locator('#nb-mobile-toolbar').evaluate(e=>e.getBoundingClientRect().height<100),'mobile toolbar is one row');
-        for(const key of ['product','upload','addtext','shapes','templates','layers','properties','sides','cart']){
+        for(const key of ['product','upload','addtext','shapes','templates','layers','properties','sides']){
           const b=page.locator(`[data-nb-sheet-target="${key}"]`);
           await b.click();
           await page.locator('#nb-mobile-sheet').waitFor({state:'visible'});
@@ -89,14 +108,30 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
           await page.locator('#nb-mobile-sheet-close').click();
           await page.locator('#nb-mobile-sheet').waitFor({state:'hidden'});
         }
+        const before=cartRequests;
         await page.locator('#nb-studio-order').click();
-        await page.locator('#nb-mobile-complete').waitFor({state:'visible'});
+        await page.locator('#nb-processing-overlay').waitFor({state:'hidden'});
+        await page.waitForTimeout(300);
+        assert.equal(cartRequests,before+1,'bottom cart submits exactly once at '+width);
+        assert.equal(await page.locator('#nb-mobile-sheet').isVisible(),false,'cart does not open an extra panel');
+        assert.equal((await page.locator('#nb-studio-total').textContent()).replace(/\s/g,''),'6990Ft','mobile price at '+width);
+        assert.equal(await page.locator('[data-nb-sheet-target="cart"]').count(),0,'cart removed from tool icons');
+        const header=await page.locator('.nb-studio-header').boundingBox();
+        const stage=await page.locator('.nb-product-stage').boundingBox();
+        assert.ok(header.y>=stage.y+stage.height-1,'header under canvas at '+width);
+        const row=page.locator('.nb-mobile-toolbar-row');
+        const scrollable=await row.evaluate(e=>e.scrollWidth>e.clientWidth+1);
+        assert.equal(await page.locator('#nb-mobile-scroll-hint').isVisible(),scrollable,'visible scroll hint');
+        await row.evaluate(e=>{e.scrollLeft=0;});
+        await page.locator('[data-nb-open-tool="cart"]').click();
+        await page.locator('#nb-mobile-bulk').waitFor({state:'visible'});
         await page.locator('#nb-mobile-sheet-close').click();
         await page.locator('#nb-mobile-sheet').waitFor({state:'hidden'});
       }
       await page.screenshot({path:`tmp/ui-qa/viewport-${width}.png`,fullPage:true});
     }
     await page.setViewportSize({width:1440,height:1000});await page.waitForTimeout(300);
+    assert.equal(await page.locator('#nb-designer > .nb-studio-header').count(),1,'desktop header restored');
     await page.locator('[data-nb-rail-target="product"]').click();
     await page.locator('#nb-product-modal-trigger').waitFor({state:'visible'});
     await page.evaluate(()=>{
@@ -120,7 +155,37 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
     await page.setViewportSize({width:390,height:900});
     await page.locator('#nb-studio-order').waitFor({state:'visible'});
     assert.equal(await page.locator('#nb-studio-order').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(35, 69, 103)','mobile theme color');
+    for (const query of ['', '?numeric=1']) {
+      await page.goto('http://nb.test/'+query);
+      await page.waitForFunction(()=>document.getElementById('nb-studio-total').textContent.replace(/\s/g,'')==='6990Ft');
+      assert.equal(await page.locator('.nb-column--stage > .nb-studio-header').count(),1,'mobile cold-start header');
+      await page.addStyleTag({content:'button {padding: 15px 30px; line-height: 2;}'});
+      for(const id of ['nb-undo-btn','nb-redo-btn','nb-zoom-in','nb-zoom-out']) {
+        const button=page.locator('#'+id), icon=button.locator('svg');
+        const b=await button.boundingBox(), i=await icon.boundingBox();
+        assert.ok(b.width>=44 && b.height>=44,'touch target '+id);
+        assert.ok(Math.abs(i.x+i.width/2-b.x-b.width/2)<1 && Math.abs(i.y+i.height/2-b.y-b.height/2)<1,'centered icon '+id);
+      }
+      await page.locator('#nb-zoom-in').click();
+      assert.ok(await page.evaluate(()=>window.qaCanvas.getZoom()>1),'mobile zoom action');
+      await page.locator('#nb-zoom-out').click();
+      await page.screenshot({path:'tmp/ui-qa/mobile-cold'+(query?'-numeric':'')+'.png',fullPage:true});
+      await page.evaluate(()=>{const size=document.getElementById('nb-size');size.value='';size.dispatchEvent(new Event('change',{bubbles:true}));});
+      const before=cartRequests;
+      await page.locator('#nb-studio-order').click();
+      await page.locator('#nb-mobile-sheet').waitFor({state:'visible'});
+      assert.equal(cartRequests,before,'incomplete selection does not submit cart');
+    }
+    cartSucceeds=true;
+    await page.goto('http://nb.test/');
+    await page.locator('[data-nb-sheet-target="addtext"]').click();
+    await page.locator('#nb-add-text').click();
+    await page.locator('#nb-mobile-sheet-close').click();
+    await page.locator('#nb-mobile-sheet').waitFor({state:'hidden'});
+    const successfulCartBefore=cartRequests;
+    await Promise.all([page.waitForURL('http://nb.test/cart-confirmed'),page.locator('#nb-studio-order').click()]);
+    assert.equal(cartRequests,successfulCartBefore+1,'successful mobile cart redirects exactly once');
     assert.deepEqual(errors,[],'JavaScript errors across all interactions');
-    console.log('PASS: original tools, text, layers, undo/redo, sides, cart error recovery, mobile 9 tools, responsive widths 1440/1024/768/390/320, desktop-mobile-desktop restoration.');
+    console.log('PASS: original tools, text, layers, undo/redo, sides, cart error recovery, mobile 8 tools and direct cart, cold-start price and numeric fallback, scroll hint and SVG alignment, responsive widths 1440/1024/768/390/320, desktop-mobile-desktop restoration.');
   }finally{await page.screenshot({path:'tmp/ui-qa/last-state.png',fullPage:true}).catch(()=>{});await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

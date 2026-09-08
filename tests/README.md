@@ -15,4 +15,6 @@ The test runs the actual frontend template, stylesheets and editor code in a bro
 
 This does not replace a WordPress/WooCommerce integration test of admin persistence, live product data, pricing, or successful checkout.
 
+Mobile regression coverage also checks cold-start prices (including numeric-only data without the desktop price container), two-sided surcharges, the header below the canvas, the visible scroll hint, centered SVG controls under theme button padding, and direct cart submission with failure recovery and a mocked successful redirect.
+
 The appearance test uses the real admin preview markup and script with form fixtures. It verifies changing primary/secondary colors, square corners, and restoring defaults without submitting a form.
