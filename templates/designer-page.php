@@ -504,6 +504,11 @@
           <h3>Terméktípus</h3>
           <div class="nb-modal-type-list" id="nb-modal-type-list"></div>
         </div>
+        <div class="nb-modal-section">
+          <h3>Elérhető termékek</h3>
+          <p class="nb-modal-help">Az adminban engedélyezett termékek közül választhatsz.</p>
+          <div class="nb-modal-product-list" id="nb-modal-product-list"></div>
+        </div>
       </div>
     </div>
   </div>

@@ -292,6 +292,7 @@
   const productModal = document.getElementById('nb-product-modal');
   const productModalTrigger = document.getElementById('nb-product-modal-trigger');
   const modalTypeList = document.getElementById('nb-modal-type-list');
+  const modalProductList = document.getElementById('nb-modal-product-list');
   const colorModal = document.getElementById('nb-color-modal');
   const colorModalTrigger = document.getElementById('nb-color-modal-trigger');
   const modalColorList = document.getElementById('nb-modal-color-list');
@@ -540,7 +541,12 @@
   })();
 
   function getCatalog() { return settings.catalog || {}; }
-  function productList() { return settings.products || []; }
+  function productList() {
+    if (Array.isArray(settings.products) && settings.products.length) return settings.products;
+    const catalog = settings.catalog;
+    if (!catalog || typeof catalog !== 'object') return [];
+    return Object.keys(catalog).filter(key => /^\d+$/.test(String(key)));
+  }
   function mockups() {
     const raw = settings.mockups;
     if (Array.isArray(raw)) {
@@ -1258,6 +1264,50 @@
     });
   }
 
+  function renderModalProducts() {
+    if (!modalProductList) return;
+    modalProductList.innerHTML = '';
+    const cat = getCatalog();
+    const options = Array.from(productSel.options);
+    const products = productList();
+    if (!products.length) {
+      const empty = document.createElement('div');
+      empty.className = 'nb-modal-empty';
+      empty.textContent = 'Nincs elérhető termék. Ellenőrizd az admin Termékek beállításait.';
+      modalProductList.appendChild(empty);
+      return;
+    }
+    const currentValue = String(productSel.value || '');
+    products.forEach(pid => {
+      const key = String(pid);
+      const cfg = cat[pid] || cat[key] || {};
+      const option = options.find(opt => String(opt.value) === key);
+      const title = (cfg.title || option?.textContent || `Termék #${key}`).toString().trim();
+      const typeLabels = Array.isArray(cfg.types) ? cfg.types.filter(Boolean).join(' · ') : '';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'nb-modal-product' + (key === currentValue ? ' is-active' : '');
+      btn.setAttribute('aria-pressed', key === currentValue ? 'true' : 'false');
+      const titleEl = document.createElement('strong');
+      titleEl.textContent = title;
+      btn.appendChild(titleEl);
+      if (typeLabels) {
+        const metaEl = document.createElement('span');
+        metaEl.className = 'nb-modal-product-meta';
+        metaEl.textContent = typeLabels;
+        btn.appendChild(metaEl);
+      }
+      btn.addEventListener('click', () => {
+        if (productSel.value !== key) {
+          productSel.value = key;
+          dispatchChangeEvent(productSel);
+        }
+        closeProductModal();
+      });
+      modalProductList.appendChild(btn);
+    });
+  }
+
   function firstProductForType(typeValue) {
     const cat = getCatalog();
     const normalized = normalizedTypeValue(typeValue);
@@ -1320,6 +1370,7 @@
   function openProductModal() {
     if (!productModal) return;
     renderModalTypes();
+    renderModalProducts();
     productModal.hidden = false;
     updateModalBodyState();
   }
@@ -4795,6 +4846,7 @@
     });
     ensureSelectValue(productSel);
     ensureProductMatchesType();
+    renderModalProducts();
   }
 
   function populateColorsSizes() {
@@ -5094,6 +5146,7 @@
     populateColorsSizes();
     setMockupBgAndArea();
     updateSelectionSummary();
+    renderModalProducts();
     markDesignDirty();
   };
   if (colorSel) colorSel.onchange = () => { renderColorChoices(); setMockupBgAndArea(); updateSelectionSummary(); markDesignDirty(); };

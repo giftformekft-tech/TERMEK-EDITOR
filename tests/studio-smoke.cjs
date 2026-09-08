@@ -53,6 +53,11 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
     await page.locator('#nb-redo-btn').click();
     await page.waitForTimeout(150);
     await page.locator('[data-nb-rail-target="product"]').click();
+    await page.locator('#nb-product-modal-trigger').click();
+    assert.equal(await page.locator('#nb-modal-product-list .nb-modal-product').count(), 1, 'admin products appear in product picker');
+    assert.equal(await page.locator('#nb-modal-product-list .nb-modal-product strong').textContent(), 'Prémium póló', 'product picker uses configured title');
+    await page.locator('#nb-modal-product-list .nb-modal-product').click();
+    await page.locator('#nb-product-modal').waitFor({state:'hidden'});
     await page.locator('#nb-double-sided-toggle').check();
     await page.locator('.nb-side-button[data-nb-side="back"]').click();
     await page.waitForTimeout(200);
