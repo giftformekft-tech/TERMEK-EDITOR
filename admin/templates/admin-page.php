@@ -1,6 +1,7 @@
 <?php
 if (!defined('ABSPATH')) exit;
 $settings = nb_sync_mockup_references(is_array($settings) ? $settings : []);
+$settings['appearance'] = nb_sanitize_designer_appearance($settings['appearance'] ?? []);
 $report = nb_configuration_report($settings);
 $mockups = $settings['mockups'] ?? [];
 $catalog = $settings['catalog'] ?? [];
@@ -13,12 +14,12 @@ $statusLabel = empty($report['missing']) ? __('Rendben', 'nb-designer') : __('Te
 <div class="wrap nb-admin nb-admin-v2">
   <header class="nb-page-header">
     <div>
-      <p class="nb-eyebrow"><?php esc_html_e('Nano Banana Terméktervező · v2.0', 'nb-designer'); ?></p>
+    <p class="nb-eyebrow"><?php esc_html_e('Nano Banana Terméktervező · v2.1', 'nb-designer'); ?></p>
       <h1><?php
         $titles = [
           'overview'=>__('Áttekintés','nb-designer'), 'products'=>__('Termékek','nb-designer'),
           'variants'=>__('Termék konfiguráció','nb-designer'), 'colors'=>__('Típusok és színek','nb-designer'),
-          'mockups'=>__('Mockup könyvtár','nb-designer'), 'pricing'=>__('Árazás','nb-designer'),
+          'mockups'=>__('Mockup könyvtár','nb-designer'), 'pricing'=>__('Árazás','nb-designer'), 'appearance'=>__('Megjelenés','nb-designer'),
           'tools'=>__('Eszközök','nb-designer'),
         ];
         echo esc_html($titles[$tab] ?? __('Terméktervező','nb-designer'));
@@ -139,6 +140,43 @@ $statusLabel = empty($report['missing']) ? __('Rendben', 'nb-designer') : __('Te
   <?php elseif ($tab === 'pricing'): ?>
     <?php $tiers=$settings['bulk_discounts']??[]; $rowCount=max(count($tiers)+1,2); ?>
     <form method="post" class="nb-form nb-pricing-layout" data-dirty-form data-pricing-form><?php wp_nonce_field('nb_save','nb_nonce'); ?><div><section class="nb-panel"><h2><?php esc_html_e('Globális alapértékek','nb-designer'); ?></h2><div class="nb-field-grid"><label><span><?php esc_html_e('Ár négyzetcentiméterenként','nb-designer'); ?></span><input type="number" min="0" step="0.1" name="fee_per_cm2" value="<?php echo esc_attr($settings['fee_per_cm2']??3); ?>"><small><?php esc_html_e('Ft/cm²','nb-designer'); ?></small></label><label><span><?php esc_html_e('Minimum felár','nb-designer'); ?></span><input type="number" min="0" step="1" name="min_fee" value="<?php echo esc_attr($settings['min_fee']??990); ?>"><small>Ft</small></label><label><span><?php esc_html_e('Kétoldalas felár','nb-designer'); ?></span><input type="number" min="0" step="1" name="double_sided_fee" value="<?php echo esc_attr($settings['double_sided_fee']??0); ?>"><small>Ft</small></label></div></section><section class="nb-panel"><h2><?php esc_html_e('Mennyiségi kedvezmények','nb-designer'); ?></h2><div class="nb-repeater" data-repeater="discounts"><?php for($i=0;$i<$rowCount;$i++):$tier=$tiers[$i]??[]; ?><div class="nb-repeater-row is-compact"><label><span><?php esc_html_e('Darabtól','nb-designer'); ?></span><input type="number" min="1" name="bulk_from[]" value="<?php echo esc_attr($tier['min_qty']??''); ?>"></label><label><span><?php esc_html_e('Darabig','nb-designer'); ?></span><input type="number" min="0" name="bulk_to[]" value="<?php echo esc_attr(!empty($tier['max_qty'])?$tier['max_qty']:''); ?>"></label><label><span><?php esc_html_e('Kedvezmény','nb-designer'); ?></span><input type="number" min="0" max="99.9" step="0.1" name="bulk_discount[]" value="<?php echo esc_attr($tier['percent']??''); ?>"></label><button type="button" class="button-link-delete nb-remove-row">×</button></div><?php endfor; ?></div><div class="nb-validation-message" aria-live="polite"></div><button type="button" class="button nb-add-row" data-target="discounts">+ <?php esc_html_e('Sáv hozzáadása','nb-designer'); ?></button></section></div><aside class="nb-panel nb-calculator"><h2><?php esc_html_e('Élő kalkuláció','nb-designer'); ?></h2><div class="nb-field-grid is-single"><label><span><?php esc_html_e('Termék','nb-designer'); ?></span><select data-calc="product_id"><?php foreach($selectedProducts as $pid):?><option value="<?php echo esc_attr($pid); ?>" data-price="<?php $p=wc_get_product($pid);echo esc_attr($p?$p->get_price():0); ?>"><?php echo esc_html(get_the_title($pid)); ?></option><?php endforeach;?></select></label><label><span><?php esc_html_e('Típus','nb-designer'); ?></span><select data-calc="type"><?php foreach(($settings['types']??[]) as $type):?><option value="<?php echo esc_attr(nb_normalize_type_key($type)); ?>"><?php echo esc_html($type); ?></option><?php endforeach;?></select></label><label><span><?php esc_html_e('Szín','nb-designer'); ?></span><select data-calc="color"><?php foreach(($settings['color_palette']??[]) as $color):?><option value="<?php echo esc_attr(nb_normalize_color_key($color)); ?>"><?php echo esc_html($color); ?></option><?php endforeach;?></select></label><label><span><?php esc_html_e('Mennyiség','nb-designer'); ?></span><input type="number" min="1" value="1" data-calc="quantity"></label><label class="nb-inline-toggle"><input type="checkbox" data-calc="two_sided"> <?php esc_html_e('Kétoldalas','nb-designer'); ?></label></div><div id="nb-price-breakdown" class="nb-price-breakdown" aria-live="polite"><p><?php esc_html_e('Válassz értékeket a kalkulációhoz.','nb-designer'); ?></p></div></aside><div class="nb-save-bar"><span class="nb-save-state" aria-live="polite"><?php esc_html_e('Nincs mentetlen módosítás','nb-designer'); ?></span><button class="button button-primary"><?php esc_html_e('Módosítások mentése','nb-designer'); ?></button></div></form>
+
+  <?php elseif ($tab === 'appearance'): ?>
+    <?php $appearance = nb_sanitize_designer_appearance($settings['appearance'] ?? []); $appearanceDefaults = nb_designer_appearance_defaults(); ?>
+    <form method="post" class="nb-form nb-appearance-form" data-dirty-form data-appearance-defaults="<?php echo esc_attr(wp_json_encode($appearanceDefaults)); ?>">
+      <?php wp_nonce_field('nb_save','nb_nonce'); ?>
+      <section class="nb-appearance-layout">
+        <div>
+          <section class="nb-panel">
+            <div class="nb-panel-heading"><div><h2><?php esc_html_e('Stúdió színvilága','nb-designer'); ?></h2><p><?php esc_html_e('A tervező felületének színei és lekerekítése. A változás mentés után jelenik meg a vásárlói oldalon.','nb-designer'); ?></p></div></div>
+            <div class="nb-appearance-fields">
+              <?php
+                $appearanceLabels = [
+                  'background'=>__('Munkafelület','nb-designer'), 'surface'=>__('Kártya felülete','nb-designer'), 'surface_alt'=>__('Másodlagos felület','nb-designer'),
+                  'text'=>__('Fő szöveg','nb-designer'), 'muted'=>__('Halvány szöveg','nb-designer'), 'border'=>__('Szegély','nb-designer'),
+                  'accent'=>__('Főgomb és kijelölés','nb-designer'), 'accent_text'=>__('Főgomb szövege','nb-designer'), 'accent_hover'=>__('Főgomb rámutatáskor','nb-designer'),
+                  'secondary'=>__('Másodlagos gomb','nb-designer'), 'secondary_text'=>__('Másodlagos gomb szövege','nb-designer'), 'success'=>__('Sikeres állapot','nb-designer'), 'danger'=>__('Hiba állapot','nb-designer'),
+                ];
+                foreach ($appearanceLabels as $key => $label):
+              ?>
+                <label class="nb-appearance-field"><span><?php echo esc_html($label); ?></span><span class="nb-appearance-color-control"><input type="color" name="appearance[<?php echo esc_attr($key); ?>]" value="<?php echo esc_attr($appearance[$key]); ?>" data-appearance-key="<?php echo esc_attr($key); ?>"><code><?php echo esc_html($appearance[$key]); ?></code></span></label>
+              <?php endforeach; ?>
+              <label class="nb-appearance-field nb-appearance-radius"><span><?php esc_html_e('Lekerekítés','nb-designer'); ?></span><span class="nb-appearance-radius-control"><input type="range" min="0" max="24" step="1" name="appearance[radius]" value="<?php echo esc_attr($appearance['radius']); ?>" data-appearance-key="radius"><output data-appearance-radius-output><?php echo esc_html($appearance['radius']); ?> px</output></span></label>
+            </div>
+            <div class="nb-appearance-actions"><button type="button" class="button" data-appearance-reset><?php esc_html_e('Alapértékek visszaállítása','nb-designer'); ?></button><span class="description"><?php esc_html_e('A visszaállítás csak az előnézetet és a mezőket módosítja; a mentéshez kattints a Mentés gombra.','nb-designer'); ?></span></div>
+          </section>
+          <div class="nb-save-bar"><span class="nb-save-state" aria-live="polite"><?php esc_html_e('Nincs mentetlen módosítás','nb-designer'); ?></span><button class="button button-primary"><?php esc_html_e('Módosítások mentése','nb-designer'); ?></button></div>
+        </div>
+        <aside class="nb-panel nb-appearance-preview-panel">
+          <div class="nb-panel-heading"><div><h2><?php esc_html_e('Élő előnézet','nb-designer'); ?></h2><p><?php esc_html_e('A színek és gombok megjelenése mentés előtt kipróbálható.','nb-designer'); ?></p></div></div>
+          <div class="nb-appearance-preview" id="nb-appearance-preview" aria-label="<?php esc_attr_e('Megjelenés előnézete','nb-designer'); ?>">
+            <div class="nb-preview-toolbar"><span class="nb-preview-logo">N</span><strong><?php esc_html_e('Tervező','nb-designer'); ?></strong><span class="nb-preview-status"><?php esc_html_e('Mentve','nb-designer'); ?></span></div>
+            <div class="nb-preview-workspace"><div class="nb-preview-sidebar"><span></span><span></span><span></span><span></span></div><div class="nb-preview-canvas"><div class="nb-preview-shirt"></div><span class="nb-preview-mark">NB</span></div><div class="nb-preview-order"><strong><?php esc_html_e('Összesítő','nb-designer'); ?></strong><span></span><span></span><button type="button" class="is-primary"><?php esc_html_e('Kosárba','nb-designer'); ?></button><button type="button" class="is-secondary"><?php esc_html_e('Előnézet','nb-designer'); ?></button><small class="is-warning"><?php esc_html_e('Hiányzó hátlap','nb-designer'); ?></small></div></div>
+          </div>
+          <div class="nb-appearance-legend"><span><i class="is-accent"></i><?php esc_html_e('Fő művelet','nb-designer'); ?></span><span><i class="is-surface"></i><?php esc_html_e('Felület','nb-designer'); ?></span><span><i class="is-background"></i><?php esc_html_e('Munkaterület','nb-designer'); ?></span></div>
+        </aside>
+      </section>
+    </form>
 
   <?php elseif ($tab === 'tools'): ?>
     <div class="nb-tools-grid"><form method="post" class="nb-form" data-dirty-form><?php wp_nonce_field('nb_save','nb_nonce'); ?><section class="nb-panel"><h2><?php esc_html_e('Betűtípusok','nb-designer'); ?></h2><p><?php esc_html_e('A tervezőben betölthető fontfájlok, azonnali előnézettel.','nb-designer'); ?></p><div id="nb-fonts"><?php foreach(($settings['fonts']??[]) as $url):?><div class="nb-font"><input type="url" name="fonts[]" value="<?php echo esc_attr($url); ?>"><span class="nb-font-preview" style="font-family:var(--nb-font-preview)">Árvíztűrő tükörfúrógép</span><button type="button" class="button nb-remove-font"><?php esc_html_e('Eltávolítás','nb-designer'); ?></button></div><?php endforeach;?></div><button type="button" class="button" id="nb-add-font">+ <?php esc_html_e('Font mező','nb-designer'); ?></button><p><button class="button button-primary"><?php esc_html_e('Fontok mentése','nb-designer'); ?></button></p></section></form><form method="post" class="nb-form" data-dirty-form><?php wp_nonce_field('nb_save','nb_nonce'); ?><section class="nb-panel"><h2><?php esc_html_e('Import / export','nb-designer'); ?></h2><p><?php esc_html_e('Migráció vagy környezetváltás előtt exportálj biztonsági mentést.','nb-designer'); ?></p><p><a class="button" href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=nb_export_settings'),'nb_export_settings')); ?>"><?php esc_html_e('Konfiguráció exportálása','nb-designer'); ?></a></p><label for="nb-import-json"><strong><?php esc_html_e('JSON import','nb-designer'); ?></strong></label><textarea id="nb-import-json" name="nb_import_json" rows="10" placeholder="{ … }"></textarea><p><button class="button button-primary"><?php esc_html_e('Importálás és ellenőrzés','nb-designer'); ?></button></p></section></form></div>

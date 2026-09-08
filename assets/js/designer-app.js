@@ -312,6 +312,11 @@
   const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
   const priceTotalEl = document.getElementById('nb-price-total');
   const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
+  const studioTotalEl = document.getElementById('nb-studio-total');
+  const studioCheckout = document.getElementById('nb-studio-checkout');
+  const studioOrderBtn = document.getElementById('nb-studio-order');
+  const studioDesignStatus = document.getElementById('nb-studio-design-status');
+  const studioSelectionHint = document.getElementById('nb-studio-selection-hint');
   const fontFamilySel = document.getElementById('nb-font-family');
   const DEFAULT_FONT_SIZE = 24;
   const DEFAULT_STROKE_WIDTH = 0;
@@ -610,6 +615,14 @@
   function updateActionStates() {
     const ready = hasCompleteSelection();
     const busy = saving || actionSubmitting;
+    if (studioOrderBtn) studioOrderBtn.disabled = busy;
+    if (studioDesignStatus) {
+      studioDesignStatus.dataset.state = saving ? 'saving' : (!designState.dirty && designState.savedDesignId ? 'saved' : 'dirty');
+      studioDesignStatus.textContent = saving ? 'Terv mentése…' : (!designState.dirty && designState.savedDesignId ? 'Terv elmentve' : 'Mentés kosárba helyezéskor');
+    }
+    if (studioSelectionHint) {
+      studioSelectionHint.textContent = ready ? 'A tervet kosárba helyezéskor mentjük.' : 'Válassz terméket, színt és méretet a rendeléshez.';
+    }
     if (addToCartBtn) {
       addToCartBtn.disabled = !ready || busy;
     }
@@ -1465,7 +1478,7 @@
     const baseAmount = currentProductPriceValue();
     const surcharge = shouldApplyDoubleSidedSurcharge() ? doubleSidedFeeValue() : 0;
     const hasBase = (markup && markup.trim()) || (priceText && priceText.trim());
-    const totalTargets = [priceTotalEl, priceTotalMobileEl].filter(Boolean);
+    const totalTargets = [priceTotalEl, priceTotalMobileEl, studioTotalEl].filter(Boolean);
     const surchargeTargets = [];
     if (priceSurchargeRow && priceSurchargeValueEl) {
       surchargeTargets.push({ row: priceSurchargeRow, value: priceSurchargeValueEl });
@@ -1665,98 +1678,27 @@
   }
 
   function preferredCanvasBounds() {
-    const stageColumn = canvasEl.closest('.nb-column--stage');
-    const stageFrame = canvasEl.closest('.nb-product-frame');
-    const widthConstraints = [];
-    const heightConstraints = [];
-
-    if (stageColumn) {
-      const rect = stageColumn.getBoundingClientRect();
-      if (rect) {
-        if (rect.width) {
-          widthConstraints.push(Math.floor(rect.width));
-        }
-        if (rect.height) {
-          heightConstraints.push(Math.floor(rect.height - 32));
-        }
-      }
-    }
-
-    if (stageFrame) {
-      const rect = stageFrame.getBoundingClientRect();
-      if (rect) {
-        if (rect.width) {
-          widthConstraints.push(Math.floor(rect.width));
-        }
-        if (rect.height) {
-          heightConstraints.push(Math.floor(rect.height - 24));
-        }
-      }
-    }
-
-    if (window.innerWidth) {
-      widthConstraints.push(Math.floor(window.innerWidth - 24));
-    }
-    if (window.innerHeight) {
-      heightConstraints.push(Math.floor(window.innerHeight - 140));
-    }
-
-    const positiveMin = (values, fallback) => {
-      const filtered = values.filter(v => Number.isFinite(v) && v > 0);
-      if (!filtered.length) return fallback;
-      return Math.max(220, Math.min(...filtered));
-    };
-
-    const widthAvailable = positiveMin(widthConstraints, defaultCanvasSize.w);
-    const heightAvailable = positiveMin(heightConstraints, defaultCanvasSize.h);
-
+    // Measure the stable stage, never the previously sized canvas wrapper.
+    // Reading the wrapper here creates a shrink feedback loop after layout changes.
+    const stage = canvasEl.closest('.nb-product-stage');
+    const style = stage ? getComputedStyle(stage) : null;
+    const horizontalPadding = style ? (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0) : 0;
+    const availableWidth = stage ? stage.clientWidth - horizontalPadding - 2 : window.innerWidth - 32;
+    const reservedHeight = mobileUiEnabled() ? 290 : 230;
     return {
-      w: Math.max(widthAvailable, 220),
-      h: Math.max(heightAvailable, 220)
+      w: Math.max(1, availableWidth || defaultCanvasSize.w),
+      h: Math.max(220, window.innerHeight - reservedHeight)
     };
   }
 
   function applyCanvasSize(size) {
     const canvasElement = c.getElement();
-    const sizeW = positiveNumberOr(size?.w, defaultCanvasSize.w);
-    const sizeH = positiveNumberOr(size?.h, defaultCanvasSize.h);
-    const targetW = sizeW > 0 ? sizeW : defaultCanvasSize.w;
-    const targetH = sizeH > 0 ? sizeH : defaultCanvasSize.h;
-
-    const canvasContainer = canvasElement?.parentElement || null;
-    const containerRect = canvasContainer && typeof canvasContainer.getBoundingClientRect === 'function'
-      ? canvasContainer.getBoundingClientRect()
-      : null;
-    const containerWidth = containerRect && containerRect.width ? Math.floor(containerRect.width) : 0;
-
+    const targetW = positiveNumberOr(size?.w, defaultCanvasSize.w);
+    const targetH = positiveNumberOr(size?.h, defaultCanvasSize.h);
     const bounds = preferredCanvasBounds();
-    let scaleX = bounds.w / targetW;
-    let scaleY = bounds.h / targetH;
-    if (!Number.isFinite(scaleX) || scaleX <= 0) {
-      scaleX = 1;
-    }
-    if (!Number.isFinite(scaleY) || scaleY <= 0) {
-      scaleY = 1;
-    }
-
-    const narrowLayout = (containerWidth && containerWidth <= 640)
-      || (!containerWidth && window.innerWidth && window.innerWidth <= 768);
-    let scale = narrowLayout ? scaleX : Math.min(scaleX, scaleY);
-    if (!Number.isFinite(scale) || scale <= 0) {
-      scale = narrowLayout ? scaleX : 1;
-    }
-    if (!Number.isFinite(scale) || scale <= 0) {
-      scale = 1;
-    }
-
-    let appliedW = Math.max(1, Math.round(targetW * scale));
-    let appliedH = Math.max(1, Math.round(targetH * scale));
-
-    if (containerWidth && appliedW > containerWidth) {
-      const containerScale = containerWidth / appliedW;
-      appliedW = Math.max(1, Math.round(appliedW * containerScale));
-      appliedH = Math.max(1, Math.round(appliedH * containerScale));
-    }
+    const scale = Math.min(bounds.w / targetW, bounds.h / targetH);
+    const appliedW = Math.max(1, Math.floor(targetW * scale));
+    const appliedH = Math.max(1, Math.floor(targetH * scale));
 
     const dims = { width: appliedW, height: appliedH };
     const cssDims = { cssOnly: true };
@@ -2022,6 +1964,10 @@
     printSummaryEl.textContent = `Nyomtatási oldalak: ${used} / ${total}`;
   }
 
+  function toolPanelTitle(key) {
+    return ({ product: 'Termék beállításai', sides: 'Előlap és hátlap', upload: 'Saját képek', addtext: 'Szöveg hozzáadása', shapes: 'Elemek és QR-kód', templates: 'Sablonok', layers: 'Rétegek', properties: 'Tulajdonságok', cart: 'Rendelés' })[key] || '';
+  }
+
   function sheetKeysForTarget(key) {
     if (!key) return [];
     const bundle = sectionBundles[key];
@@ -2068,6 +2014,8 @@
     mobileToolbarButtons.forEach((btn, key) => {
       if (!btn) return;
       const isActive = sheetState.activeKey === key;
+      btn.setAttribute('aria-expanded', String(isActive));
+      btn.setAttribute('aria-controls', 'nb-mobile-sheet');
       if (isActive) {
         btn.classList.add('is-active');
       } else {
@@ -2236,7 +2184,7 @@
       }
     });
     if (mobileSheetTitle) {
-      const label = titles.length ? titles.join(' • ') : '';
+      const label = toolPanelTitle(key) || (titles.length ? titles.join(' • ') : '');
       if (label) {
         mobileSheetTitle.textContent = label;
       } else {
@@ -2268,6 +2216,8 @@
   function updateRailActiveState() {
     railButtons.forEach((btn, key) => {
       if (!btn) return;
+      btn.setAttribute('aria-expanded', String(flyoutState.activeKey === key));
+      btn.setAttribute('aria-controls', 'nb-flyout');
       if (flyoutState.activeKey === key) {
         btn.classList.add('is-active');
       } else {
@@ -2302,7 +2252,7 @@
     }
   }
 
-  function openFlyout(key) {
+  function openFlyout(key, options) {
     if (!flyout || !flyoutContent || !key) return;
     if (flyoutState.activeKey === key) {
       closeFlyout();
@@ -2341,7 +2291,7 @@
       }
     });
     if (flyoutTitle) {
-      const label = titles.length ? titles.join(' • ') : '';
+      const label = toolPanelTitle(key) || (titles.length ? titles.join(' • ') : '');
       if (label) {
         flyoutTitle.textContent = label;
       } else {
@@ -2356,6 +2306,7 @@
     flyout.classList.add('is-open');
     flyoutState.activeKey = key;
     updateRailActiveState();
+    if (options && options.skipFocus) return;
     const focusTarget = flyoutContent.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
     if (focusTarget && typeof focusTarget.focus === 'function') {
       focusTarget.focus();
@@ -2366,6 +2317,8 @@
 
   function refreshMobileUi() {
     const enabled = mobileUiEnabled();
+    if (studioCheckout) studioCheckout.hidden = !enabled;
+    if (enabled && flyoutState.activeKey) closeFlyout({ skipFocus: true });
     if (mobileToolbar) {
       if (enabled) {
         mobileToolbar.removeAttribute('hidden');
@@ -2376,7 +2329,6 @@
     if (!enabled) {
       const previousDepth = sheetState.historyDepth;
       closeMobileSheet({ fromPopState: true });
-      restoreAllSheetSources();
       if (previousDepth > 0 && typeof history !== 'undefined' && history.back) {
         sheetState.pendingClose = true;
         history.back();
@@ -4941,11 +4893,35 @@
   syncTextControls();
   syncImageControls();
   captureActiveSideState();
+  commitHistory();
   updateCanvasEmptyHint();
   updateSideUiState();
   updateSideStatus();
   updatePrintSummary();
   refreshMobileUi();
+  updateToolbarActiveState();
+  updateRailActiveState();
+  if (!mobileUiEnabled()) openFlyout('product', { skipFocus: true });
+
+  const studioHelpToggle = document.getElementById('nb-studio-help-toggle');
+  const studioHelp = document.getElementById('nb-studio-help');
+  if (studioHelpToggle && studioHelp) {
+    studioHelpToggle.addEventListener('click', () => {
+      studioHelp.hidden = !studioHelp.hidden;
+      studioHelpToggle.setAttribute('aria-expanded', String(!studioHelp.hidden));
+    });
+  }
+  document.querySelectorAll('[data-nb-open-tool]').forEach(button => {
+    button.addEventListener('click', () => {
+      const key = button.dataset.nbOpenTool;
+      if (mobileUiEnabled()) openMobileSheet(key);
+      else openFlyout(key);
+    });
+  });
+  if (studioOrderBtn) studioOrderBtn.addEventListener('click', () => {
+    if (!mobileUiEnabled()) return;
+    openMobileSheet(hasCompleteSelection() ? 'cart' : 'product');
+  });
 
   // Auto-load saved design from URL ?nb_design_id=ID (set by "Saját Terveim" edit button)
   const urlNbDesignId = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.nb_design_id) ? parseInt(NB_DESIGNER.nb_design_id, 10) : 0;
@@ -6111,7 +6087,7 @@
   const processingOverlay = document.createElement('div');
   processingOverlay.id = 'nb-processing-overlay';
   processingOverlay.setAttribute('role', 'status');
-  processingOverlay.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,.6);z-index:999999;align-items:center;justify-content:center;';
+  processingOverlay.style.display = 'none';
   processingOverlay.innerHTML = '<div class="nb-processing-box"><div class="nb-processing-spinner"></div><p class="nb-processing-text">Kis türelmet, terv feldolgozása…</p></div>';
   document.body.appendChild(processingOverlay);
 
@@ -6159,6 +6135,7 @@
           alert('Hálózati hiba');
         }
       } finally {
+        hideProcessingOverlay();
         actionSubmitting = false;
         updateActionStates();
       }

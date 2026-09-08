@@ -1,5 +1,9 @@
 # TERMEK-EDITOR
 
+## Tervező megjelenése
+
+A Terméktervező → Megjelenés oldalon a teljes tervezői felület színvilága és lekerekítése állítható. A módosítások élő miniatűr előnézetben láthatók, az alapértékek visszaállítása pedig csak a mezőket és az előnézetet módosítja; a tartós alkalmazáshoz külön mentés szükséges. A beállítások a meglévő termék-, mockup- és árazási konfigurációtól függetlenül, az `appearance` kulcs alatt tárolódnak.
+
 ## Főoldali Gutenberg-blokk
 
 A bővítmény az **„Egyedi terméktervező – főoldali blokk”** nevű dinamikus blokkot adja a Gutenberg szerkesztőhöz.
