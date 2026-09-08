@@ -54,6 +54,11 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
     const ids = await page.locator('[id]').evaluateAll(els=>els.map(e=>e.id));
     assert.equal(ids.length,new Set(ids).size,'duplicate element IDs');
     await page.locator('#nb-flyout').waitFor({state:'visible'});
+    assert.ok(await page.evaluate(()=>document.querySelector('.nb-studio-header').getBoundingClientRect().top>=document.querySelector('.nb-product-stage').getBoundingClientRect().bottom),'desktop header below canvas');
+    await page.locator('#nb-studio-help-toggle').click();
+    await page.locator('#nb-studio-help').waitFor({state:'visible'});
+    await page.locator('#nb-studio-help-toggle').click();
+    await page.locator('#nb-studio-help').waitFor({state:'hidden'});
     const widthBefore=await page.locator('.nb-column--stage').evaluate(e=>e.getBoundingClientRect().width);
     await page.locator('[data-nb-rail-target="addtext"]').click();
     await page.locator('#nb-add-text').click();
@@ -97,6 +102,7 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
       const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
       assert.equal(overflow,false,'page overflow at '+width);
       assert.ok(await page.locator('#nb-canvas').evaluate(e=>e.getBoundingClientRect().width>180),'canvas stays visible at '+width);
+      assert.ok(await page.evaluate(()=>document.querySelector('.nb-studio-header').getBoundingClientRect().top>=document.querySelector('.nb-product-stage').getBoundingClientRect().bottom),'header below canvas at '+width);
       if(width<=768){
         await page.locator('#nb-studio-checkout').waitFor({state:'visible'});
         assert.ok(await page.locator('#nb-mobile-toolbar').evaluate(e=>e.getBoundingClientRect().height<100),'mobile toolbar is one row');
@@ -137,7 +143,7 @@ const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="v
       await page.screenshot({path:`tmp/ui-qa/viewport-${width}.png`,fullPage:true});
     }
     await page.setViewportSize({width:1440,height:1000});await page.waitForTimeout(300);
-    assert.equal(await page.locator('#nb-designer > .nb-studio-header').count(),1,'desktop header restored');
+    assert.equal(await page.locator('.nb-column--stage > .nb-studio-header').count(),1,'desktop header stays below canvas');
     await page.locator('[data-nb-rail-target="product"]').click();
     await page.locator('#nb-product-modal-trigger').waitFor({state:'visible'});
     await page.evaluate(()=>{

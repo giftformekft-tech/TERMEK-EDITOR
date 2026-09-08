@@ -1,18 +1,4 @@
 <div id="nb-designer">
-  <header class="nb-studio-header">
-    <div class="nb-studio-brand">
-      <span class="nb-studio-mark" aria-hidden="true"></span>
-      <div class="nb-studio-heading"><h1>Tervezd meg</h1><p>A te ötleted. A te stílusod.</p></div>
-    </div>
-    <div class="nb-studio-header-tools">
-      <span id="nb-studio-design-status" role="status">Mentés kosárba helyezéskor</span>
-      <button type="button" id="nb-studio-help-toggle" aria-expanded="false" aria-controls="nb-studio-help">Segítség</button>
-    </div>
-  </header>
-  <div class="nb-studio-help" id="nb-studio-help" hidden>
-    <p><strong>Így készül a saját terméked:</strong> válassz terméket, színt és méretet, majd tölts fel képet, adj hozzá szöveget vagy válassz sablont. A kijelölt elemet a Tulajdonságok és a Rétegek eszközzel szerkesztheted. A hátoldalhoz kapcsold be a kétoldalas nyomtatást.</p>
-    <p>A tervet kosárba helyezéskor mentjük. Több mérethez válaszd a „Többet vennék” lehetőséget. Mobilon az eszközsort oldalra húzva minden eszközt elérsz.</p>
-  </div>
   <div class="nb-designer-shell">
     <aside class="nb-column nb-column--actions">
       <nav class="nb-rail" id="nb-rail" aria-label="Eszközök">
@@ -177,6 +163,20 @@
         <button type="button" class="nb-side-fab" id="nb-side-toggle-mobile" aria-label="Oldal váltása" hidden>
           ⟲
         </button>
+      </div>
+      <header class="nb-studio-header">
+        <div class="nb-studio-brand">
+          <span class="nb-studio-mark" aria-hidden="true"></span>
+          <div class="nb-studio-heading"><h1>Tervezd meg</h1><p>A te ötleted. A te stílusod.</p></div>
+        </div>
+        <div class="nb-studio-header-tools">
+          <span id="nb-studio-design-status" role="status">Mentés kosárba helyezéskor</span>
+          <button type="button" id="nb-studio-help-toggle" aria-expanded="false" aria-controls="nb-studio-help">Segítség</button>
+        </div>
+      </header>
+      <div class="nb-studio-help" id="nb-studio-help" hidden>
+        <p><strong>Így készül a saját terméked:</strong> válassz terméket, színt és méretet, majd tölts fel képet, adj hozzá szöveget vagy válassz sablont. A kijelölt elemet a Tulajdonságok és a Rétegek eszközzel szerkesztheted. A hátoldalhoz kapcsold be a kétoldalas nyomtatást.</p>
+        <p>A tervet kosárba helyezéskor mentjük. Több mérethez válaszd a „Többet vennék” lehetőséget. Mobilon az eszközsort oldalra húzva minden eszközt elérsz.</p>
       </div>
     </main>
 

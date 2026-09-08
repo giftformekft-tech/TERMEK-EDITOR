@@ -72,11 +72,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
   min-height: 64px;
-  margin: -2px -2px 18px;
-  padding: 4px 2px 16px;
-  border-bottom: 1px solid var(--studio-border);
+  margin: 0;
+  padding: 12px 2px;
+  border-top: 1px solid var(--studio-border);
 }
 
 #nb-designer .nb-studio-brand,

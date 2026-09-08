@@ -315,12 +315,6 @@
   const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
   const studioTotalEl = document.getElementById('nb-studio-total');
   const studioCheckout = document.getElementById('nb-studio-checkout');
-  const studioStage = document.querySelector('#nb-designer .nb-column--stage');
-  const studioHeaderBlocks = Array.from(document.querySelectorAll('#nb-designer > .nb-studio-header, #nb-designer > .nb-studio-help')).map(element => {
-    const placeholder = document.createComment('Studio header position');
-    element.before(placeholder);
-    return { element, placeholder };
-  });
   const studioOrderBtn = document.getElementById('nb-studio-order');
   const studioDesignStatus = document.getElementById('nb-studio-design-status');
   const studioSelectionHint = document.getElementById('nb-studio-selection-hint');
@@ -2383,10 +2377,6 @@
   function refreshMobileUi() {
     const enabled = mobileUiEnabled();
     if (studioCheckout) studioCheckout.hidden = !enabled;
-    studioHeaderBlocks.forEach(({ element, placeholder }) => {
-      if (enabled && studioStage) studioStage.appendChild(element);
-      else placeholder.after(element);
-    });
     updatePriceDisplay();
     requestAnimationFrame(updateMobileScrollHint);
     if (enabled && flyoutState.activeKey) closeFlyout({ skipFocus: true });
