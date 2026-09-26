@@ -18,6 +18,7 @@ define('NB_DESIGNER_PRINT_AREA_WIDTH_MM', 300);
 define('NB_DESIGNER_PRINT_AREA_HEIGHT_MM', 400);
 
 require_once NB_DESIGNER_PATH.'inc/helpers.php';
+require_once NB_DESIGNER_PATH.'inc/design-guard.php';
 require_once NB_DESIGNER_PATH.'inc/appearance.php';
 require_once NB_DESIGNER_PATH.'inc/cpt.php';
 require_once NB_DESIGNER_PATH.'inc/rest.php';
@@ -30,6 +31,7 @@ require_once NB_DESIGNER_PATH.'inc/admin-meta.php';
 require_once NB_DESIGNER_PATH.'inc/admin-menu.php';
 require_once NB_DESIGNER_PATH.'inc/admin-rest.php';
 require_once NB_DESIGNER_PATH.'inc/account-integration.php';
+require_once NB_DESIGNER_PATH.'inc/design-cleanup.php';
 
 add_action('admin_init', 'nb_upgrade_settings_schema');
 add_action('init', function(){ load_plugin_textdomain('nb-designer', false, dirname(plugin_basename(__FILE__)).'/languages'); });
@@ -65,4 +67,8 @@ register_activation_hook(__FILE__, function(){
   }
   nb_upgrade_settings_schema();
   if (function_exists('nb_teamwear_ensure_page')) nb_teamwear_ensure_page();
+});
+
+register_deactivation_hook(__FILE__, function(){
+  wp_clear_scheduled_hook('nb_designer_cleanup_designs');
 });

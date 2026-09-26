@@ -40,6 +40,10 @@ function nb_calc_fee_for_design($design_id, $override_ctx = []){
   if ($printed_side_count < 0){
     $printed_side_count = 0;
   }
+  // Ha van hátoldali nyomdai fájl, az kétoldalas nyomtatás, függetlenül a tárolt számtól.
+  if (get_post_meta($design_id,'print_back_url',true) || get_post_meta($design_id,'preview_back_url',true)){
+    $printed_side_count = max($printed_side_count, 2);
+  }
 
   if (!empty($settings['catalog'][$pid])){
     $cfg = $settings['catalog'][$pid];
@@ -55,14 +59,11 @@ function nb_calc_fee_for_design($design_id, $override_ctx = []){
 
   $fee = max($min, round($area_cm2 * $per)) + $base + $size_add;
   if ($printed_side_count > 1){
-    $meta_double_fee = floatval(get_post_meta($design_id,'double_sided_fee',true));
-    if ($meta_double_fee > 0){
-      $fee += $meta_double_fee;
-    } else {
-      $global_double_fee = isset($settings['double_sided_fee']) ? floatval($settings['double_sided_fee']) : 0;
-      if ($global_double_fee > 0){
-        $fee += $global_double_fee;
-      }
+    // Mindig az aktuális admin beállítást használjuk; a tervnél tárolt érték régebben
+    // a kliens kéréséből származott, így nem megbízható.
+    $global_double_fee = isset($settings['double_sided_fee']) ? floatval($settings['double_sided_fee']) : 0;
+    if ($global_double_fee > 0){
+      $fee += $global_double_fee;
     }
   }
   return max(0,$fee);
