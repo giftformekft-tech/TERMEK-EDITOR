@@ -1,6 +1,56 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
+/**
+ * A katalógus termékeihez hozzáadja a WooCommerce árat (price_value, price_html, price_text)
+ * és szinkronizálja a típus–szín beállításokat. A frontend és az admin felület is ezt használja.
+ */
+function nb_enrich_catalog_for_designer($settings){
+  if (!empty($settings['catalog']) && is_array($settings['catalog'])){
+    foreach($settings['catalog'] as $pid=>&$cfg){
+      if (empty($cfg['title'])) $cfg['title'] = get_the_title($pid);
+      unset($cfg['price_html'], $cfg['price_text']);
+      unset($cfg['price_value']);
+      if (function_exists('wc_get_product')) {
+        $product_obj = wc_get_product($pid);
+        if ($product_obj) {
+          $display_price = '';
+          if (function_exists('wc_get_price_to_display')) {
+            $display_price = wc_get_price_to_display($product_obj);
+          }
+          if ($display_price !== '' && is_numeric($display_price)) {
+            $cfg['price_value'] = (float)$display_price;
+          }
+          $price_html = $product_obj->get_price_html();
+          if ($price_html === '' && $display_price !== '' && function_exists('wc_price')) {
+            if ($display_price !== '') {
+              $price_html = wc_price($display_price);
+            }
+          }
+          if (is_string($price_html) && $price_html !== '') {
+            $cfg['price_html'] = wp_kses_post($price_html);
+            if (function_exists('wp_strip_all_tags')) {
+              $plain = trim(wp_strip_all_tags($price_html));
+              if ($plain !== '') {
+                $cfg['price_text'] = $plain;
+              }
+            }
+          }
+          if (!isset($cfg['price_text']) || $cfg['price_text'] === '') {
+            $raw_price = $product_obj->get_price();
+            if ($raw_price !== '') {
+              $cfg['price_text'] = (string)$raw_price;
+            }
+          }
+        }
+      }
+      nb_sync_product_color_configuration($cfg, $settings);
+    }
+    unset($cfg);
+  }
+  return $settings;
+}
+
 add_action('wp_enqueue_scripts', function(){
   if ( is_page() && has_shortcode(get_post()->post_content ?? '', 'nb_designer') ) {
     $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.7.11';
@@ -16,47 +66,7 @@ add_action('wp_enqueue_scripts', function(){
     // Clean settings but do not save on frontend load
     $settings = nb_sync_mockup_references($cleaned);
     wp_add_inline_style('nb-designer', nb_designer_appearance_inline_css($settings['appearance'] ?? []));
-    if (!empty($settings['catalog']) && is_array($settings['catalog'])){
-      foreach($settings['catalog'] as $pid=>&$cfg){
-        if (empty($cfg['title'])) $cfg['title'] = get_the_title($pid);
-        unset($cfg['price_html'], $cfg['price_text']);
-        unset($cfg['price_value']);
-        if (function_exists('wc_get_product')) {
-          $product_obj = wc_get_product($pid);
-          if ($product_obj) {
-            $display_price = '';
-            if (function_exists('wc_get_price_to_display')) {
-              $display_price = wc_get_price_to_display($product_obj);
-            }
-            if ($display_price !== '' && is_numeric($display_price)) {
-              $cfg['price_value'] = (float)$display_price;
-            }
-            $price_html = $product_obj->get_price_html();
-            if ($price_html === '' && $display_price !== '' && function_exists('wc_price')) {
-              if ($display_price !== '') {
-                $price_html = wc_price($display_price);
-              }
-            }
-            if (is_string($price_html) && $price_html !== '') {
-              $cfg['price_html'] = wp_kses_post($price_html);
-              if (function_exists('wp_strip_all_tags')) {
-                $plain = trim(wp_strip_all_tags($price_html));
-                if ($plain !== '') {
-                  $cfg['price_text'] = $plain;
-                }
-              }
-            }
-            if (!isset($cfg['price_text']) || $cfg['price_text'] === '') {
-              $raw_price = $product_obj->get_price();
-              if ($raw_price !== '') {
-                $cfg['price_text'] = (string)$raw_price;
-              }
-            }
-          }
-        }
-        nb_sync_product_color_configuration($cfg, $settings);
-      }
-    }
+    $settings = nb_enrich_catalog_for_designer($settings);
     $initial_design_image_url = '';
     $nb_product_id = isset($_GET['nb_product']) ? absint($_GET['nb_product']) : 0;
     $nb_type = isset($_GET['nb_type']) ? sanitize_text_field(wp_unslash($_GET['nb_type'])) : '';
@@ -127,47 +137,7 @@ add_action('admin_enqueue_scripts', function($hook){
     } else {
       $adminSettings = nb_sync_mockup_references($cleanedAdmin);
     }
-    if (!empty($adminSettings['catalog']) && is_array($adminSettings['catalog'])){
-      foreach($adminSettings['catalog'] as $pid=>&$cfg){
-        if (empty($cfg['title'])) $cfg['title'] = get_the_title($pid);
-        unset($cfg['price_html'], $cfg['price_text']);
-        unset($cfg['price_value']);
-        if (function_exists('wc_get_product')) {
-          $product_obj = wc_get_product($pid);
-          if ($product_obj) {
-            $display_price = '';
-            if (function_exists('wc_get_price_to_display')) {
-              $display_price = wc_get_price_to_display($product_obj);
-            }
-            if ($display_price !== '' && is_numeric($display_price)) {
-              $cfg['price_value'] = (float)$display_price;
-            }
-            $price_html = $product_obj->get_price_html();
-            if ($price_html === '' && $display_price !== '' && function_exists('wc_price')) {
-              if ($display_price !== '') {
-                $price_html = wc_price($display_price);
-              }
-            }
-            if (is_string($price_html) && $price_html !== '') {
-              $cfg['price_html'] = wp_kses_post($price_html);
-              if (function_exists('wp_strip_all_tags')) {
-                $plain = trim(wp_strip_all_tags($price_html));
-                if ($plain !== '') {
-                  $cfg['price_text'] = $plain;
-                }
-              }
-            }
-            if (!isset($cfg['price_text']) || $cfg['price_text'] === '') {
-              $raw_price = $product_obj->get_price();
-              if ($raw_price !== '') {
-                $cfg['price_text'] = (string)$raw_price;
-              }
-            }
-          }
-        }
-        nb_sync_product_color_configuration($cfg, $adminSettings);
-      }
-    }
+    $adminSettings = nb_enrich_catalog_for_designer($adminSettings);
     wp_localize_script('nb-admin','NB_ADMIN',[
       'nonce' => wp_create_nonce('nb_admin'),
       'restNonce' => wp_create_nonce('wp_rest'),
