@@ -359,73 +359,87 @@ add_action('rest_api_init', function(){
     'methods'  => 'POST',
     'permission_callback' => $permission_callback,
     'callback' => function($req){
-      $png = $req->get_param('png_base64');
-      $print_png = $req->get_param('print_png_base64');
+      $rate = nb_check_rate_limit(
+        'save',
+        apply_filters('nb_designer_save_rate_limit', 20),
+        apply_filters('nb_designer_save_rate_window', 10 * MINUTE_IN_SECONDS)
+      );
+      if (is_wp_error($rate)) return $rate;
+
+      $limits = nb_design_upload_limits();
       $meta = $req->get_param('meta');
+      $meta = is_array($meta) ? $meta : [];
       $layers = $req->get_param('layers');
-      if (! $png || strpos($png,'data:image/png;base64,') !== 0) {
-        return new WP_Error('bad_png','Hibás PNG adat', ['status'=>400]);
+      $layers_json = wp_json_encode($layers);
+      if ($layers_json === false || strlen($layers_json) > intval($limits['layers_bytes'])) {
+        return new WP_Error('bad_layers','A terv adatai túl nagyok vagy hibásak', ['status'=>413]);
       }
-      $data = base64_decode(substr($png,22));
-      $print_data = null;
+
+      // Az árazási kontextust a szerver konfigurációjához kötjük; a kliens nem adhat meg
+      // tetszőleges terméket vagy nem létező típus|szín párost.
+      $storedSettings = nb_get_settings([]);
+      $serverSettings = nb_sync_mockup_references(is_array($storedSettings) ? $storedSettings : []);
+      $product_id = intval($meta['product_id'] ?? 0);
+      $priceCtx = nb_validate_design_price_ctx($meta['price_ctx'] ?? [], $product_id, $serverSettings);
+      if (is_wp_error($priceCtx)) return $priceCtx;
+      $attributes = isset($meta['attributes_json']) && is_array($meta['attributes_json']) ? $meta['attributes_json'] : [];
+      if (isset($priceCtx['type'])) $attributes['pa_type'] = $priceCtx['type'];
+      if (isset($priceCtx['color'])) $attributes['pa_color'] = $priceCtx['color'];
+
+      $data = nb_decode_png_data_url($req->get_param('png_base64'), intval($limits['preview_bytes']), 'bad_png', 'előnézeti PNG');
+      if (is_wp_error($data)) return $data;
+      $print_png = $req->get_param('print_png_base64');
+      $print_data = $data;
       if ($print_png){
-        if (strpos($print_png,'data:image/png;base64,') !== 0){
-          return new WP_Error('bad_print_png','Hibás nyomdai PNG adat', ['status'=>400]);
-        }
-        $print_data = base64_decode(substr($print_png,22));
+        $print_data = nb_decode_png_data_url($print_png, intval($limits['print_bytes']), 'bad_print_png', 'nyomdai PNG');
+        if (is_wp_error($print_data)) return $print_data;
       }
-      if (! $print_data){
-        $print_data = $data;
+      $back_data = null;
+      $back_print_data = null;
+      $png_back = $req->get_param('png_back_base64');
+      $print_png_back = $req->get_param('print_png_back_base64');
+      if ($png_back){
+        $back_data = nb_decode_png_data_url($png_back, intval($limits['preview_bytes']), 'bad_png_back', 'hátoldali PNG');
+        if (is_wp_error($back_data)) return $back_data;
       }
+      if ($print_png_back){
+        $back_print_data = nb_decode_png_data_url($print_png_back, intval($limits['print_bytes']), 'bad_print_png_back', 'hátoldali nyomdai PNG');
+        if (is_wp_error($back_print_data)) return $back_print_data;
+      }
+
       if ( ! function_exists('wp_upload_bits') ) require_once ABSPATH.'wp-admin/includes/file.php';
       $timestamp = time();
-      $preview_filename = 'nb_preview_'.$timestamp.'.png';
-      $print_filename = 'nb_print_'.$timestamp.'.png';
-      $upload = wp_upload_bits($preview_filename, null, $data);
+      $upload = wp_upload_bits('nb_preview_'.$timestamp.'.png', null, $data);
       if (!empty($upload['error'])) return new WP_Error('upload','Mentési hiba: '.$upload['error'], ['status'=>500]);
-      $print_upload = wp_upload_bits($print_filename, null, $print_data);
+      $print_upload = wp_upload_bits('nb_print_'.$timestamp.'.png', null, $print_data);
       if (!empty($print_upload['error'])) return new WP_Error('print_upload','Mentési hiba: '.$print_upload['error'], ['status'=>500]);
       $print_width_px = max(0, intval($req->get_param('print_width_px')));
       $print_height_px = max(0, intval($req->get_param('print_height_px')));
-      $png_back = $req->get_param('png_back_base64');
-      $print_png_back = $req->get_param('print_png_back_base64');
       $back_preview_upload = null;
       $back_print_upload = null;
-      if ($png_back){
-        if (strpos($png_back,'data:image/png;base64,') !== 0){
-          return new WP_Error('bad_png_back','Hibás hátoldali PNG adat', ['status'=>400]);
-        }
-        $back_data = base64_decode(substr($png_back,22));
-        $back_preview_filename = 'nb_preview_back_'.$timestamp.'.png';
-        $back_preview_upload = wp_upload_bits($back_preview_filename, null, $back_data);
+      if ($back_data !== null){
+        $back_preview_upload = wp_upload_bits('nb_preview_back_'.$timestamp.'.png', null, $back_data);
         if (!empty($back_preview_upload['error'])){
           return new WP_Error('upload_back','Mentési hiba: '.$back_preview_upload['error'], ['status'=>500]);
         }
       }
-      if ($print_png_back){
-        if (strpos($print_png_back,'data:image/png;base64,') !== 0){
-          return new WP_Error('bad_print_png_back','Hibás hátoldali nyomdai PNG adat', ['status'=>400]);
-        }
-        $back_print_data = base64_decode(substr($print_png_back,22));
-        $back_print_filename = 'nb_print_back_'.$timestamp.'.png';
-        $back_print_upload = wp_upload_bits($back_print_filename, null, $back_print_data);
+      if ($back_print_data !== null){
+        $back_print_upload = wp_upload_bits('nb_print_back_'.$timestamp.'.png', null, $back_print_data);
         if (!empty($back_print_upload['error'])){
           return new WP_Error('print_upload_back','Mentési hiba: '.$back_print_upload['error'], ['status'=>500]);
         }
       }
       $print_back_width_px = max(0, intval($req->get_param('print_back_width_px')));
       $print_back_height_px = max(0, intval($req->get_param('print_back_height_px')));
-      $double_enabled = !empty($meta['double_sided_enabled']) ? 1 : 0;
-      $printed_side_count = max(0, intval($meta['printed_side_count'] ?? 0));
-      $double_fee = isset($meta['double_sided_surcharge']) ? floatval($meta['double_sided_surcharge']) : 0;
-      if ($double_fee < 0){
-        $double_fee = 0;
-      }
+
+      // A nyomtatott oldalak számát és a kétoldalas felárat a szerver határozza meg a
+      // ténylegesen feltöltött fájlokból és a saját beállításaiból, nem a kérésből.
+      $has_back = $back_print_upload !== null || $back_preview_upload !== null;
+      $printed_side_count = $has_back ? 2 : 1;
+      $double_enabled = $has_back ? 1 : 0;
+      $double_fee = $has_back ? max(0, floatval($serverSettings['double_sided_fee'] ?? 0)) : 0;
       $printed_sides = isset($meta['printed_sides']) ? $meta['printed_sides'] : [];
 
-      $storedSettings = nb_get_settings([]);
-      $serverSettings = nb_sync_mockup_references(is_array($storedSettings) ? $storedSettings : []);
-      $priceCtx = isset($meta['price_ctx']) && is_array($meta['price_ctx']) ? $meta['price_ctx'] : [];
       $frontArea = nb_design_physical_area($serverSettings, $priceCtx, 'front');
       $backArea = nb_design_physical_area($serverSettings, $priceCtx, 'back');
       $post_author = get_current_user_id();
@@ -436,7 +450,7 @@ add_action('rest_api_init', function(){
         'meta_input'=>[
           'preview_url'     => esc_url_raw($upload['url']),
           'print_url'       => esc_url_raw($print_upload['url']),
-          'layers_json'     => wp_json_encode($layers),
+          'layers_json'     => $layers_json,
           'width_mm'        => $frontArea['width_mm'],
           'height_mm'       => $frontArea['height_mm'],
           'dpi'             => $frontArea['dpi'],
@@ -447,9 +461,9 @@ add_action('rest_api_init', function(){
           'back_dpi'        => $backArea['dpi'],
           'back_mockup_id'  => $backArea['mockup_id'],
           'back_print_area_id' => $backArea['area_id'],
-          'product_id'      => intval($meta['product_id']??0),
-          'attributes_json' => wp_json_encode($meta['attributes_json']??[]),
-          'price_ctx'       => wp_json_encode($meta['price_ctx']??[]),
+          'product_id'      => $product_id,
+          'attributes_json' => wp_json_encode($attributes),
+          'price_ctx'       => wp_json_encode($priceCtx),
           'print_width_px'  => $print_width_px,
           'print_height_px' => $print_height_px,
           'preview_back_url'    => $back_preview_upload ? esc_url_raw($back_preview_upload['url']) : '',
