@@ -1,5 +1,20 @@
 # TERMEK-EDITOR
 
+## Tervező felület (2.2)
+
+A `/tervezd-meg/` oldal tervezője egyetlen, mobilra és asztali gépre egyaránt tervezett felületet kapott:
+
+- **Asztali gépen** balra az eszközök (Termék, Feltöltés, Szöveg, Elemek, Sablonok) és a nyitott eszközpanel, középen a vászon, jobbra a kijelölt elem beállításai (Formázás / Rétegek) és a rendelési összesítő látható. A „Tervezd meg” cím és a Segítség a vászon alatt marad.
+- **Tableten** az eszközpanel lebegve nyílik a vászon fölött, és hozzáadás után magától bezárul.
+- **Mobilon** felül a termék (szín, méret) és a Kosárba gomb az árral, középen a vászon, alul öt fül. A panelek alsó lapként nyílnak, a fülsor közben is elérhető marad, a vászon pedig a lap fölötti részre igazodik.
+- A kijelölt elemhez a vászon alján gyorsmenü jelenik meg (Formázás, Másolat, Előre, Hátra, Középre, Törlés).
+- A szín- és méretválasztás közvetlenül a Termék panelen történik. Több méret esetén a vásárlónak kifejezetten választania kell; a Kosárba gomb ilyenkor megmutatja, mi hiányzik.
+- A feliratot szövegmezőben lehet beírni és később szerkeszteni, ami telefonon is megbízhatóan működik.
+- A Hátlap gombbal azonnal bekapcsolható a kétoldalas nyomtatás; a felár a gomb mellett látszik, és csak akkor kerül az árba, ha a hátlapon is van minta.
+- Képet a vászonra húzva vagy Ctrl+V-vel is fel lehet tenni, a sablonok a panelben böngészhetők, az előnézet mód segédvonalak nélkül mutatja a terméket.
+- A böngésző automatikusan megjegyzi a befejezetlen tervet, és visszatéréskor felajánlja a folytatást. Sikeres kosárba tétel után a piszkozat törlődik.
+- A vászon belső mérete fix, csak a megjelenítés méreteződik, így ablakméret-változáskor vagy a mobilbillentyűzet megjelenésekor a tervben lévő elemek nem mozdulnak el.
+
 ## Tervező megjelenése
 
 A Terméktervező → Megjelenés oldalon a teljes tervezői felület színvilága és lekerekítése állítható. A módosítások élő miniatűr előnézetben láthatók, az alapértékek visszaállítása pedig csak a mezőket és az előnézetet módosítja; a tartós alkalmazáshoz külön mentés szükséges. A beállítások a meglévő termék-, mockup- és árazási konfigurációtól függetlenül, az `appearance` kulcs alatt tárolódnak.
