@@ -29,6 +29,7 @@ require_once NB_DESIGNER_PATH.'inc/teamwear-page.php';
 require_once NB_DESIGNER_PATH.'inc/cart-fees.php';
 require_once NB_DESIGNER_PATH.'inc/admin-meta.php';
 require_once NB_DESIGNER_PATH.'inc/admin-menu.php';
+require_once NB_DESIGNER_PATH.'inc/admin-create-product.php';
 require_once NB_DESIGNER_PATH.'inc/admin-rest.php';
 require_once NB_DESIGNER_PATH.'inc/account-integration.php';
 require_once NB_DESIGNER_PATH.'inc/design-cleanup.php';

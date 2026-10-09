@@ -89,7 +89,7 @@ $statusLabel = empty($report['missing']) ? __('Rendben', 'nb-designer') : __('Te
         $typeRowCount = max(count($types) + 1, 2);
       ?>
       <section class="nb-panel">
-        <div class="nb-panel-heading"><div><h2><?php esc_html_e('Globális terméktípusok','nb-designer'); ?></h2><p><?php esc_html_e('A megjelenő és rendelési név, valamint az alap WooCommerce termék.','nb-designer'); ?></p></div></div>
+        <div class="nb-panel-heading"><div><h2><?php esc_html_e('Globális terméktípusok','nb-designer'); ?></h2><p><?php esc_html_e('A megjelenő és rendelési név, valamint az alap WooCommerce termék.','nb-designer'); ?></p></div><a class="button" href="#nb-create-product">＋ <?php esc_html_e('Új tervezhető WooCommerce termék','nb-designer'); ?></a></div>
         <div class="nb-repeater" data-repeater="types">
           <?php for ($i=0; $i<$typeRowCount; $i++): $label=$types[$i]??''; $key=nb_normalize_type_key($label); ?>
             <div class="nb-repeater-row">
@@ -105,6 +105,7 @@ $statusLabel = empty($report['missing']) ? __('Rendben', 'nb-designer') : __('Te
       </section>
       <div class="nb-save-bar"><span class="nb-save-state" aria-live="polite"><?php esc_html_e('Nincs mentetlen módosítás','nb-designer'); ?></span><button class="button button-primary"><?php esc_html_e('Módosítások mentése','nb-designer'); ?></button></div>
     </form>
+    <?php if (function_exists('nb_render_create_product_panel')) nb_render_create_product_panel($settings); ?>
 
   <?php elseif ($tab === 'variants'): ?>
     <?php

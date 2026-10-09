@@ -430,6 +430,53 @@ add_filter('body_class', function($classes){
   return $classes;
 });
 
+/**
+ * Adminhoz: minden termék + típus párosnál, hogy megjelenik-e a csapattervezőben, és ha nem, miért.
+ * A típusok a termék saját típusaiból és a globális típusok közül az ehhez a termékhez kötöttekből jönnek.
+ */
+function nb_team_option_diagnostics($settings, $team){
+  $settings = nb_sync_mockup_references(nb_clean_settings_unicode(is_array($settings) ? $settings : []));
+  $catalog = isset($settings['catalog']) && is_array($settings['catalog']) ? $settings['catalog'] : [];
+  $designer_products = isset($settings['products']) && is_array($settings['products']) ? array_map('absint', $settings['products']) : array_map('absint', array_keys($catalog));
+  $enabled = nb_team_allowed_product_ids($settings, $team);
+  $type_products = isset($settings['type_products']) && is_array($settings['type_products']) ? $settings['type_products'] : [];
+  $type_colors = isset($settings['type_colors']) && is_array($settings['type_colors']) ? $settings['type_colors'] : [];
+  $rows = [];
+  foreach ($designer_products as $pid){
+    if (!isset($catalog[$pid])) continue;
+    $cfg = $catalog[$pid];
+    $own = array_map('nb_normalize_type_key', (array)($cfg['types'] ?? []));
+    $labels = [];
+    foreach ((array)($cfg['types'] ?? []) as $type) $labels[nb_normalize_type_key($type)] = $type;
+    foreach ((array)($settings['types'] ?? []) as $type){
+      $key = nb_normalize_type_key($type);
+      if ($key !== '' && absint($type_products[$key] ?? 0) === $pid && !isset($labels[$key])) $labels[$key] = $type;
+    }
+    foreach ($labels as $key => $label){
+      $colors = isset($cfg['colors_by_type'][$key]) && is_array($cfg['colors_by_type'][$key]) ? $cfg['colors_by_type'][$key] : (array)($type_colors[$key] ?? []);
+      $with_mockup = 0;
+      foreach ($colors as $color){
+        $entry = $cfg['map'][$key.'|'.nb_normalize_color_key($color)] ?? null;
+        if ($entry && nb_mockup_by_reference($settings, $entry, 'front')) $with_mockup++;
+      }
+      if (!in_array($key, $own, true)) $status = __('Nincs felvéve a termék típusai közé (Termékek oldal).', 'nb-designer');
+      elseif (!$colors) $status = __('Nincs színe (Típusok és színek oldal).', 'nb-designer');
+      elseif (!$with_mockup) $status = __('Egyik színéhez sincs mockup rendelve (Termékek oldal).', 'nb-designer');
+      elseif (!in_array($pid, $enabled, true)) $status = __('A termék ki van kapcsolva ebben a modulban (lent, Termékek).', 'nb-designer');
+      else $status = '';
+      $rows[] = [
+        'product' => $cfg['title'] ?? get_the_title($pid),
+        'pid'     => $pid,
+        'type'    => $label,
+        'colors'  => count($colors),
+        'ready'   => $with_mockup,
+        'status'  => $status,
+      ];
+    }
+  }
+  return $rows;
+}
+
 /** A frontend számára szükséges, szűrt adatok. */
 function nb_team_public_data(){
   $stored = nb_get_settings([]);
@@ -780,6 +827,20 @@ function nb_team_admin_render(){
       </table>
 
       <h2><?php esc_html_e('Termékek', 'nb-designer'); ?></h2>
+      <p class="description"><?php esc_html_e('Egy termék + típus akkor jelenik meg a csapattervezőben, ha a típus fel van véve a termékhez, van színe, és legalább egy színéhez mockup tartozik.', 'nb-designer'); ?></p>
+      <table class="widefat striped" style="max-width:980px;margin:0 0 14px">
+        <thead><tr><th><?php esc_html_e('Termék', 'nb-designer'); ?></th><th><?php esc_html_e('Típus', 'nb-designer'); ?></th><th><?php esc_html_e('Színek (mockuppal)', 'nb-designer'); ?></th><th><?php esc_html_e('A csapattervezőben', 'nb-designer'); ?></th></tr></thead>
+        <tbody>
+        <?php foreach (nb_team_option_diagnostics($designer, $team) as $diag): ?>
+          <tr>
+            <td><?php echo esc_html($diag['product'].' (#'.$diag['pid'].')'); ?></td>
+            <td><?php echo esc_html($diag['type'] !== '' ? $diag['type'] : '—'); ?></td>
+            <td><?php echo esc_html($diag['colors'].' ('.$diag['ready'].')'); ?></td>
+            <td><?php if ($diag['status'] === ''): ?><span style="color:#008a20;font-weight:600"><?php esc_html_e('Megjelenik', 'nb-designer'); ?></span><?php else: ?><span style="color:#b32d2e"><?php echo esc_html(__('Nem jelenik meg:', 'nb-designer').' '.$diag['status']); ?></span><?php endif; ?></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
       <p class="description"><?php esc_html_e('Ha egyet sem jelölsz ki, a tervező összes terméke megjelenik.', 'nb-designer'); ?></p>
       <fieldset class="nb-team-products">
         <?php foreach ($product_ids as $pid): if (!isset($catalog[$pid])) continue; ?>
