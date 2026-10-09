@@ -37,9 +37,18 @@ Beállítások: **Terméktervező → Csapatruha tervező** (típusválasztó sz
 
 Az eredeti tervezőben a százalékos mennyiségi kedvezmény a termék és a hozzá tartozó egyedi nyomat együttes árára jár.
 
-**Új tervezhető termék** (Terméktervező → Termékek, „＋ Új tervezhető WooCommerce termék”): egy lépésben létrehoz egy egyszerű WooCommerce terméket (név, alapár, méretek; alapból rejtve a bolt listáiból), felveszi a tervező termékei közé, és a megadott tervezői típust hozzá köti (új típust is felvesz). Utána a megnyíló oldalon csak a mockupokat kell a színekhez rendelni. A termék színei a típus színei (Típusok és színek). Egy Csapatruha tervező termékhez a Csapatruha tervező oldalon is fel kell venni, és megadni a sávárait. A termék és típus hiányának okát a Csapatruha tervező oldal Termékek részének táblázata mutatja.
+**Új tervezhető termék** (Terméktervező → Termékek, legfelül „＋ Új termék”, vagy az Áttekintés gyors műveleteiből): egy lépésben létrehoz egy egyszerű WooCommerce terméket (név, alapár, méretek; alapból rejtve a bolt listáiból), felveszi a tervező termékei közé, és a megadott tervezői típust hozzá köti (új típust is felvesz). Utána a megnyíló oldalon csak a mockupokat kell a színekhez rendelni. A termék színei a típus színei (Típusok és színek). Egy Csapatruha tervező termékhez a Csapatruha tervező oldalon is fel kell venni, és megadni a sávárait. A termék és típus hiányának okát a Csapatruha tervező oldal Termékek részének táblázata mutatja.
 
 Árak röviden: a fő tervezőben a WooCommerce termék ára (alapár) + a nyomtatási díj (cm² alapú, minimum, kétoldalas felár) − mennyiségi kedvezmény, plusz a termékenkénti méretfelár. A csapattervezőben a Csapatruha tervező oldalon megadott sávár számít (nyomással együtt); a WooCommerce-ár csak akkor, ha ott nincs ár.
+
+## Admin felület (2.4)
+
+- Egységes kártyás megjelenés minden oldalon, a Csapatruha tervező oldalon is: szakasznavigáció (Típusválasztó, Termékek, Árak, Egyéb, Segédsablonok), termékenkénti árkártyák „Árazva / Nincs ár” jelzéssel, alul rögzített mentéssáv, mentetlen módosítás figyelmeztetéssel.
+- Áttekintés: gyors műveletek (új termék, mockup, színek, csapattervező).
+- Termékek: a kártyákon látszik a típus és hogy hány mockup hiányzik; üres mockup mátrixnál útmutató a színek beállításához.
+- Menü: a Csapatruha tervező az Árazás után, a Sablon feltöltő a Sablonok után.
+- Gyorsabb betöltés: a fabric.js és a médiatár csak a Mockup könyvtárban töltődik be; az admin CSS/JS verziója a fájl módosítási idejét is tartalmazza, így frissítés után nem marad régi a böngésző gyorsítótárában.
+- Mockup szerkesztő: a mockup a dobozhoz méretezve, egyben látszik; a nyomtatási felület húzása után nem dob hibát.
 
 ## Tervező megjelenése
 

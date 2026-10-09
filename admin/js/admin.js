@@ -176,6 +176,12 @@
     if (canvas) canvas.dispose();
     canvas = new fabric.Canvas('nb-active-canvas', {preserveObjectStacking:true});
     canvas.setWidth(item.canvas_w); canvas.setHeight(item.canvas_h);
+    // Kijelzésre a dobozhoz méretezzük (csak CSS-ben), a koordináták px-ben maradnak.
+    const wrap=document.querySelector('.nb-canvas-wrap');
+    if (wrap) {
+      const fit=Math.min(1, Math.max(120, wrap.clientWidth-20)/item.canvas_w, 600/item.canvas_h);
+      canvas.setDimensions({width:Math.round(item.canvas_w*fit)+'px', height:Math.round(item.canvas_h*fit)+'px'}, {cssOnly:true});
+    }
     if (item.image_url) fabric.Image.fromURL(item.image_url, image => {
       const scale = Math.min(canvas.width/image.width, canvas.height/image.height);
       image.scale(scale); image.selectable=false; image.evented=false; canvas.add(image); canvas.sendToBack(image); canvas.requestRenderAll();
@@ -193,7 +199,9 @@
     canvas.setActiveObject(areaRect);
     canvas.on('object:modified', function(){
       const grid=item.guides.snap_to_grid?10:1; area.x=Math.round(areaRect.left/grid)*grid; area.y=Math.round(areaRect.top/grid)*grid; area.w=Math.max(1,Math.round((areaRect.width*areaRect.scaleX)/grid)*grid); area.h=Math.max(1,Math.round((areaRect.height*areaRect.scaleY)/grid)*grid); areaRect.set({left:area.x,top:area.y,width:area.w,height:area.h,scaleX:1,scaleY:1});
-      writeMockups(items); renderMockupDetail(item, items);
+      writeMockups(items);
+      // A fabric még a saját egérkezelőjében fut: az újrarajzolás csak utána jöhet.
+      setTimeout(()=>renderMockupDetail(item, items), 0);
     });
   }
   function scheduleMockupSave(){
@@ -269,4 +277,17 @@
   if ($('[data-repeater="discounts"]').length) validateDiscounts();
   if ($('#nb-price-breakdown').length) { if(!$('[data-calc="size"]').length)$('<label><span>Méret</span><select data-calc="size"></select></label>').insertBefore($('[data-calc="quantity"]').closest('label')); syncCalculatorOptions(); calculatePrice(); }
   if ($('#nb-fonts').length) updateFontPreviews();
+
+  // Új tervezhető termék: a #nb-create-product hivatkozás kinyitja a panelt.
+  function openCreatePanel(){
+    const panel=document.getElementById('nb-create-product');
+    if(!panel) return false;
+    panel.open=true;
+    panel.scrollIntoView({block:'start',behavior:'smooth'});
+    const field=panel.querySelector('input[type=text]');
+    if(field) setTimeout(()=>field.focus({preventScroll:true}),250);
+    return true;
+  }
+  $(document).on('click','a[href$="#nb-create-product"]',function(event){ if(openCreatePanel()) event.preventDefault(); });
+  if (window.location.hash==='#nb-create-product') openCreatePanel();
 })(jQuery);

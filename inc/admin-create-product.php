@@ -11,23 +11,35 @@ if ( ! defined('ABSPATH') ) exit;
 function nb_render_create_product_panel($settings){
   if (!current_user_can(nb_admin_capability()) || !class_exists('WC_Product_Simple')) return;
   $types = is_array($settings['types'] ?? null) ? $settings['types'] : [];
+  $open = !empty($_GET['nb_create_error']);
   ?>
-  <section class="nb-panel" id="nb-create-product">
-    <div class="nb-panel-heading"><div><h2><?php esc_html_e('Új tervezhető termék létrehozása', 'nb-designer'); ?></h2><p><?php esc_html_e('Létrehozza a WooCommerce terméket, felveszi a tervezőbe a típussal és a méretekkel, és a típust ehhez a termékhez köti. Utána már csak a mockupokat kell a színekhez rendelni.', 'nb-designer'); ?></p></div></div>
-    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="nb-form">
+  <details class="nb-panel nb-create-product" id="nb-create-product"<?php echo $open ? ' open' : ''; ?>>
+    <summary>
+      <div><h2><?php esc_html_e('Új tervezhető termék', 'nb-designer'); ?></h2><p><?php esc_html_e('WooCommerce termék és tervező-beállítás egy lépésben, pl. gyerekpólóhoz.', 'nb-designer'); ?></p></div>
+      <span class="button button-primary nb-create-toggle">＋ <?php esc_html_e('Új termék', 'nb-designer'); ?></span>
+    </summary>
+    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="nb-create-body">
       <input type="hidden" name="action" value="nb_create_designable_product">
       <?php wp_nonce_field('nb_create_designable_product'); ?>
-      <div class="nb-repeater-row" style="flex-wrap:wrap">
-        <label><span><?php esc_html_e('Termék neve (WooCommerce)', 'nb-designer'); ?></span><input type="text" name="nb_new[name]" required placeholder="<?php esc_attr_e('Tervezhető gyerekpóló', 'nb-designer'); ?>"></label>
+      <div class="nb-field-grid">
+        <label><span><?php esc_html_e('Termék neve', 'nb-designer'); ?></span><input type="text" name="nb_new[name]" required placeholder="<?php esc_attr_e('Tervezhető gyerekpóló', 'nb-designer'); ?>"></label>
         <label><span><?php esc_html_e('Tervezői típus', 'nb-designer'); ?></span><input type="text" name="nb_new[type]" required list="nb-new-type-list" placeholder="<?php esc_attr_e('Gyerek póló', 'nb-designer'); ?>"><datalist id="nb-new-type-list"><?php foreach ($types as $type): ?><option value="<?php echo esc_attr($type); ?>"><?php endforeach; ?></datalist></label>
-        <label><span><?php esc_html_e('Méretek (vesszővel)', 'nb-designer'); ?></span><input type="text" name="nb_new[sizes]" placeholder="104, 116, 128, 140, 152, 164"></label>
-        <label><span><?php esc_html_e('Alapár nyomás nélkül (Ft)', 'nb-designer'); ?></span><input type="number" min="0" step="1" name="nb_new[price]" placeholder="4990"></label>
+        <label><span><?php esc_html_e('Méretek, vesszővel', 'nb-designer'); ?></span><input type="text" name="nb_new[sizes]" placeholder="104, 116, 128, 140, 152, 164"></label>
+        <label><span><?php esc_html_e('Alapár nyomás nélkül', 'nb-designer'); ?></span><input type="number" min="0" step="1" name="nb_new[price]" placeholder="4990"><small>Ft</small></label>
       </div>
-      <p><label class="nb-inline-toggle"><input type="checkbox" name="nb_new[hidden]" value="1" checked> <?php esc_html_e('Ne jelenjen meg külön a boltban (csak a tervezőből rendelhető)', 'nb-designer'); ?></label></p>
-      <p class="description"><?php esc_html_e('Ha a típus már létezik, ehhez az új termékhez kötődik; ha más termék típusai között is szerepel, ott a Termékek oldalon eltávolíthatod. A típus színei a Típusok és színek oldalról jönnek. Az alapár a WooCommerce termék ára: a fő tervezőben erre jön a nyomtatási díj. A csapattervezőben a Csapatruha tervező oldalon megadott sávárak számítanak (nyomással együtt); ha ott nincs ár, ez az alapár.', 'nb-designer'); ?></p>
-      <p><button class="button button-primary"><?php esc_html_e('Termék létrehozása', 'nb-designer'); ?></button></p>
+      <div class="nb-create-actions">
+        <button class="button button-primary"><?php esc_html_e('Termék létrehozása', 'nb-designer'); ?></button>
+        <label class="nb-inline-toggle"><input type="checkbox" name="nb_new[hidden]" value="1" checked> <?php esc_html_e('Csak a tervezőből rendelhető (rejtve a bolt listáiban)', 'nb-designer'); ?></label>
+      </div>
+      <ol class="nb-steps">
+        <li><b>1</b><?php esc_html_e('Létrehozás', 'nb-designer'); ?></li>
+        <li><b>2</b><?php esc_html_e('Színek: Típusok és színek', 'nb-designer'); ?></li>
+        <li><b>3</b><?php esc_html_e('Mockupok a megnyíló oldalon', 'nb-designer'); ?></li>
+        <li><b>4</b><?php esc_html_e('Csapattervezőhöz: sávárak a Csapatruha tervező oldalon', 'nb-designer'); ?></li>
+      </ol>
+      <p class="description"><?php esc_html_e('Új típusnév esetén új típus jön létre; meglévőnél a típus ehhez a termékhez kötődik. Az alapár a WooCommerce ár: a fő tervezőben erre jön a nyomtatási díj, a csapattervezőben a sávár számít.', 'nb-designer'); ?></p>
     </form>
-  </section>
+  </details>
   <?php
 }
 
@@ -89,7 +101,13 @@ add_action('admin_notices', function(){
   $page = sanitize_key($_GET['page'] ?? '');
   if ($page !== 'nb-designer-products') return;
   if (!empty($_GET['nb_created'])){
-    echo '<div class="notice notice-success is-dismissible"><p>'.esc_html__('A tervezhető termék elkészült. Most rendeld hozzá a mockupokat a színekhez az alábbi mátrixban, majd mentsd.', 'nb-designer').'</p></div>';
+    $pid = absint($_GET['product_id'] ?? 0);
+    $settings = nb_get_settings([]);
+    $has_colors = !empty($settings['catalog'][$pid]['colors']);
+    $message = $has_colors
+      ? __('A tervezhető termék elkészült. Most rendeld hozzá a mockupokat a színekhez az alábbi mátrixban, majd mentsd.', 'nb-designer')
+      : __('A tervezhető termék elkészült. A típusnak még nincs színe: jelöld be a Típusok és színek oldalon, utána itt rendeld hozzá a mockupokat.', 'nb-designer');
+    echo '<div class="notice notice-success is-dismissible"><p>'.esc_html($message).'</p></div>';
   }
   if (!empty($_GET['nb_create_error'])){
     echo '<div class="notice notice-error is-dismissible"><p>'.esc_html(sanitize_text_field(wp_unslash($_GET['nb_create_error']))).'</p></div>';

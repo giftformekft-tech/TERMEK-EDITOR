@@ -696,16 +696,27 @@ add_action('before_delete_post', function($post_id){
 /* ------------------------------------------------------------------------ */
 
 add_action('admin_menu', function(){
-  add_submenu_page('nb-designer', __('Csapatruha tervező', 'nb-designer'), __('Csapatruha tervező', 'nb-designer'), nb_admin_capability(), 'nb-team-designer', 'nb_team_admin_render');
+  // Az Árazás után, hogy a beállítások egy blokkban legyenek.
+  add_submenu_page('nb-designer', __('Csapatruha tervező', 'nb-designer'), __('Csapatruha tervező', 'nb-designer'), nb_admin_capability(), 'nb-team-designer', 'nb_team_admin_render', 5);
 }, 20);
 
 add_action('admin_enqueue_scripts', function(){
   if (sanitize_key($_GET['page'] ?? '') !== 'nb-team-designer') return;
   $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '2.3.0';
-  wp_enqueue_style('nb-admin', NB_DESIGNER_URL.'admin/css/admin.css', [], $version);
+  $css = NB_DESIGNER_PATH.'admin/css/admin.css';
+  wp_enqueue_style('nb-admin', NB_DESIGNER_URL.'admin/css/admin.css', [], file_exists($css) ? $version.'.'.filemtime($css) : $version);
   wp_enqueue_media();
   wp_add_inline_script('media-editor', <<<'JS'
 jQuery(function($){
+  var form = $('#nb-team-form'), state = $('.nb-save-state'), dirty = false;
+  form.on('input change', ':input', function(){
+    if (dirty) return;
+    dirty = true;
+    state.text('Mentetlen módosítások').addClass('is-dirty');
+  });
+  form.on('submit', function(){ dirty = false; state.text('Mentés…').removeClass('is-dirty').addClass('is-saving'); });
+  $(window).on('beforeunload', function(){ if (dirty) return 'Mentetlen módosítások'; });
+
   $(document).on('click', '.nb-team-image-pick', function(e){
     e.preventDefault();
     var box = $(this).closest('.nb-team-image');
@@ -713,19 +724,30 @@ jQuery(function($){
     frame.on('select', function(){
       var file = frame.state().get('selection').first().toJSON();
       var url = (file.sizes && (file.sizes.medium_large || file.sizes.large || file.sizes.full) || file).url;
-      box.find('input[type=hidden]').val(file.id);
-      box.find('.nb-team-image__preview').html($('<img>').attr('src', url).css({maxWidth: '360px', height: 'auto', borderRadius: '8px', display: 'block'}));
-      box.find('.nb-team-image-remove').show();
+      box.find('input[type=hidden]').val(file.id).trigger('change');
+      box.find('.nb-team-image__preview').empty().append($('<img alt="">').attr('src', url));
+      box.find('.nb-team-image-remove').prop('hidden', false);
     });
     frame.open();
   });
   $(document).on('click', '.nb-team-image-remove', function(e){
     e.preventDefault();
-    var box = $(this).closest('.nb-team-image');
-    box.find('input[type=hidden]').val('0');
-    box.find('.nb-team-image__preview').empty();
-    $(this).hide();
+    var box = $(this).closest('.nb-team-image'), preview = box.find('.nb-team-image__preview');
+    box.find('input[type=hidden]').val('0').trigger('change');
+    preview.text(preview.data('empty') || '');
+    $(this).prop('hidden', true);
   });
+
+  // A szakasznavigáció kiemeli az éppen látható részt.
+  var links = $('.nb-subnav a');
+  if ('IntersectionObserver' in window && links.length){
+    var observer = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if (entry.isIntersecting) links.removeClass('is-active').filter('[href="#' + entry.target.id + '"]').addClass('is-active');
+      });
+    }, { rootMargin: '-120px 0px -65% 0px' });
+    links.each(function(){ var el = document.querySelector($(this).attr('href')); if (el) observer.observe(el); });
+  }
 });
 JS
   );
@@ -779,149 +801,179 @@ function nb_team_admin_render(){
     foreach ($types as $type){
       $title = $catalog[$pid]['title'] ?? get_the_title($pid);
       $sizes = array_values(array_filter(array_map(function($size){ return trim((string)$size); }, (array)($catalog[$pid]['sizes'] ?? [])), 'strlen'));
-      $price_options[] = ['key'=>$pid.'|'.nb_normalize_type_key($type), 'label'=>$type !== '' && $type !== $title ? $title.' – '.$type : $title, 'sizes'=>$sizes];
+      $price_options[] = ['key'=>$pid.'|'.nb_normalize_type_key($type), 'title'=>$title, 'type'=>$type !== '' && $type !== $title ? $type : '', 'sizes'=>$sizes];
     }
   }
   $presets = array_values($team['presets']);
   for ($i = 0; $i < 3; $i++) $presets[] = ['id'=>'', 'mode'=>'both', 'side'=>'front', 'kind'=>'logo', 'label'=>'', 'cx'=>0.5, 'top'=>0.1, 'w_mm'=>'', 'h_mm'=>'', 'text'=>'', 'bind'=>''];
   $page_url = nb_team_designer_url();
+  $diagnostics = nb_team_option_diagnostics($designer, $team);
+  $visible = count(array_filter($diagnostics, function($row){ return $row['status'] === ''; }));
+  $unpriced = count(array_filter($price_options, function($option) use ($team){ return empty($team['prices'][$option['key']]); }));
+  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '';
+  $sections = ['nb-team-intro'=>__('Típusválasztó', 'nb-designer'), 'nb-team-products'=>__('Termékek', 'nb-designer'), 'nb-team-prices'=>__('Árak', 'nb-designer'), 'nb-team-other'=>__('Egyéb', 'nb-designer'), 'nb-team-presets'=>__('Segédsablonok', 'nb-designer')];
   ?>
   <div class="wrap nb-admin nb-admin-v2 nb-team-admin">
-    <header class="nb-page-header"><div><p class="nb-eyebrow"><?php esc_html_e('Külön modul', 'nb-designer'); ?></p><h1><?php esc_html_e('Csapatruha tervező', 'nb-designer'); ?></h1></div><div class="nb-header-actions"><a class="button" href="<?php echo esc_url($page_url); ?>" target="_blank" rel="noopener"><?php esc_html_e('Oldal megnyitása', 'nb-designer'); ?></a></div></header>
+    <header class="nb-page-header">
+      <div><p class="nb-eyebrow"><?php echo esc_html('Nano Banana Terméktervező · v'.$version); ?></p><h1><?php esc_html_e('Csapatruha tervező', 'nb-designer'); ?></h1></div>
+      <div class="nb-header-actions">
+        <?php if ($unpriced): ?><a class="nb-status-pill is-warning" href="#nb-team-prices"><span class="dashicons dashicons-warning" aria-hidden="true"></span><?php echo esc_html(sprintf(__('%d termékhez nincs ár', 'nb-designer'), $unpriced)); ?></a>
+        <?php else: ?><span class="nb-status-pill is-ok"><span class="dashicons dashicons-yes-alt" aria-hidden="true"></span><?php echo esc_html(sprintf(__('%d termék a modulban', 'nb-designer'), $visible)); ?></span><?php endif; ?>
+        <a class="button" href="<?php echo esc_url($page_url); ?>" target="_blank" rel="noopener"><?php esc_html_e('Oldal megnyitása', 'nb-designer'); ?></a>
+      </div>
+    </header><hr class="wp-header-end">
     <?php if (!empty($_GET['updated'])): ?><div class="notice notice-success is-dismissible"><p><?php esc_html_e('Beállítások elmentve.', 'nb-designer'); ?></p></div><?php endif; ?>
-    <p><?php echo wp_kses_post(sprintf(__('A tervező a <a href="%1$s">%1$s</a> oldalon érhető el. A menübe a Megjelenés → Menük oldalon veheted fel.', 'nb-designer'), esc_url($page_url))); ?></p>
-    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+    <nav class="nb-subnav" aria-label="<?php esc_attr_e('Szakaszok', 'nb-designer'); ?>">
+      <?php foreach ($sections as $anchor => $label): ?><a href="#<?php echo esc_attr($anchor); ?>"><?php echo esc_html($label); ?></a><?php endforeach; ?>
+    </nav>
+    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="nb-form" id="nb-team-form">
       <input type="hidden" name="action" value="nb_team_save">
       <?php wp_nonce_field('nb_team_save'); ?>
 
-      <h2><?php esc_html_e('Típusválasztó (első képernyő)', 'nb-designer'); ?></h2>
-      <p class="description"><?php esc_html_e('Ezt látja a vásárló, amikor megnyitja a tervezőt.', 'nb-designer'); ?></p>
-      <table class="form-table" role="presentation">
-        <tr><th scope="row"><label for="nb-team-kicker"><?php esc_html_e('Felső címke', 'nb-designer'); ?></label></th><td><input id="nb-team-kicker" class="regular-text" type="text" name="nb_team[intro][kicker]" value="<?php echo esc_attr($intro['kicker']); ?>"></td></tr>
-        <tr><th scope="row"><label for="nb-team-title"><?php esc_html_e('Cím', 'nb-designer'); ?></label></th><td><input id="nb-team-title" class="regular-text" type="text" name="nb_team[intro][title]" value="<?php echo esc_attr($intro['title']); ?>"></td></tr>
-        <tr><th scope="row"><label for="nb-team-lead"><?php esc_html_e('Bevezető szöveg', 'nb-designer'); ?></label></th><td><textarea id="nb-team-lead" class="large-text" rows="3" name="nb_team[intro][lead]"><?php echo esc_textarea($intro['lead']); ?></textarea></td></tr>
-        <?php foreach (['work'=>__('Munkaruha kártya', 'nb-designer'), 'sport'=>__('Csapatmez kártya', 'nb-designer')] as $card_key => $card_label): $card = $intro['cards'][$card_key]; $card_name = 'nb_team[intro][cards]['.$card_key.']'; ?>
-          <tr>
-            <th scope="row"><?php echo esc_html($card_label); ?></th>
-            <td>
-              <p><label><?php esc_html_e('Cím', 'nb-designer'); ?><br><input class="regular-text" type="text" name="<?php echo esc_attr($card_name); ?>[title]" value="<?php echo esc_attr($card['title']); ?>"></label></p>
-              <p><label><?php esc_html_e('Leírás', 'nb-designer'); ?><br><textarea class="large-text" rows="2" name="<?php echo esc_attr($card_name); ?>[text]"><?php echo esc_textarea($card['text']); ?></textarea></label></p>
-            </td>
-          </tr>
-        <?php endforeach; ?>
-        <?php $banner = $intro['banner']; $banner_image = $banner['image_id'] ? wp_get_attachment_image_url($banner['image_id'], 'medium_large') : ''; ?>
-        <tr>
-          <th scope="row"><?php esc_html_e('Nagy kép a kártyák alatt', 'nb-designer'); ?></th>
-          <td>
-            <div class="nb-team-image">
-              <input type="hidden" name="nb_team[intro][banner][image_id]" value="<?php echo esc_attr($banner['image_id']); ?>">
-              <div class="nb-team-image__preview" style="margin:0 0 6px"><?php if ($banner_image): ?><img src="<?php echo esc_url($banner_image); ?>" alt="" style="max-width:360px;height:auto;border-radius:8px;display:block"><?php endif; ?></div>
-              <button type="button" class="button nb-team-image-pick"><?php esc_html_e('Kép kiválasztása', 'nb-designer'); ?></button>
-              <button type="button" class="button-link nb-team-image-remove" style="margin-left:8px;<?php echo $banner_image ? '' : 'display:none'; ?>"><?php esc_html_e('Kép eltávolítása', 'nb-designer'); ?></button>
+      <section class="nb-panel" id="nb-team-intro">
+        <div class="nb-panel-heading"><div><h2><?php esc_html_e('Típusválasztó', 'nb-designer'); ?></h2><p><?php echo wp_kses_post(sprintf(__('Az első képernyő a <a href="%1$s" target="_blank" rel="noopener">csapattervező oldalon</a>. A webhely menüjébe a Megjelenés → Menük oldalon veheted fel.', 'nb-designer'), esc_url($page_url))); ?></p></div></div>
+        <div class="nb-team-intro">
+          <label class="nb-field"><span><?php esc_html_e('Felső címke', 'nb-designer'); ?></span><input type="text" name="nb_team[intro][kicker]" value="<?php echo esc_attr($intro['kicker']); ?>"></label>
+          <label class="nb-field"><span><?php esc_html_e('Cím', 'nb-designer'); ?></span><input type="text" name="nb_team[intro][title]" value="<?php echo esc_attr($intro['title']); ?>"></label>
+          <label class="nb-field is-wide"><span><?php esc_html_e('Bevezető szöveg', 'nb-designer'); ?></span><textarea rows="2" name="nb_team[intro][lead]"><?php echo esc_textarea($intro['lead']); ?></textarea></label>
+        </div>
+        <div class="nb-team-cards">
+          <?php foreach (['work'=>[__('Munkaruha kártya', 'nb-designer'), 'dashicons-businessman'], 'sport'=>[__('Csapatmez kártya', 'nb-designer'), 'dashicons-groups']] as $card_key => [$card_label, $card_icon]): $card = $intro['cards'][$card_key]; $card_name = 'nb_team[intro][cards]['.$card_key.']'; ?>
+            <div class="nb-team-card">
+              <strong><span class="dashicons <?php echo esc_attr($card_icon); ?>" aria-hidden="true"></span><?php echo esc_html($card_label); ?></strong>
+              <label class="nb-field"><span><?php esc_html_e('Cím', 'nb-designer'); ?></span><input type="text" name="<?php echo esc_attr($card_name); ?>[title]" value="<?php echo esc_attr($card['title']); ?>"></label>
+              <label class="nb-field"><span><?php esc_html_e('Leírás', 'nb-designer'); ?></span><textarea rows="2" name="<?php echo esc_attr($card_name); ?>[text]"><?php echo esc_textarea($card['text']); ?></textarea></label>
             </div>
-            <p class="description"><?php esc_html_e('Teljes szélességben jelenik meg a két kártya alatt. Ajánlott: fekvő kép, legalább 1600 px széles.', 'nb-designer'); ?></p>
-            <p><label><?php esc_html_e('Cím (nem kötelező)', 'nb-designer'); ?><br><input class="regular-text" type="text" name="nb_team[intro][banner][title]" value="<?php echo esc_attr($banner['title']); ?>"></label></p>
-            <p><label><?php esc_html_e('Leírás (nem kötelező)', 'nb-designer'); ?><br><textarea class="large-text" rows="4" name="nb_team[intro][banner][text]"><?php echo esc_textarea($banner['text']); ?></textarea></label></p>
-          </td>
-        </tr>
-      </table>
-
-      <h2><?php esc_html_e('Termékek', 'nb-designer'); ?></h2>
-      <p class="description"><?php esc_html_e('Egy termék + típus akkor jelenik meg a csapattervezőben, ha a típus fel van véve a termékhez, van színe, és legalább egy színéhez mockup tartozik.', 'nb-designer'); ?></p>
-      <table class="widefat striped" style="max-width:980px;margin:0 0 14px">
-        <thead><tr><th><?php esc_html_e('Termék', 'nb-designer'); ?></th><th><?php esc_html_e('Típus', 'nb-designer'); ?></th><th><?php esc_html_e('Színek (mockuppal)', 'nb-designer'); ?></th><th><?php esc_html_e('A csapattervezőben', 'nb-designer'); ?></th></tr></thead>
-        <tbody>
-        <?php foreach (nb_team_option_diagnostics($designer, $team) as $diag): ?>
-          <tr>
-            <td><?php echo esc_html($diag['product'].' (#'.$diag['pid'].')'); ?></td>
-            <td><?php echo esc_html($diag['type'] !== '' ? $diag['type'] : '—'); ?></td>
-            <td><?php echo esc_html($diag['colors'].' ('.$diag['ready'].')'); ?></td>
-            <td><?php if ($diag['status'] === ''): ?><span style="color:#008a20;font-weight:600"><?php esc_html_e('Megjelenik', 'nb-designer'); ?></span><?php else: ?><span style="color:#b32d2e"><?php echo esc_html(__('Nem jelenik meg:', 'nb-designer').' '.$diag['status']); ?></span><?php endif; ?></td>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-      <p class="description"><?php esc_html_e('Ha egyet sem jelölsz ki, a tervező összes terméke megjelenik.', 'nb-designer'); ?></p>
-      <fieldset class="nb-team-products">
-        <?php foreach ($product_ids as $pid): if (!isset($catalog[$pid])) continue; ?>
-          <label style="display:inline-block;margin:0 18px 8px 0"><input type="checkbox" name="nb_team[products][]" value="<?php echo esc_attr($pid); ?>" <?php checked(in_array($pid, $team['products'], true)); ?>> <?php echo esc_html($catalog[$pid]['title'] ?? get_the_title($pid)); ?></label>
-        <?php endforeach; ?>
-      </fieldset>
-
-      <h2><?php esc_html_e('Árak', 'nb-designer'); ?></h2>
-      <p class="description"><?php esc_html_e('A darabár a nyomtatással együtt értendő; a vevő csak ezt látja, külön nyomatárat nem. A sávot a rendelés teljes darabszáma dönti el (minden szín és méret együtt). Kétoldalas, ha elöl és hátul is van minta: ilyenkor a darabárhoz a kétoldalas felár adódik.', 'nb-designer'); ?></p>
-      <h3><?php esc_html_e('Mennyiségi sávok', 'nb-designer'); ?></h3>
-      <table class="widefat striped" style="max-width:420px">
-        <thead><tr><th><?php esc_html_e('Darabtól', 'nb-designer'); ?></th><th><?php esc_html_e('Darabig (üres = felette)', 'nb-designer'); ?></th></tr></thead>
-        <tbody>
-        <?php foreach ($band_rows as $i => $band): ?>
-          <tr>
-            <td><input type="number" min="1" step="1" style="width:110px" name="nb_team[bands][<?php echo esc_attr($i); ?>][min]" value="<?php echo esc_attr($band['min']); ?>"></td>
-            <td><input type="number" min="0" step="1" style="width:110px" name="nb_team[bands][<?php echo esc_attr($i); ?>][max]" value="<?php echo esc_attr($band['max'] ?: ''); ?>"></td>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-      <p class="description"><?php esc_html_e('Ha a sávokat módosítod, mentsd el, és utána ellenőrizd a termékek árait: az árak a sávok sorrendjéhez tartoznak.', 'nb-designer'); ?></p>
-      <h3><?php esc_html_e('Darabárak termékenként', 'nb-designer'); ?></h3>
-      <?php if (!$price_options): ?><p><?php esc_html_e('Nincs termék a modulban.', 'nb-designer'); ?></p><?php endif; ?>
-      <?php foreach ($price_options as $option): $rows = $team['prices'][$option['key']] ?? []; $option_sizes = $option['sizes']; $fees = $team['size_fees'][$option['key']] ?? []; ?>
-        <table class="widefat striped" style="max-width:620px;margin:0 0 18px">
-          <thead><tr><th><?php echo esc_html($option['label']); ?><?php if (!$rows): ?> <span style="color:#b32d2e;font-weight:400"><?php esc_html_e('(nincs ár megadva: most a WooCommerce-ár és a tervező kétoldalas felára számol)', 'nb-designer'); ?></span><?php endif; ?></th><th><?php esc_html_e('Egyoldalas darabár (Ft)', 'nb-designer'); ?></th><th><?php esc_html_e('Kétoldalas felár (Ft / db)', 'nb-designer'); ?></th></tr></thead>
-          <tbody>
-          <?php foreach ($bands as $i => $band): $row = $rows[$i] ?? ['single'=>null, 'double'=>null]; $field = 'nb_team[prices]['.$option['key'].']['.$i.']'; ?>
-            <tr>
-              <td><?php echo esc_html($band_label($band)); ?></td>
-              <td><input type="number" min="0" step="1" style="width:120px" name="<?php echo esc_attr($field); ?>[single]" value="<?php echo esc_attr($row['single'] ?? ''); ?>"></td>
-              <td><input type="number" min="0" step="1" style="width:120px" name="<?php echo esc_attr($field); ?>[double]" value="<?php echo esc_attr($row['double'] ?? ''); ?>"></td>
-            </tr>
           <?php endforeach; ?>
-          <?php if ($option_sizes): ?>
-            <tr>
-              <td><?php esc_html_e('Méretfelár (Ft / db)', 'nb-designer'); ?></td>
-              <td colspan="2">
-                <?php foreach ($option_sizes as $size): ?>
-                  <label style="display:inline-block;margin:0 10px 6px 0"><?php echo esc_html($size); ?> <input type="number" min="0" step="1" style="width:84px" name="<?php echo esc_attr('nb_team[size_fees]['.$option['key'].']['.$size.']'); ?>" value="<?php echo esc_attr(isset($fees[$size]) ? $fees[$size] : ''); ?>"></label>
+        </div>
+        <?php $banner = $intro['banner']; $banner_image = $banner['image_id'] ? wp_get_attachment_image_url($banner['image_id'], 'medium_large') : ''; ?>
+        <div class="nb-team-banner">
+          <div class="nb-team-image">
+            <input type="hidden" name="nb_team[intro][banner][image_id]" value="<?php echo esc_attr($banner['image_id']); ?>">
+            <div class="nb-team-image__preview" data-empty="<?php esc_attr_e('Nincs kép', 'nb-designer'); ?>"><?php if ($banner_image): ?><img src="<?php echo esc_url($banner_image); ?>" alt=""><?php else: esc_html_e('Nincs kép', 'nb-designer'); endif; ?></div>
+            <div class="nb-team-image__actions">
+              <button type="button" class="button nb-team-image-pick"><?php esc_html_e('Kép kiválasztása', 'nb-designer'); ?></button>
+              <button type="button" class="button-link-delete nb-team-image-remove"<?php echo $banner_image ? '' : ' hidden'; ?>><?php esc_html_e('Eltávolítás', 'nb-designer'); ?></button>
+            </div>
+          </div>
+          <div class="nb-team-banner__fields">
+            <strong><?php esc_html_e('Nagy kép a kártyák alatt', 'nb-designer'); ?></strong>
+            <p class="description" style="margin:0"><?php esc_html_e('Teljes szélességben jelenik meg a két kártya alatt. Ajánlott: fekvő kép, legalább 1600 px széles. A cím és a leírás nem kötelező.', 'nb-designer'); ?></p>
+            <label class="nb-field"><span><?php esc_html_e('Cím', 'nb-designer'); ?></span><input type="text" name="nb_team[intro][banner][title]" value="<?php echo esc_attr($banner['title']); ?>"></label>
+            <label class="nb-field"><span><?php esc_html_e('Leírás', 'nb-designer'); ?></span><textarea rows="3" name="nb_team[intro][banner][text]"><?php echo esc_textarea($banner['text']); ?></textarea></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="nb-panel" id="nb-team-products">
+        <div class="nb-panel-heading"><div><h2><?php esc_html_e('Termékek', 'nb-designer'); ?></h2><p><?php esc_html_e('Egy termék + típus akkor jelenik meg, ha a típus fel van véve a termékhez, van színe, és legalább egy színéhez mockup tartozik.', 'nb-designer'); ?></p></div><a class="button" href="<?php echo esc_url(admin_url('admin.php?page=nb-designer-products#nb-create-product')); ?>">＋ <?php esc_html_e('Új tervezhető termék', 'nb-designer'); ?></a></div>
+        <div class="nb-table-wrap">
+          <table class="nb-table">
+            <thead><tr><th><?php esc_html_e('Termék', 'nb-designer'); ?></th><th><?php esc_html_e('Típus', 'nb-designer'); ?></th><th><?php esc_html_e('Színek', 'nb-designer'); ?></th><th><?php esc_html_e('Állapot', 'nb-designer'); ?></th><th></th></tr></thead>
+            <tbody>
+            <?php foreach ($diagnostics as $diag): ?>
+              <tr>
+                <td><strong><?php echo esc_html($diag['product']); ?></strong> <small>#<?php echo esc_html($diag['pid']); ?></small></td>
+                <td><?php echo esc_html($diag['type'] !== '' ? $diag['type'] : '—'); ?></td>
+                <td><?php echo esc_html(sprintf(__('%1$d szín, ebből %2$d mockuppal', 'nb-designer'), $diag['colors'], $diag['ready'])); ?></td>
+                <td><?php if ($diag['status'] === ''): ?><span class="nb-tag is-ok"><?php esc_html_e('Megjelenik', 'nb-designer'); ?></span><?php else: ?><span class="nb-tag is-warning"><?php esc_html_e('Nem jelenik meg', 'nb-designer'); ?></span> <small><?php echo esc_html($diag['status']); ?></small><?php endif; ?></td>
+                <td style="text-align:right"><a href="<?php echo esc_url(admin_url('admin.php?page=nb-designer-products&product_id='.$diag['pid'])); ?>"><?php esc_html_e('Beállítás', 'nb-designer'); ?></a></td>
+              </tr>
+            <?php endforeach; if (!$diagnostics): ?>
+              <tr><td colspan="5"><?php esc_html_e('Még nincs tervezhető termék.', 'nb-designer'); ?></td></tr>
+            <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
+        <h3><?php esc_html_e('Melyik termék legyen a modulban?', 'nb-designer'); ?></h3>
+        <p class="description" style="margin:0"><?php esc_html_e('Ha egyet sem jelölsz ki, a tervező összes terméke megjelenik.', 'nb-designer'); ?></p>
+        <div class="nb-team-toggles">
+          <?php foreach ($product_ids as $pid): if (!isset($catalog[$pid])) continue; ?>
+            <label class="nb-team-toggle"><input type="checkbox" name="nb_team[products][]" value="<?php echo esc_attr($pid); ?>" <?php checked(in_array($pid, $team['products'], true)); ?>> <?php echo esc_html($catalog[$pid]['title'] ?? get_the_title($pid)); ?></label>
+          <?php endforeach; ?>
+        </div>
+      </section>
+
+      <section class="nb-panel" id="nb-team-prices">
+        <div class="nb-panel-heading"><div><h2><?php esc_html_e('Árak', 'nb-designer'); ?></h2><p><?php esc_html_e('A darabár a nyomtatással együtt értendő, a vevő külön nyomatárat nem lát. A sávot a rendelés teljes darabszáma adja (minden szín és méret együtt). Ha elöl és hátul is van minta, a kétoldalas felár is hozzáadódik.', 'nb-designer'); ?></p></div></div>
+        <h3 style="margin-top:0"><?php esc_html_e('Mennyiségi sávok', 'nb-designer'); ?></h3>
+        <div class="nb-team-bands">
+          <?php foreach ($band_rows as $i => $band): ?>
+            <div class="nb-team-band"><b><?php echo esc_html($i + 1); ?></b><input type="number" min="1" step="1" placeholder="<?php esc_attr_e('tól', 'nb-designer'); ?>" aria-label="<?php echo esc_attr(sprintf(__('%d. sáv: darabtól', 'nb-designer'), $i + 1)); ?>" name="nb_team[bands][<?php echo esc_attr($i); ?>][min]" value="<?php echo esc_attr($band['min']); ?>"><span>–</span><input type="number" min="0" step="1" placeholder="<?php esc_attr_e('felette', 'nb-designer'); ?>" aria-label="<?php echo esc_attr(sprintf(__('%d. sáv: darabig', 'nb-designer'), $i + 1)); ?>" name="nb_team[bands][<?php echo esc_attr($i); ?>][max]" value="<?php echo esc_attr($band['max'] ?: ''); ?>"><span>db</span></div>
+          <?php endforeach; ?>
+        </div>
+        <p class="description"><?php esc_html_e('Üres „darabig” = afelett mind. Ha a sávokat módosítod, ments, és utána ellenőrizd a termékek árait: az árak a sávok sorrendjéhez tartoznak.', 'nb-designer'); ?></p>
+        <h3><?php esc_html_e('Darabárak termékenként', 'nb-designer'); ?></h3>
+        <?php if (!$price_options): ?><div class="nb-empty-state"><p><?php esc_html_e('Nincs termék a modulban.', 'nb-designer'); ?></p></div><?php endif; ?>
+        <div class="nb-team-prices">
+          <?php foreach ($price_options as $option): $rows = $team['prices'][$option['key']] ?? []; $fees = $team['size_fees'][$option['key']] ?? []; ?>
+            <div class="nb-team-price<?php echo $rows ? '' : ' is-missing'; ?>">
+              <div class="nb-team-price__head">
+                <strong><?php echo esc_html($option['title']); ?><?php if ($option['type']): ?> <small style="color:var(--nb-muted);font-weight:500">· <?php echo esc_html($option['type']); ?></small><?php endif; ?></strong>
+                <?php if ($rows): ?><span class="nb-tag is-ok"><?php esc_html_e('Árazva', 'nb-designer'); ?></span><?php else: ?><span class="nb-tag is-warning" title="<?php esc_attr_e('Addig a WooCommerce-ár és a tervező kétoldalas felára számol.', 'nb-designer'); ?>"><?php esc_html_e('Nincs ár', 'nb-designer'); ?></span><?php endif; ?>
+              </div>
+              <table class="nb-table is-compact">
+                <thead><tr><th><?php esc_html_e('Sáv', 'nb-designer'); ?></th><th><?php esc_html_e('Darabár, egyoldalas (Ft)', 'nb-designer'); ?></th><th><?php esc_html_e('Kétoldalas felár (Ft)', 'nb-designer'); ?></th></tr></thead>
+                <tbody>
+                <?php foreach ($bands as $i => $band): $row = $rows[$i] ?? ['single'=>null, 'double'=>null]; $field = 'nb_team[prices]['.$option['key'].']['.$i.']'; ?>
+                  <tr>
+                    <td><?php echo esc_html($band_label($band)); ?></td>
+                    <td><input type="number" min="0" step="1" name="<?php echo esc_attr($field); ?>[single]" value="<?php echo esc_attr($row['single'] ?? ''); ?>"></td>
+                    <td><input type="number" min="0" step="1" name="<?php echo esc_attr($field); ?>[double]" value="<?php echo esc_attr($row['double'] ?? ''); ?>"></td>
+                  </tr>
                 <?php endforeach; ?>
-                <p class="description" style="margin:0"><?php esc_html_e('Minden sávban hozzáadódik a darabárhoz (pl. 3XL, 4XL). Üres vagy 0 = nincs felár.', 'nb-designer'); ?></p>
-              </td>
-            </tr>
-          <?php endif; ?>
-          </tbody>
-        </table>
-      <?php endforeach; ?>
+                </tbody>
+              </table>
+              <?php if ($option['sizes']): ?>
+                <div class="nb-team-sizefees">
+                  <span><?php esc_html_e('Méretfelár (Ft / db, minden sávban)', 'nb-designer'); ?></span>
+                  <?php foreach ($option['sizes'] as $size): ?>
+                    <label class="nb-team-sizefee"><?php echo esc_html($size); ?><input type="number" min="0" step="1" placeholder="0" name="<?php echo esc_attr('nb_team[size_fees]['.$option['key'].']['.$size.']'); ?>" value="<?php echo esc_attr(isset($fees[$size]) ? $fees[$size] : ''); ?>"></label>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </section>
 
-      <h2><?php esc_html_e('Egyéb', 'nb-designer'); ?></h2>
-      <table class="form-table" role="presentation">
-        <tr><th scope="row"><label for="nb-team-min"><?php esc_html_e('Minimum rendelés (db)', 'nb-designer'); ?></label></th><td><input id="nb-team-min" type="number" min="1" step="1" name="nb_team[min_qty]" value="<?php echo esc_attr($team['min_qty']); ?>"></td></tr>
-        <tr><th scope="row"><label for="nb-team-colors"><?php esc_html_e('Színek száma egy rendelésben legfeljebb', 'nb-designer'); ?></label></th><td><input id="nb-team-colors" type="number" min="1" max="20" step="1" name="nb_team[max_colors]" value="<?php echo esc_attr($team['max_colors']); ?>"></td></tr>
-        <tr><th scope="row"><label for="nb-team-personal"><?php esc_html_e('Név/szám felár a névsorból (Ft / db)', 'nb-designer'); ?></label></th><td><input id="nb-team-personal" type="number" min="0" step="1" name="nb_team[personal_fee]" value="<?php echo esc_attr($team['personal_fee']); ?>"><p class="description"><?php esc_html_e('Azokra a darabokra, amelyekre a névsorból név vagy szám kerül. 0 = nincs felár.', 'nb-designer'); ?></p></td></tr>
-        <tr><th scope="row"><label for="nb-team-players"><?php esc_html_e('Névsor sorainak száma egy rendelésben legfeljebb', 'nb-designer'); ?></label></th><td><input id="nb-team-players" type="number" min="1" max="300" step="1" name="nb_team[max_players]" value="<?php echo esc_attr($team['max_players']); ?>"></td></tr>
-      </table>
+      <section class="nb-panel" id="nb-team-other">
+        <div class="nb-panel-heading"><div><h2><?php esc_html_e('Egyéb', 'nb-designer'); ?></h2><p><?php esc_html_e('Korlátok és a névsor felára.', 'nb-designer'); ?></p></div></div>
+        <div class="nb-team-other">
+          <label class="nb-field"><span><?php esc_html_e('Minimum rendelés (db)', 'nb-designer'); ?></span><input type="number" min="1" step="1" name="nb_team[min_qty]" value="<?php echo esc_attr($team['min_qty']); ?>"></label>
+          <label class="nb-field"><span><?php esc_html_e('Színek egy rendelésben (max.)', 'nb-designer'); ?></span><input type="number" min="1" max="20" step="1" name="nb_team[max_colors]" value="<?php echo esc_attr($team['max_colors']); ?>"></label>
+          <label class="nb-field"><span><?php esc_html_e('Névsor sorai (max.)', 'nb-designer'); ?></span><input type="number" min="1" max="300" step="1" name="nb_team[max_players]" value="<?php echo esc_attr($team['max_players']); ?>"></label>
+          <label class="nb-field"><span><?php esc_html_e('Név/szám felár (Ft / db)', 'nb-designer'); ?></span><input type="number" min="0" step="1" name="nb_team[personal_fee]" value="<?php echo esc_attr($team['personal_fee']); ?>"><small class="description"><?php esc_html_e('A névsorból névvel vagy számmal nyomott darabokra. 0 = nincs.', 'nb-designer'); ?></small></label>
+        </div>
+      </section>
 
-      <h2><?php esc_html_e('Elhelyezési segédsablonok', 'nb-designer'); ?></h2>
-      <p class="description"><?php esc_html_e('A vásárló ezekkel egy kattintással a jó helyre és jó méretben teszi a logót vagy feliratot, utána szabadon módosíthatja. Vízszintes közép és felső él: 0–1 közötti arány a nyomtatási felülethez képest (0,5 = középen). Méret mm-ben. A név nélküli sor nem mentődik.', 'nb-designer'); ?></p>
-      <table class="widefat striped nb-team-presets">
-        <thead><tr><th><?php esc_html_e('Megnevezés', 'nb-designer'); ?></th><th><?php esc_html_e('Mód', 'nb-designer'); ?></th><th><?php esc_html_e('Oldal', 'nb-designer'); ?></th><th><?php esc_html_e('Tartalom', 'nb-designer'); ?></th><th><?php esc_html_e('Vízsz. közép', 'nb-designer'); ?></th><th><?php esc_html_e('Felső él', 'nb-designer'); ?></th><th><?php esc_html_e('Szél. mm', 'nb-designer'); ?></th><th><?php esc_html_e('Mag. mm', 'nb-designer'); ?></th><th><?php esc_html_e('Alap szöveg', 'nb-designer'); ?></th><th><?php esc_html_e('Névsorból', 'nb-designer'); ?></th></tr></thead>
-        <tbody>
-        <?php foreach ($presets as $i => $preset): $name = 'nb_team[presets]['.$i.']'; ?>
-          <tr>
-            <td><input type="hidden" name="<?php echo esc_attr($name); ?>[id]" value="<?php echo esc_attr($preset['id']); ?>"><input type="text" name="<?php echo esc_attr($name); ?>[label]" value="<?php echo esc_attr($preset['label']); ?>"></td>
-            <td><select name="<?php echo esc_attr($name); ?>[mode]"><option value="work" <?php selected($preset['mode'], 'work'); ?>><?php esc_html_e('Munkaruha', 'nb-designer'); ?></option><option value="sport" <?php selected($preset['mode'], 'sport'); ?>><?php esc_html_e('Csapatmez', 'nb-designer'); ?></option><option value="both" <?php selected($preset['mode'], 'both'); ?>><?php esc_html_e('Mindkettő', 'nb-designer'); ?></option></select></td>
-            <td><select name="<?php echo esc_attr($name); ?>[side]"><option value="front" <?php selected($preset['side'], 'front'); ?>><?php esc_html_e('Elöl', 'nb-designer'); ?></option><option value="back" <?php selected($preset['side'], 'back'); ?>><?php esc_html_e('Hátul', 'nb-designer'); ?></option></select></td>
-            <td><select name="<?php echo esc_attr($name); ?>[kind]"><option value="logo" <?php selected($preset['kind'], 'logo'); ?>><?php esc_html_e('Logó', 'nb-designer'); ?></option><option value="text" <?php selected($preset['kind'], 'text'); ?>><?php esc_html_e('Felirat', 'nb-designer'); ?></option><option value="number" <?php selected($preset['kind'], 'number'); ?>><?php esc_html_e('Szám', 'nb-designer'); ?></option></select></td>
-            <td><input type="number" min="0" max="1" step="0.01" style="width:80px" name="<?php echo esc_attr($name); ?>[cx]" value="<?php echo esc_attr($preset['cx']); ?>"></td>
-            <td><input type="number" min="0" max="1" step="0.01" style="width:80px" name="<?php echo esc_attr($name); ?>[top]" value="<?php echo esc_attr($preset['top']); ?>"></td>
-            <td><input type="number" min="0" step="1" style="width:80px" name="<?php echo esc_attr($name); ?>[w_mm]" value="<?php echo esc_attr($preset['w_mm']); ?>"></td>
-            <td><input type="number" min="0" step="1" style="width:80px" name="<?php echo esc_attr($name); ?>[h_mm]" value="<?php echo esc_attr($preset['h_mm']); ?>"></td>
-            <td><input type="text" name="<?php echo esc_attr($name); ?>[text]" value="<?php echo esc_attr($preset['text']); ?>"></td>
-            <td><select name="<?php echo esc_attr($name); ?>[bind]"><option value="" <?php selected($preset['bind'], ''); ?>><?php esc_html_e('Nem (fix)', 'nb-designer'); ?></option><option value="name" <?php selected($preset['bind'], 'name'); ?>><?php esc_html_e('Játékos neve', 'nb-designer'); ?></option><option value="number" <?php selected($preset['bind'], 'number'); ?>><?php esc_html_e('Játékos száma', 'nb-designer'); ?></option></select></td>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-      <p><label><input type="checkbox" name="nb_team[reset_presets]" value="1"> <?php esc_html_e('Segédsablonok visszaállítása az alapértékekre mentéskor', 'nb-designer'); ?></label></p>
-      <?php submit_button(__('Beállítások mentése', 'nb-designer')); ?>
+      <section class="nb-panel" id="nb-team-presets">
+        <div class="nb-panel-heading"><div><h2><?php esc_html_e('Elhelyezési segédsablonok', 'nb-designer'); ?></h2><p><?php esc_html_e('Egy kattintással a jó helyre és méretre teszik a logót vagy feliratot, utána a vásárló szabadon módosíthatja. Vízszintes közép és felső él: 0–1 arány a nyomtatási felülethez (0,5 = középen). Méret mm-ben. A név nélküli sor nem mentődik.', 'nb-designer'); ?></p></div></div>
+        <div class="nb-table-wrap">
+          <table class="nb-table is-compact nb-team-presets-table">
+            <thead><tr><th><?php esc_html_e('Megnevezés', 'nb-designer'); ?></th><th><?php esc_html_e('Mód', 'nb-designer'); ?></th><th><?php esc_html_e('Oldal', 'nb-designer'); ?></th><th><?php esc_html_e('Tartalom', 'nb-designer'); ?></th><th><?php esc_html_e('Közép', 'nb-designer'); ?></th><th><?php esc_html_e('Felső él', 'nb-designer'); ?></th><th><?php esc_html_e('Szél. mm', 'nb-designer'); ?></th><th><?php esc_html_e('Mag. mm', 'nb-designer'); ?></th><th><?php esc_html_e('Alap szöveg', 'nb-designer'); ?></th><th><?php esc_html_e('Névsorból', 'nb-designer'); ?></th></tr></thead>
+            <tbody>
+            <?php foreach ($presets as $i => $preset): $name = 'nb_team[presets]['.$i.']'; ?>
+              <tr>
+                <td><input type="hidden" name="<?php echo esc_attr($name); ?>[id]" value="<?php echo esc_attr($preset['id']); ?>"><input type="text" name="<?php echo esc_attr($name); ?>[label]" value="<?php echo esc_attr($preset['label']); ?>" placeholder="<?php esc_attr_e('Új sablon', 'nb-designer'); ?>"></td>
+                <td><select name="<?php echo esc_attr($name); ?>[mode]"><option value="work" <?php selected($preset['mode'], 'work'); ?>><?php esc_html_e('Munkaruha', 'nb-designer'); ?></option><option value="sport" <?php selected($preset['mode'], 'sport'); ?>><?php esc_html_e('Csapatmez', 'nb-designer'); ?></option><option value="both" <?php selected($preset['mode'], 'both'); ?>><?php esc_html_e('Mindkettő', 'nb-designer'); ?></option></select></td>
+                <td><select name="<?php echo esc_attr($name); ?>[side]"><option value="front" <?php selected($preset['side'], 'front'); ?>><?php esc_html_e('Elöl', 'nb-designer'); ?></option><option value="back" <?php selected($preset['side'], 'back'); ?>><?php esc_html_e('Hátul', 'nb-designer'); ?></option></select></td>
+                <td><select name="<?php echo esc_attr($name); ?>[kind]"><option value="logo" <?php selected($preset['kind'], 'logo'); ?>><?php esc_html_e('Logó', 'nb-designer'); ?></option><option value="text" <?php selected($preset['kind'], 'text'); ?>><?php esc_html_e('Felirat', 'nb-designer'); ?></option><option value="number" <?php selected($preset['kind'], 'number'); ?>><?php esc_html_e('Szám', 'nb-designer'); ?></option></select></td>
+                <td><input type="number" min="0" max="1" step="0.01" name="<?php echo esc_attr($name); ?>[cx]" value="<?php echo esc_attr($preset['cx']); ?>"></td>
+                <td><input type="number" min="0" max="1" step="0.01" name="<?php echo esc_attr($name); ?>[top]" value="<?php echo esc_attr($preset['top']); ?>"></td>
+                <td><input type="number" min="0" step="1" name="<?php echo esc_attr($name); ?>[w_mm]" value="<?php echo esc_attr($preset['w_mm']); ?>"></td>
+                <td><input type="number" min="0" step="1" name="<?php echo esc_attr($name); ?>[h_mm]" value="<?php echo esc_attr($preset['h_mm']); ?>"></td>
+                <td><input type="text" name="<?php echo esc_attr($name); ?>[text]" value="<?php echo esc_attr($preset['text']); ?>"></td>
+                <td><select name="<?php echo esc_attr($name); ?>[bind]"><option value="" <?php selected($preset['bind'], ''); ?>><?php esc_html_e('Nem (fix)', 'nb-designer'); ?></option><option value="name" <?php selected($preset['bind'], 'name'); ?>><?php esc_html_e('Név', 'nb-designer'); ?></option><option value="number" <?php selected($preset['bind'], 'number'); ?>><?php esc_html_e('Szám', 'nb-designer'); ?></option></select></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <label class="nb-team-presets-foot nb-inline-toggle"><input type="checkbox" name="nb_team[reset_presets]" value="1"> <?php esc_html_e('Segédsablonok visszaállítása az alapértékekre mentéskor', 'nb-designer'); ?></label>
+      </section>
+
+      <div class="nb-save-bar"><span class="nb-save-state" aria-live="polite"><?php esc_html_e('Nincs mentetlen módosítás', 'nb-designer'); ?></span><button class="button button-primary"><?php esc_html_e('Beállítások mentése', 'nb-designer'); ?></button></div>
     </form>
   </div>
   <?php
