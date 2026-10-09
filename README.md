@@ -23,12 +23,14 @@ Külön modul a `/csapatruha-tervezo/` oldalon (`[nb_team_designer]` shortcode).
 - **Termék és alapszín:** az előnézet a választott szín mockupján látszik, elöl és hátul.
 - **Elhelyezési segédsablonok:** egy kattintással a jó helyre és mm-ben megadott méretre kerül a logó, felirat vagy szám (pl. bal mell logó 9×9 cm, hát szám 25 cm). Utána minden elem szabadon mozgatható és méretezhető; a nyomtatási felületből nem lóghat ki.
 - **Színek × méretek:** színenként egy sor, méretenként darabszám. Bármennyi szín hozzáadható (az adminban beállított korlátig), a darabszámok összeadódnak.
+- **Névsor:** a 3. lépés „Névsor” fülén mezenként egy sor (név, szám, méret, szín), a „+ Játékos” gombbal vagy a szám mezőben Enterrel bővíthető. A darabszám a névsorból adódik; név vagy szám nélküli mez is felvehető. Ha előbb darabszámokat adott meg a vevő, a Névsorra váltáskor ennyi üres sor jelenik meg a méretekkel és színekkel. Egy játékosra kattintva a mezen az ő neve és száma látszik. Figyelmeztet, ha egy színen belül egy szám többször szerepel.
+- **Névsorból jövő feliratok:** a kijelölt feliratnál választható a tartalom: „Mindenkinél ugyanaz”, „Játékos neve” vagy „Játékos száma”. A csapatmez „Hát név”, „Hát szám” és „Jobb mell szám”, valamint a munkaruha „Jobb mell felirat” sablonja alapból a névsorból kap szöveget (az adminban sablononként állítható). A közös nyomdai fájl ezek nélkül készül, a nevek és számok játékosonként külön, ugyanakkora átlátszó PNG-be kerülnek; ezek a rendelés tételénél, a játékoslistában tölthetők le.
 - **Ár:** darabonként a termék (variációs) ára + a nyomatok fix ára. Egy nyomat a terv egy oldalán egymáshoz közeli elemek csoportja; az árát a befoglaló méretéhez illő sáv adja (Kis / Közepes / Nagy). A mennyiségi kedvezmény a teljes darabárra jár. Az árat a szerver újraszámolja, a kosárban a darabár tartalmazza a nyomatot.
 - **Figyelmeztetések:** ha egy felirat beleolvad valamelyik rendelt színbe, vagy a logó felbontása kevés a választott mérethez.
 - **Kosárba:** egy kattintással; a nyomdai PNG oldalanként egyszer készül (300 dpi, legfeljebb 3600 px széles), az előnézet színenként. Minden szín–méret páros külön kosársor, egy kedvezménycsoportban.
 - **Piszkozat:** a böngésző megjegyzi a befejezetlen tervet, és visszatéréskor felajánlja a folytatást.
 
-Beállítások: **Terméktervező → Csapatruha tervező** (termékek, nyomatsávok ára és mérete, csoportosítási távolság, minimum darabszám, színek száma, segédsablonok). A `/csapatpolo/` oldal gombjai erre a modulra mutatnak.
+Beállítások: **Terméktervező → Csapatruha tervező** (termékek, nyomatsávok ára és mérete, csoportosítási távolság, minimum darabszám, színek és játékosok száma, név/szám felár, segédsablonok és hogy melyik a névsorból kap szöveget). A `/csapatpolo/` oldal gombjai erre a modulra mutatnak.
 
 A mennyiségi kedvezmény az eredeti tervezőben is a termék és a hozzá tartozó egyedi nyomat együttes árára jár.
 

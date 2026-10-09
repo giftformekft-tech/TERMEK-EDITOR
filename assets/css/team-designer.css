@@ -139,6 +139,27 @@
 .nbt-add-color { display: grid; gap: 6px; margin-top: 12px; font-weight: 700; font-size: 14px; }
 .nbt-add-color select { min-height: 44px; padding: 8px 10px; border: 1px dashed #b9bec7; border-radius: 10px; background: #fff; font-size: 16px; }
 
+.nbt-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 12px; border-radius: 12px; background: var(--nbt-soft); }
+.nbt-tabs button { display: grid; gap: 1px; justify-items: center; min-height: 48px; padding: 6px 8px; border: 0; border-radius: 9px; background: transparent; color: var(--nbt-muted); font-weight: 700; line-height: 1.15; }
+.nbt-tabs button small { font-weight: 500; font-size: 11px; }
+.nbt-tabs button:hover { background: rgba(255,255,255,.6); color: var(--nbt-ink); }
+.nbt-tabs button[aria-selected="true"] { background: var(--nbt-card); color: var(--nbt-ink); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+
+.nbt-roster { display: grid; gap: 6px; margin: 10px 0; }
+.nbt-player { display: grid; grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr) 36px; grid-template-areas: "name name name del" "num size color color"; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--nbt-line); border-radius: 12px; background: var(--nbt-card); }
+.nbt-player.is-active { border-color: var(--nbt-accent); box-shadow: 0 0 0 1px var(--nbt-accent); }
+.nbt-player input, .nbt-player select { width: 100%; min-height: 42px; padding: 6px 8px; border: 1px solid var(--nbt-line); border-radius: 9px; background: #fff; color: var(--nbt-ink); font-size: 16px; }
+.nbt-player__name { grid-area: name; font-weight: 700; text-transform: none; }
+.nbt-player__number { grid-area: num; text-align: center; font-weight: 700; }
+.nbt-player__size { grid-area: size; }
+.nbt-player__color { grid-area: color; }
+.nbt-player__remove { grid-area: del; width: 36px; height: 36px; min-height: 0; padding: 0; border: 1px solid var(--nbt-line); border-radius: 50%; background: var(--nbt-card); color: var(--nbt-muted); font-size: 20px; line-height: 1; }
+.nbt-player__remove:hover:not(:disabled) { color: var(--nbt-danger); border-color: var(--nbt-danger); background: var(--nbt-card); }
+.nbt-player__remove:disabled { opacity: .35; cursor: default; }
+.nbt-player:not(:has(.nbt-player__color)) { grid-template-areas: "name name name del" "num size size size"; }
+.nbt-roster-sum { margin-top: 10px !important; color: var(--nbt-muted); font-size: 13px; font-weight: 600; }
+.nbt-bind-hint { flex: 1 1 100%; margin: 0; padding: 8px 10px; border-radius: 10px; background: #f3f7ff; color: var(--nbt-ink); font-size: 13px; }
+
 .nbt-summary__list { display: grid; gap: 8px; margin: 0; }
 .nbt-summary__list div { display: flex; justify-content: space-between; gap: 12px; }
 .nbt-summary__list dt { color: var(--nbt-muted); }

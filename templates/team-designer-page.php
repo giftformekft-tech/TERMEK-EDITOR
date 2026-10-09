@@ -39,7 +39,9 @@
       </div>
       <div class="nbt-selection" id="nbt-selection" hidden>
         <div class="nbt-selection__row nbt-selection__text">
-          <label class="nbt-field nbt-field--grow"><span>Felirat</span><input type="text" id="nbt-text-input" maxlength="60" autocomplete="off"></label>
+          <label class="nbt-field nbt-field--grow"><span>Tartalom</span><select id="nbt-bind"><option value="">Mindenkinél ugyanaz</option><option value="name">Játékos neve (névsorból)</option><option value="number">Játékos száma (névsorból)</option></select></label>
+          <label class="nbt-field nbt-field--grow" id="nbt-text-field"><span>Felirat</span><input type="text" id="nbt-text-input" maxlength="60" autocomplete="off"></label>
+          <p class="nbt-bind-hint" id="nbt-bind-hint" hidden>A szöveg játékosonként a névsorból jön. Most ez látszik: <strong id="nbt-bind-current"></strong></p>
         </div>
         <div class="nbt-selection__row nbt-selection__text">
           <label class="nbt-field nbt-field--grow"><span>Betűtípus</span><select id="nbt-font"></select></label>
@@ -77,8 +79,20 @@
 
       <section class="nbt-step" aria-labelledby="nbt-step3">
         <h2 id="nbt-step3"><span class="nbt-step__num">3</span>Színek, méretek, darabszám</h2>
-        <div class="nbt-rows" id="nbt-rows"></div>
-        <label class="nbt-add-color" id="nbt-add-color-wrap"><span>+ Másik szín hozzáadása</span><select id="nbt-add-color"></select></label>
+        <div class="nbt-tabs" role="tablist" aria-label="Mennyiség megadása">
+          <button type="button" role="tab" data-qty="grid" aria-selected="true">Darabszám</button>
+          <button type="button" role="tab" data-qty="roster" aria-selected="false">Névsor <small>név és szám mezenként</small></button>
+        </div>
+        <div id="nbt-qty-grid">
+          <div class="nbt-rows" id="nbt-rows"></div>
+          <label class="nbt-add-color" id="nbt-add-color-wrap"><span>+ Másik szín hozzáadása</span><select id="nbt-add-color"></select></label>
+        </div>
+        <div id="nbt-qty-roster" hidden>
+          <p class="nbt-help">Mezenként egy sor. A darabszámot a névsorból számoljuk; név vagy szám nélkül is felvehetsz mezt. Kattints egy játékosra, és a mezen az ő neve látszik.</p>
+          <div class="nbt-roster" id="nbt-roster"></div>
+          <button type="button" class="nbt-btn" id="nbt-add-player">+ Játékos</button>
+          <p class="nbt-roster-sum" id="nbt-roster-sum"></p>
+        </div>
       </section>
 
       <section class="nbt-summary" id="nbt-summary" aria-live="polite">

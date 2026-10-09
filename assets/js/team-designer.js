@@ -15,6 +15,10 @@
   const gapMm = Number(team.gap_mm) >= 0 ? Number(team.gap_mm) : 20;
   const minQty = Math.max(1, parseInt(team.min_qty, 10) || 1);
   const maxColors = Math.max(1, parseInt(team.max_colors, 10) || 8);
+  const personalFee = Math.max(0, Number(team.personal_fee) || 0);
+  const maxPlayers = Math.max(1, parseInt(team.max_players, 10) || 100);
+  // Az elemek saját tulajdonságai, amelyeket mentéskor és másoláskor is meg kell tartani.
+  const OBJECT_PROPS = ['nbKind', 'nbMaxW', 'nbBaseScale', 'nbBind', 'nbPlaceholder'];
   const DRAFT_KEY = 'nb_team_draft_v1';
   const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
   const PRINT_MAX_BYTES = 24 * 1024 * 1024;
@@ -33,7 +37,9 @@
     sumUnit: $('nbt-sum-unit'), sumTotal: $('nbt-sum-total'), placements: $('nbt-placements'), nextTier: $('nbt-next-tier'),
     error: $('nbt-error'), cart: $('nbt-cart'), barQty: $('nbt-bar-qty'), barTotal: $('nbt-bar-total'), barCart: $('nbt-bar-cart'),
     busy: $('nbt-busy'), busyText: $('nbt-busy-text'), toast: $('nbt-toast'),
-    draft: $('nbt-draft'), draftRestore: $('nbt-draft-restore'), draftDiscard: $('nbt-draft-discard')
+    draft: $('nbt-draft'), draftRestore: $('nbt-draft-restore'), draftDiscard: $('nbt-draft-discard'),
+    bind: $('nbt-bind'), textField: $('nbt-text-field'), bindHint: $('nbt-bind-hint'), bindCurrent: $('nbt-bind-current'),
+    qtyGrid: $('nbt-qty-grid'), qtyRoster: $('nbt-qty-roster'), roster: $('nbt-roster'), addPlayer: $('nbt-add-player'), rosterSum: $('nbt-roster-sum')
   };
 
   const FONTS = [
@@ -202,6 +208,9 @@
     option: null,      // kiválasztott termék + típus
     color: '',         // előnézeti szín
     rows: [],          // [{ color, qty: { size: n } }]
+    qtyMode: 'grid',   // 'grid' = darabszám, 'roster' = névsor
+    roster: [],        // [{ name, number, size, color }]
+    activePlayer: -1,  // a vásznon látszó játékos
     side: 'front',
     logo: null,        // { src, name }
     pendingPreset: null,
@@ -466,10 +475,11 @@
     return img;
   }
 
-  function addText(text, box, side, kind) {
+  function addText(text, box, side, kind, bind) {
     const obj = new fabric.Text(text, {
       fontFamily: kind === 'number' ? NUMBER_FONT : TEXT_FONT,
-      fontWeight: 700, fontSize: 100, fill: defaultTextColor(), textAlign: 'center', nbKind: kind
+      fontWeight: 700, fontSize: 100, fill: defaultTextColor(), textAlign: 'center', nbKind: kind,
+      nbBind: bind === 'name' || bind === 'number' ? bind : '', nbPlaceholder: text
     });
     fitIntoBox(obj, box);
     obj.set({ nbMaxW: box.w, nbBaseScale: obj.scaleX });
@@ -491,14 +501,56 @@
       }
       obj = await addLogo(box, preset.side);
     } else {
-      obj = addText(preset.text || (preset.kind === 'number' ? '10' : 'FELIRAT'), box, preset.side, preset.kind);
+      obj = addText(preset.text || (preset.kind === 'number' ? '10' : 'FELIRAT'), box, preset.side, preset.kind, preset.bind);
     }
     if (!obj) return;
+    if (obj.nbBind) {
+      // Ha még nincs megadva darabszám, a névsor a kényelmesebb indulás.
+      if (state.qtyMode === 'grid' && totalQty() === 0) setQtyMode('roster');
+      else displayPlayer();
+    }
     sides[preset.side].canvas.setActiveObject(obj);
     sides[preset.side].canvas.requestRenderAll();
     syncSelection();
     refresh();
-    if (preset.kind !== 'logo') focusTextInput();
+    if (preset.kind !== 'logo' && !obj.nbBind) focusTextInput();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Játékosonként változó feliratok                                         */
+  /* ---------------------------------------------------------------------- */
+
+  const isText = o => !!o && (o.type === 'text' || o.type === 'i-text' || o.type === 'textbox');
+  const boundObjects = side => designObjects(side).filter(o => isText(o) && o.nbBind);
+  const hasBound = () => boundObjects('front').length + boundObjects('back').length > 0;
+  const playerValue = (player, bind) => String((bind === 'number' ? player.number : player.name) || '').trim();
+  const isPersonal = player => !!(String(player.name || '').trim() || String(player.number || '').trim());
+  /** Kerül-e a játékos adatából valami a mezre (van hozzá kötött felirat és kitöltött adat). */
+  const playerHasPrint = player => ['front', 'back'].some(side => boundObjects(side).some(o => playerValue(player, o.nbBind) !== ''));
+
+  /** A kötött felirat a játékos adatát mutatja; játékos nélkül a mintaszöveget. Üres adatnál a felirat nem kerül a mezre. */
+  function setBoundText(obj, player, side) {
+    const value = player ? playerValue(player, obj.nbBind) : '';
+    const text = value || obj.nbPlaceholder || ' ';
+    const centerX = obj.left + obj.getScaledWidth() / 2;
+    obj.set({ text, visible: !player || value !== '' });
+    obj.initDimensions();
+    fitTextWidth(obj);
+    obj.set('left', centerX - obj.getScaledWidth() / 2);
+    keepInside(obj, side);
+  }
+
+  function activePlayer() {
+    return state.qtyMode === 'roster' ? (state.roster[state.activePlayer] || null) : null;
+  }
+
+  function displayPlayer(player) {
+    const shown = player === undefined ? activePlayer() : player;
+    ['front', 'back'].forEach(side => {
+      boundObjects(side).forEach(o => setBoundText(o, shown, side));
+      sides[side].canvas.requestRenderAll();
+    });
+    syncSelection();
   }
 
   function focusTextInput() {
@@ -543,7 +595,12 @@
     const isText = obj.type === 'text' || obj.type === 'i-text' || obj.type === 'textbox';
     el.selection.querySelectorAll('.nbt-selection__text').forEach(row => { row.hidden = !isText; });
     if (isText) {
-      if (document.activeElement !== el.textInput) el.textInput.value = obj.text || '';
+      const bound = !!obj.nbBind;
+      el.bind.value = obj.nbBind || '';
+      el.textField.hidden = bound;
+      el.bindHint.hidden = !bound;
+      if (bound) el.bindCurrent.textContent = obj.visible === false ? '(üres)' : (obj.text || '');
+      if (document.activeElement !== el.textInput) el.textInput.value = bound ? (obj.nbPlaceholder || '') : (obj.text || '');
       el.font.value = obj.fontFamily;
       el.textColor.value = /^#[0-9a-f]{6}$/i.test(obj.fill) ? obj.fill : '#111111';
     }
@@ -568,6 +625,22 @@
     activeCanvas().requestRenderAll();
     syncSelection();
     scheduleRefresh();
+  });
+
+  el.bind.addEventListener('change', () => {
+    const obj = selected();
+    if (!isText(obj)) return;
+    const bind = el.bind.value;
+    if (bind) {
+      if (!obj.nbBind) obj.set({ nbPlaceholder: obj.text });
+      if (!obj.nbMaxW) obj.set({ nbMaxW: obj.getScaledWidth(), nbBaseScale: obj.scaleX });
+      obj.set({ nbBind: bind });
+      if (state.qtyMode === 'grid' && totalQty() === 0) setQtyMode('roster');
+    } else {
+      obj.set({ nbBind: '', visible: true });
+    }
+    displayPlayer();
+    refresh();
   });
 
   el.font.addEventListener('change', () => {
@@ -605,13 +678,13 @@
     const obj = selected();
     if (!obj) return;
     obj.clone(copy => {
-      copy.set({ left: obj.left + 15, top: obj.top + 15, nbKind: obj.nbKind });
+      copy.set({ left: obj.left + 15, top: obj.top + 15 });
       activeCanvas().add(copy);
       keepInside(copy, state.side);
       activeCanvas().setActiveObject(copy).requestRenderAll();
       syncSelection();
       refresh();
-    }, ['nbKind', 'nbMaxW', 'nbBaseScale']);
+    }, OBJECT_PROPS);
   });
 
   function deleteSelected() {
@@ -722,9 +795,15 @@
       }));
     }
     if (!colors.some(c => norm(c) === norm(state.color))) state.color = state.rows[0] ? state.rows[0].color : colors[0];
+    const sizes = sizesFor(p);
+    state.roster.forEach(player => {
+      if (!sizes.includes(player.size)) player.size = sizes[0];
+      const match = colors.find(c => norm(c) === norm(player.color));
+      player.color = match || state.color;
+    });
     renderTypes();
     renderColors();
-    renderRows();
+    renderQtyMode();
     await applyMockups(state.color);
     refresh();
   }
@@ -753,9 +832,13 @@
   /** Az alapszín választása: ha még csak egy üres sor van, az a sor is átszíneződik. */
   async function previewColor(color, fromSwatch) {
     if (fromSwatch && state.rows.length === 1 && rowTotal(state.rows[0]) === 0) state.rows[0].color = color;
+    if (fromSwatch && state.qtyMode === 'roster' && state.roster.length === 1 && !isPersonal(state.roster[0])) {
+      state.roster[0].color = color;
+      renderRoster();
+    }
     state.color = color;
     renderColors();
-    renderRows();
+    if (state.qtyMode === 'grid') renderRows();
     await applyMockups(color);
     refresh();
   }
@@ -789,7 +872,195 @@
   }
 
   const rowTotal = row => Object.keys(row.qty).reduce((sum, s) => sum + (parseInt(row.qty[s], 10) || 0), 0);
-  const totalQty = () => state.rows.reduce((sum, r) => sum + rowTotal(r), 0);
+  const totalQty = () => state.qtyMode === 'roster' ? state.roster.length : state.rows.reduce((sum, r) => sum + rowTotal(r), 0);
+
+  /** A rendelés sorai (szín, méret, darab, névvel/számmal), a választott módtól függetlenül. */
+  function orderRows() {
+    const p = product();
+    if (!p) return [];
+    const rows = [];
+    const add = (color, size, qty, personal) => {
+      const found = rows.find(r => norm(r.color) === norm(color) && r.size === size && r.personal === personal);
+      if (found) found.qty += qty; else rows.push({ color, size, qty, personal });
+    };
+    if (state.qtyMode === 'roster') {
+      state.roster.forEach(player => add(player.color, player.size, 1, playerHasPrint(player)));
+    } else {
+      state.rows.forEach(r => sizesFor(p).forEach(size => {
+        const n = parseInt(r.qty[size], 10) || 0;
+        if (n) add(r.color, size, n, false);
+      }));
+    }
+    return rows;
+  }
+
+  function orderColors() {
+    const colors = [];
+    orderRows().forEach(r => { if (!colors.some(c => norm(c) === norm(r.color))) colors.push(r.color); });
+    return colors;
+  }
+
+  /* Névsor ---------------------------------------------------------------- */
+
+  function newPlayer() {
+    const p = product();
+    const last = state.roster[state.roster.length - 1];
+    const sizes = sizesFor(p);
+    return { name: '', number: '', size: last ? last.size : sizes[Math.min(2, sizes.length - 1)], color: last ? last.color : state.color };
+  }
+
+  function setQtyMode(mode) {
+    if (mode === state.qtyMode) return;
+    const p = product();
+    if (mode === 'roster' && p) {
+      if (!state.roster.length) {
+        // A már megadott darabszámokból üres sorok lesznek, csak a neveket kell beírni.
+        state.rows.forEach(r => sizesFor(p).forEach(size => {
+          const n = parseInt(r.qty[size], 10) || 0;
+          for (let i = 0; i < n && state.roster.length < maxPlayers; i++) state.roster.push({ name: '', number: '', size, color: r.color });
+        }));
+        if (!state.roster.length) state.roster.push(newPlayer());
+      }
+      state.activePlayer = 0;
+    } else if (mode === 'grid' && p && state.roster.length) {
+      const rows = [];
+      state.roster.forEach(player => {
+        let row = rows.find(r => norm(r.color) === norm(player.color));
+        if (!row) rows.push(row = { color: player.color, qty: {} });
+        row.qty[player.size] = (row.qty[player.size] || 0) + 1;
+      });
+      state.rows = rows;
+      state.activePlayer = -1;
+    }
+    state.qtyMode = mode;
+    renderQtyMode();
+    displayPlayer();
+    refresh();
+  }
+
+  function renderQtyMode() {
+    app.querySelectorAll('.nbt-tabs [data-qty]').forEach(b => b.setAttribute('aria-selected', b.dataset.qty === state.qtyMode ? 'true' : 'false'));
+    el.qtyGrid.hidden = state.qtyMode !== 'grid';
+    el.qtyRoster.hidden = state.qtyMode !== 'roster';
+    if (state.qtyMode === 'roster') renderRoster(); else renderRows();
+  }
+
+  function setActivePlayer(index) {
+    // A játékos kiválasztásakor azt az oldalt mutatjuk, ahol a neve vagy száma van.
+    if (!boundObjects(state.side).length) {
+      const other = state.side === 'front' ? 'back' : 'front';
+      if (boundObjects(other).length) setSide(other);
+    }
+    if (index === state.activePlayer) return;
+    state.activePlayer = index;
+    el.roster.querySelectorAll('.nbt-player').forEach((row, i) => row.classList.toggle('is-active', i === index));
+    const player = state.roster[index];
+    if (player && norm(player.color) !== norm(state.color)) previewColor(player.color, false).then(() => displayPlayer());
+    else displayPlayer();
+  }
+
+  function renderRoster() {
+    const p = product();
+    el.roster.innerHTML = '';
+    if (!p) return;
+    const sizes = sizesFor(p);
+    const colors = colorsFor(p, state.option.typeKey);
+    state.roster.forEach((player, index) => {
+      const row = document.createElement('div');
+      row.className = 'nbt-player' + (index === state.activePlayer ? ' is-active' : '');
+      row.addEventListener('focusin', () => setActivePlayer(index));
+      row.addEventListener('click', () => setActivePlayer(index));
+      const name = document.createElement('input');
+      name.type = 'text'; name.className = 'nbt-player__name'; name.placeholder = (index + 1) + '. játékos neve'; name.maxLength = 30;
+      name.autocomplete = 'off'; name.value = player.name;
+      name.setAttribute('aria-label', (index + 1) + '. játékos neve');
+      const number = document.createElement('input');
+      number.type = 'text'; number.className = 'nbt-player__number'; number.placeholder = 'Szám'; number.maxLength = 3;
+      number.inputMode = 'numeric'; number.autocomplete = 'off'; number.value = player.number;
+      number.setAttribute('aria-label', (index + 1) + '. játékos száma');
+      name.addEventListener('input', () => { player.name = name.value; if (index === state.activePlayer) displayPlayer(); scheduleRefresh(); });
+      number.addEventListener('input', () => {
+        const clean = number.value.replace(/\D/g, '').slice(0, 3);
+        if (clean !== number.value) number.value = clean;
+        player.number = clean;
+        if (index === state.activePlayer) displayPlayer();
+        scheduleRefresh();
+      });
+      name.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); number.focus(); } });
+      number.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const next = el.roster.querySelectorAll('.nbt-player__name')[index + 1];
+        if (next) next.focus(); else addPlayer();
+      });
+      row.appendChild(name);
+      row.appendChild(number);
+      if (sizes.length > 1 || sizes[0] !== '') {
+        const size = document.createElement('select');
+        size.className = 'nbt-player__size';
+        size.setAttribute('aria-label', (index + 1) + '. játékos mérete');
+        sizes.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; size.appendChild(o); });
+        size.value = player.size;
+        size.addEventListener('change', () => { player.size = size.value; scheduleRefresh(); });
+        row.appendChild(size);
+      }
+      if (colors.length > 1) {
+        const color = document.createElement('select');
+        color.className = 'nbt-player__color';
+        color.setAttribute('aria-label', (index + 1) + '. játékos mezének színe');
+        colors.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = colorLabel(c); color.appendChild(o); });
+        color.value = colors.find(c => norm(c) === norm(player.color)) || colors[0];
+        color.addEventListener('change', () => {
+          player.color = color.value;
+          if (index === state.activePlayer) previewColor(player.color, false).then(() => displayPlayer());
+          scheduleRefresh();
+        });
+        row.appendChild(color);
+      }
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'nbt-player__remove';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label', (index + 1) + '. játékos törlése');
+      remove.disabled = state.roster.length < 2;
+      remove.addEventListener('click', e => {
+        e.stopPropagation();
+        state.roster.splice(index, 1);
+        state.activePlayer = Math.min(state.activePlayer, state.roster.length - 1);
+        renderRoster();
+        displayPlayer();
+        refresh();
+      });
+      row.appendChild(remove);
+      el.roster.appendChild(row);
+    });
+    el.addPlayer.hidden = state.roster.length >= maxPlayers;
+    renderRosterSum();
+  }
+
+  function addPlayer() {
+    if (state.roster.length >= maxPlayers) { toast('Egy rendelésben legfeljebb ' + maxPlayers + ' játékos lehet.'); return; }
+    state.roster.push(newPlayer());
+    state.activePlayer = state.roster.length - 1;
+    renderRoster();
+    displayPlayer();
+    refresh();
+    const inputs = el.roster.querySelectorAll('.nbt-player__name');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }
+
+  function renderRosterSum() {
+    if (state.qtyMode !== 'roster') return;
+    const p = product();
+    const parts = orderColors().map(color => {
+      const sizes = sizesFor(p).map(size => {
+        const n = state.roster.filter(pl => norm(pl.color) === norm(color) && pl.size === size).length;
+        return n ? (size ? size + ': ' + n : n + ' db') : '';
+      }).filter(Boolean).join(', ');
+      return colorLabel(color) + ' – ' + sizes;
+    });
+    el.rosterSum.textContent = state.roster.length + ' mez' + (parts.length ? ' · ' + parts.join(' · ') : '');
+  }
 
   function renderRows() {
     const p = product();
@@ -902,19 +1173,18 @@
     const qty = totalQty();
     let subtotal = 0;
     let priceKnown = true;
+    let personalQty = 0;
     if (p) {
-      const sizes = sizesFor(p);
-      state.rows.forEach(row => sizes.forEach(size => {
-        const n = parseInt(row.qty[size], 10) || 0;
-        if (!n) return;
-        const base = basePrice(p, state.option.typeKey, row.color, size);
+      orderRows().forEach(row => {
+        const base = basePrice(p, state.option.typeKey, row.color, row.size);
         if (!Number.isFinite(base)) priceKnown = false;
-        subtotal += ((Number.isFinite(base) ? base : 0) + unitPrint) * n;
-      }));
+        if (row.personal) personalQty += row.qty;
+        subtotal += ((Number.isFinite(base) ? base : 0) + unitPrint + (row.personal ? personalFee : 0)) * row.qty;
+      });
     }
     const pct = discountFor(qty);
     const discount = subtotal * pct / 100;
-    return { elements, placements, unitPrint, qty, subtotal, pct, discount, total: subtotal - discount, priceKnown };
+    return { elements, placements, unitPrint, qty, personalQty, subtotal, pct, discount, total: subtotal - discount, priceKnown };
   }
 
   function refresh() {
@@ -928,6 +1198,12 @@
       li.textContent = (pl.side === 'front' ? 'Elöl' : 'Hátul') + ': ' + pl.label + ', ' + cm(pl.w_mm) + '×' + cm(pl.h_mm) + ' cm – ' + formatPrice(pl.price);
       el.placements.appendChild(li);
     });
+    if (personalFee > 0 && q.personalQty > 0) {
+      const li = document.createElement('li');
+      li.textContent = 'Név/szám felár: ' + formatPrice(personalFee) + ' × ' + q.personalQty + ' db';
+      el.placements.appendChild(li);
+    }
+    renderRosterSum();
     el.sumDiscountRow.hidden = !(q.pct > 0 && q.qty > 0);
     el.sumDiscount.textContent = '−' + String(q.pct).replace('.', ',') + '% (−' + formatPrice(q.discount) + ')';
     const hasTotal = q.qty > 0 && q.priceKnown;
@@ -949,6 +1225,8 @@
   function readiness(q) {
     if (!state.option) return 'Válassz terméket.';
     if (!q.placements.length) return 'Tegyél a termékre logót vagy feliratot.';
+    if (state.qtyMode === 'roster' && !state.roster.length) return 'Adj hozzá legalább egy játékost.';
+    if (state.qtyMode === 'grid' && hasBound()) return 'A tervben játékosonként változó név vagy szám van: töltsd ki a Névsort, vagy a feliratnál válaszd a „Mindenkinél ugyanaz” tartalmat.';
     if (q.qty < 1) return 'Add meg, melyik méretből hány darab kell.';
     if (q.qty < minQty) return 'A minimum rendelés ' + minQty + ' db.';
     return '';
@@ -956,14 +1234,29 @@
 
   function renderWarnings(q) {
     const warnings = [];
-    const colors = state.rows.filter(r => rowTotal(r) > 0).map(r => r.color);
+    const colors = orderColors();
     if (!colors.length && state.color) colors.push(state.color);
+    if (state.qtyMode === 'roster') {
+      if (!hasBound() && state.roster.some(isPersonal)) {
+        warnings.push('A névsorban megadott nevek és számok nem kerülnek a mezre, mert a tervben nincs név- vagy számmező. Adj hozzá „Hát név” vagy „Hát szám” elhelyezést, vagy egy feliratnál válaszd a „Játékos neve” tartalmat.');
+      }
+      const byNumber = {};
+      state.roster.forEach(pl => {
+        const n = String(pl.number || '').trim();
+        if (!n) return;
+        const key = norm(pl.color) + '|' + n;
+        (byNumber[key] = byNumber[key] || []).push(String(pl.name || '').trim() || '(név nélkül)');
+      });
+      Object.keys(byNumber).forEach(key => {
+        if (byNumber[key].length > 1) warnings.push('A(z) ' + key.split('|')[1] + '-es szám többször szerepel: ' + byNumber[key].join(', ') + '.');
+      });
+    }
     q.elements.forEach(e => {
       const o = e.obj;
       if (o.type === 'text' && /^#[0-9a-f]{6}$/i.test(o.fill)) {
         colors.forEach(color => {
           const hex = colorHex(color);
-          if (hex && contrast(o.fill, hex) < 1.7) warnings.push('A(z) „' + o.text + '” felirat a(z) ' + colorLabel(color).toLowerCase() + ' színű ruhán alig fog látszani. Válassz más betűszínt.');
+          if (hex && contrast(o.fill, hex) < 1.7) warnings.push('A(z) „' + (o.nbBind ? (o.nbBind === 'number' ? 'szám' : 'név') : o.text) + '” felirat a(z) ' + colorLabel(color).toLowerCase() + ' színű ruhán alig fog látszani. Válassz más betűszínt.');
         });
       }
       if (o.type === 'image' && o._element && o._element.naturalWidth && !/svg/i.test(String(o.getSrc ? o.getSrc() : '').slice(0, 30))) {
@@ -1016,7 +1309,20 @@
     }
   }
 
-  function exportPrint(side) {
+  /** only: 'common' = a mindenkinél azonos elemek, 'personal' = csak a játékosonként változó feliratok. */
+  function exportPrint(side, only) {
+    const hidden = [];
+    designObjects(side).forEach(o => {
+      const bound = isText(o) && !!o.nbBind;
+      if (o.visible !== false && ((only === 'common' && bound) || (only === 'personal' && !bound))) {
+        o.visible = false;
+        hidden.push(o);
+      }
+    });
+    try { return exportArea(side); } finally { hidden.forEach(o => { o.visible = true; }); }
+  }
+
+  function exportArea(side) {
     const area = sides[side].area;
     const target = Math.min(area.widthMm / 25.4 * area.dpi, 3600);
     let multiplier = Math.min(target / area.w, 11000 / area.h);
@@ -1073,12 +1379,28 @@
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
       const sidesUsed = Array.from(new Set(quote.placements.map(p => p.side)));
       const print = {};
-      sidesUsed.forEach(side => { print[side] = exportPrint(side); });
-      const colors = [];
-      state.rows.forEach(r => { if (rowTotal(r) > 0 && !colors.some(c => norm(c) === norm(r.color))) colors.push(r.color); });
+      const roster = state.qtyMode === 'roster';
+      displayPlayer(null);
+      sidesUsed.forEach(side => { print[side] = exportPrint(side, roster ? 'common' : ''); });
+      const personal = [];
+      if (roster && hasBound()) {
+        for (let i = 0; i < state.roster.length; i++) {
+          const player = state.roster[i];
+          personal[i] = {};
+          if (!playerHasPrint(player)) continue;
+          el.busyText.textContent = 'Névfájlok készítése (' + (i + 1) + '/' + state.roster.length + ')…';
+          if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+          displayPlayer(player);
+          ['front', 'back'].forEach(side => {
+            if (boundObjects(side).some(o => o.visible !== false)) personal[i][side] = exportPrint(side, 'personal');
+          });
+        }
+      }
+      const colors = orderColors();
       const previews = [];
       for (let i = 0; i < colors.length; i++) {
         el.busyText.textContent = 'Előnézetek készítése (' + (i + 1) + '/' + colors.length + ')…';
+        displayPlayer(roster ? (state.roster.find(pl => norm(pl.color) === norm(colors[i]) && isPersonal(pl)) || null) : null);
         await applyMockups(colors[i]);
         previews.push({
           color: colors[i],
@@ -1087,12 +1409,8 @@
         });
       }
       await applyMockups(previewBefore);
-      const p = product();
-      const rows = [];
-      state.rows.forEach(r => sizesFor(p).forEach(size => {
-        const n = parseInt(r.qty[size], 10) || 0;
-        if (n) rows.push({ color: r.color, size, qty: n });
-      }));
+      displayPlayer();
+      const rows = orderRows().map(r => ({ color: r.color, size: r.size, qty: r.qty }));
       const elements = measureElements().map(e => ({ side: e.side, x_mm: e.x_mm, y_mm: e.y_mm, w_mm: e.w_mm, h_mm: e.h_mm }));
       el.busyText.textContent = 'Kosárba tétel…';
       const body = {
@@ -1100,10 +1418,11 @@
         type: state.option.type,
         mode: state.mode,
         elements,
-        layers: { front: compactLayers(sides.front.canvas.toJSON(['nbKind', 'nbMaxW', 'nbBaseScale'])), back: compactLayers(sides.back.canvas.toJSON(['nbKind', 'nbMaxW', 'nbBaseScale'])) },
+        layers: { front: compactLayers(sides.front.canvas.toJSON(OBJECT_PROPS)), back: compactLayers(sides.back.canvas.toJSON(OBJECT_PROPS)) },
         print,
         previews,
-        rows
+        rows,
+        roster: roster ? state.roster.map((pl, i) => ({ name: pl.name.trim(), number: pl.number, size: pl.size, color: pl.color, personal: personal[i] || {} })) : []
       };
       let res;
       try {
@@ -1123,6 +1442,7 @@
       window.location.href = json.redirect || D.cartUrl || '/';
     } catch (err) {
       await applyMockups(previewBefore).catch(() => { });
+      displayPlayer();
       el.busy.hidden = true;
       state.busy = false;
       refresh();
@@ -1149,7 +1469,8 @@
     if (!state.option) return;
     const data = {
       t: Date.now(), mode: state.mode, option: state.option.key, color: state.color, rows: state.rows,
-      logo: state.logo, front: sides.front.canvas.toJSON(['nbKind', 'nbMaxW', 'nbBaseScale']), back: sides.back.canvas.toJSON(['nbKind', 'nbMaxW', 'nbBaseScale'])
+      qtyMode: state.qtyMode, roster: state.roster, activePlayer: state.activePlayer,
+      logo: state.logo, front: sides.front.canvas.toJSON(OBJECT_PROPS), back: sides.back.canvas.toJSON(OBJECT_PROPS)
     };
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)); } catch (e) {
       try { data.logo = null; localStorage.setItem(DRAFT_KEY, JSON.stringify(data)); } catch (e2) { /* nincs hely */ }
@@ -1189,13 +1510,19 @@
     state.rows = Array.isArray(data.rows) ? data.rows.filter(r => r && r.color).map(r => ({ color: r.color, qty: r.qty || {} })) : [];
     state.color = data.color || '';
     state.logo = data.logo || null;
+    state.roster = Array.isArray(data.roster) ? data.roster.filter(pl => pl && typeof pl === 'object').map(pl => ({
+      name: String(pl.name || ''), number: String(pl.number || ''), size: String(pl.size || ''), color: String(pl.color || '')
+    })) : [];
+    state.qtyMode = data.qtyMode === 'roster' && state.roster.length ? 'roster' : 'grid';
+    state.activePlayer = state.qtyMode === 'roster' ? Math.min(Math.max(0, parseInt(data.activePlayer, 10) || 0), state.roster.length - 1) : -1;
     if (state.logo) { el.logoName.textContent = state.logo.name || 'Feltöltött logó'; el.upload.textContent = 'Másik logó'; }
     showWork();
     await selectOption(opt, state.rows.length > 0);
     if (!state.rows.length) await selectOption(opt);
     await loadSide('front', data.front);
     await loadSide('back', data.back);
-    ['front', 'back'].forEach(s => sides[s].canvas.requestRenderAll());
+    renderQtyMode();
+    displayPlayer();
     refresh();
     return true;
   }
@@ -1235,6 +1562,8 @@
     app.dataset.view = 'mode';
   });
   app.querySelectorAll('.nbt-sides [data-side]').forEach(btn => btn.addEventListener('click', () => setSide(btn.dataset.side)));
+  app.querySelectorAll('.nbt-tabs [data-qty]').forEach(btn => btn.addEventListener('click', () => setQtyMode(btn.dataset.qty)));
+  el.addPlayer.addEventListener('click', addPlayer);
 
   FONTS.forEach(f => {
     const o = document.createElement('option');

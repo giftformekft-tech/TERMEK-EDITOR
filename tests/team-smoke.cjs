@@ -23,7 +23,7 @@ const fixture = {
   colorMeta: {}, fonts: [],
   discounts: [{ min_qty: 10, max_qty: 0, percent: 10 }],
   team: {
-    gap_mm: 20, min_qty: 1, max_colors: 8,
+    gap_mm: 20, min_qty: 1, max_colors: 8, personal_fee: 500, max_players: 100,
     tiers: [
       { id: 'small', label: 'Kis nyomat', max_w_mm: 100, max_h_mm: 100, price: 990 },
       { id: 'medium', label: 'Közepes nyomat', max_w_mm: 210, max_h_mm: 297, price: 1490 },
@@ -32,7 +32,8 @@ const fixture = {
     presets: [
       { id: 'work-left-chest', mode: 'work', side: 'front', kind: 'logo', label: 'Bal mell logó', cx: 0.7, top: 0.08, w_mm: 90, h_mm: 90, text: '' },
       { id: 'work-back-top', mode: 'work', side: 'back', kind: 'text', label: 'Hát felső cégnév', cx: 0.5, top: 0.05, w_mm: 260, h_mm: 50, text: 'CÉGNÉV' },
-      { id: 'sport-back-num', mode: 'sport', side: 'back', kind: 'number', label: 'Hát szám', cx: 0.5, top: 0.22, w_mm: 220, h_mm: 250, text: '10' }
+      { id: 'sport-back-name', mode: 'sport', side: 'back', kind: 'text', label: 'Hát név', cx: 0.5, top: 0.05, w_mm: 280, h_mm: 70, text: 'NÉV', bind: 'name' },
+      { id: 'sport-back-num', mode: 'sport', side: 'back', kind: 'number', label: 'Hát szám', cx: 0.5, top: 0.22, w_mm: 220, h_mm: 250, text: '10', bind: 'number' }
     ]
   }
 };
@@ -173,18 +174,74 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await Promise.all([page.waitForURL('http://nb.test/cart-confirmed'), page.click('#nbt-cart')]);
     assert.equal(await page.evaluate(() => localStorage.getItem('nb_team_draft_v1')), null);
 
-    // Piszkozat visszaállítása újratöltés után.
+    // Csapatmez névsorral: név és szám mezenként, a vásznon a kiválasztott játékos látszik.
     await page.goto('http://nb.test/');
     await page.click('.nbt-mode-card[data-mode="sport"]');
+    await page.click('.nbt-chip:has-text("Hát név")');
+    assert.equal(await page.locator('.nbt-tabs [data-qty="roster"]').getAttribute('aria-selected'), 'true', 'a name preset opens the roster when nothing is ordered yet');
     await page.click('.nbt-chip:has-text("Hát szám")');
-    await page.locator('.nbt-row').first().locator('input').nth(1).fill('7');
+    const backTexts = () => page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().filter(o => o.type === 'text').map(o => o.visible === false ? '' : o.text));
+    const players = page.locator('.nbt-player');
+    assert.equal(await players.count(), 1);
+    await players.nth(0).locator('.nbt-player__name').fill('KOVÁCS');
+    await players.nth(0).locator('.nbt-player__number').fill('10');
+    await players.nth(0).locator('.nbt-player__size').selectOption('M');
+    assert.deepEqual(await backTexts(), ['KOVÁCS', '10']);
+    await page.click('#nbt-add-player');
+    await players.nth(1).locator('.nbt-player__name').fill('NAGY');
+    await players.nth(1).locator('.nbt-player__number').fill('7x');
+    assert.equal(await players.nth(1).locator('.nbt-player__number').inputValue(), '7', 'numbers only');
+    await players.nth(1).locator('.nbt-player__size').selectOption('L');
+    assert.deepEqual(await backTexts(), ['NAGY', '7'], 'the active player is shown');
+    await players.nth(1).locator('.nbt-player__number').press('Enter');
+    assert.equal(await players.count(), 3, 'Enter in the number field adds the next player');
+    assert.deepEqual(await backTexts(), ['', ''], 'a blank shirt shows no name or number');
+    await players.nth(2).locator('.nbt-player__number').fill('10');
+    await page.waitForTimeout(250);
+    assert.match(await page.locator('#nbt-warnings').textContent(), /10-es szám többször szerepel: KOVÁCS, \(név nélkül\)/);
+    await players.nth(2).locator('.nbt-player__number').fill('');
+    await players.nth(0).locator('.nbt-player__name').click();
+    assert.deepEqual(await backTexts(), ['KOVÁCS', '10']);
+    await page.waitForTimeout(250);
+    assert.equal(await text(page, 'nbt-sum-qty'), '3db');
+    assert.match(await page.locator('#nbt-roster-sum').textContent(), /3 mez · Zöld – M: 1, L: 2/);
+    const rq = await page.evaluate(() => { const q = window.NBTeamDesigner.computeQuote(); return { personal: q.personalQty, unit: q.unitPrint, total: Math.round(q.total) }; });
+    assert.equal(rq.personal, 2, 'the name/number surcharge applies to the two named shirts');
+    assert.equal(rq.total, (5000 + rq.unit) * 3 + 500 * 2);
+    // Darabszám fülre váltva összesítve látszik, és figyelmeztet, hogy a névhez névsor kell.
+    await page.click('.nbt-tabs [data-qty="grid"]');
+    assert.deepEqual(await page.locator('.nbt-row').first().locator('input').evaluateAll(els => els.map(e => e.value)), ['', '1', '2', '']);
+    await page.click('#nbt-cart');
+    assert.match(await page.locator('#nbt-error').textContent(), /Névsort/);
+    await page.click('.nbt-tabs [data-qty="roster"]');
+    assert.equal(await players.count(), 3, 'the roster is kept');
+    // Kosárba: közös nyomat név nélkül + játékosonként név/szám fájl.
+    orderStatus = 400; orderBody = null;
+    await page.click('#nbt-cart');
+    await page.waitForSelector('#nbt-error:not([hidden])');
+    assert.deepEqual(orderBody.roster.map(r => [r.name, r.number, r.size, r.color]), [['KOVÁCS', '10', 'M', 'Zöld'], ['NAGY', '7', 'L', 'Zöld'], ['', '', 'L', 'Zöld']]);
+    assert.ok(orderBody.roster[0].personal.back.startsWith('data:image/png') && orderBody.roster[1].personal.back.startsWith('data:image/png'));
+    assert.deepEqual(orderBody.roster[2].personal, {}, 'no file for a blank shirt');
+    const inkPixels = src => page.evaluate(url => new Promise(r => { const i = new Image(); i.onload = () => { const c = document.createElement('canvas'); c.width = 300; c.height = Math.round(300 * i.height / i.width); const x = c.getContext('2d'); x.drawImage(i, 0, 0, c.width, c.height); const d = x.getImageData(0, 0, c.width, c.height).data; let n = 0; for (let k = 3; k < d.length; k += 4) if (d[k] > 10) n++; r(n); }; i.src = url; }), src);
+    assert.equal(await inkPixels(orderBody.print.back), 0, 'the shared back print leaves out the names and numbers');
+    assert.ok(await inkPixels(orderBody.roster[0].personal.back) > 200, 'the player file contains the name and number');
+    assert.deepEqual(await backTexts(), ['KOVÁCS', '10'], 'the canvas returns to the active player');
+
+    // Piszkozat visszaállítása újratöltés után, a névsorral együtt.
     await page.waitForTimeout(1200);
     await page.reload();
     await page.waitForSelector('#nbt-draft:not([hidden])');
     await page.click('#nbt-draft-restore');
     await page.waitForFunction(() => window.NBTeamDesigner.sides.back.canvas.getObjects().some(o => o.type === 'text'));
-    assert.equal(await text(page, 'nbt-sum-qty'), '7db');
+    assert.equal(await text(page, 'nbt-sum-qty'), '3db');
     assert.equal(await page.locator('#nbt-mode-label').textContent(), 'Csapatmez');
+    assert.equal(await players.nth(1).locator('.nbt-player__name').inputValue(), 'NAGY');
+    assert.deepEqual(await backTexts(), ['KOVÁCS', '10']);
+    await page.click('.nbt-sides [data-side="front"]');
+    await players.nth(1).locator('.nbt-player__name').click();
+    assert.equal(await page.locator('.nbt-sides [data-side="back"]').getAttribute('aria-selected'), 'true', 'choosing a player shows the side with the name');
+    assert.deepEqual(await backTexts(), ['NAGY', '7']);
+    await page.screenshot({ path: 'tmp/ui-qa/team-roster-desktop.png' });
 
     // Mobil: nincs vízszintes görgetés, alsó sáv látszik, a méretmezők elég nagyok.
     for (const width of [390, 320]) {
@@ -193,6 +250,10 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       assert.ok(overflow <= 0, 'no horizontal scroll at ' + width + ': ' + overflow);
       assert.equal(await page.locator('#nbt-bar').isVisible(), true);
+      const nameBox = await page.locator('.nbt-player__name').first().boundingBox();
+      assert.ok(nameBox.height >= 42 && nameBox.width >= 160, 'roster name field is usable on phones: ' + JSON.stringify(nameBox));
+      await page.screenshot({ path: 'tmp/ui-qa/team-roster-mobile-' + width + '.png', fullPage: true });
+      await page.click('.nbt-tabs [data-qty="grid"]');
       const inputBox = await page.locator('.nbt-size input').first().boundingBox();
       assert.ok(inputBox.height >= 44, 'size input touch target');
       const mobileTile = await page.locator('.nbt-type__img').first().boundingBox();
@@ -201,6 +262,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
       assert.ok(canvasBox.width <= width - 32 + 1, 'canvas fits gutters');
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: 'tmp/ui-qa/team-mobile-' + width + '.png', fullPage: true });
+      await page.click('.nbt-tabs [data-qty="roster"]');
     }
 
     assert.deepEqual(errors, [], 'no page errors');

@@ -25,19 +25,20 @@ function nb_team_default_tiers(){
  * Elhelyezési segédsablonok. A pozíció a nyomtatási felülethez képest arány
  * (cx: a doboz közepe vízszintesen, top: a doboz teteje), a méret mm-ben értendő,
  * így minden mockupon ugyanott és ugyanakkora fizikai méretben jelenik meg.
+ * bind: 'name' vagy 'number' esetén a felirat játékosonként a névsorból jön.
  */
 function nb_team_default_presets(){
   return [
-    ['id'=>'work-left-chest',  'mode'=>'work',  'side'=>'front', 'kind'=>'logo',   'label'=>'Bal mell logó',         'cx'=>0.70, 'top'=>0.08, 'w_mm'=>90,  'h_mm'=>90,  'text'=>''],
-    ['id'=>'work-center',      'mode'=>'work',  'side'=>'front', 'kind'=>'logo',   'label'=>'Mell közép logó',       'cx'=>0.50, 'top'=>0.10, 'w_mm'=>250, 'h_mm'=>250, 'text'=>''],
-    ['id'=>'work-right-text',  'mode'=>'work',  'side'=>'front', 'kind'=>'text',   'label'=>'Jobb mell felirat',     'cx'=>0.30, 'top'=>0.10, 'w_mm'=>90,  'h_mm'=>22,  'text'=>'Név / beosztás'],
-    ['id'=>'work-back-top',    'mode'=>'work',  'side'=>'back',  'kind'=>'text',   'label'=>'Hát felső cégnév',      'cx'=>0.50, 'top'=>0.05, 'w_mm'=>260, 'h_mm'=>50,  'text'=>'CÉGNÉV'],
-    ['id'=>'work-back-logo',   'mode'=>'work',  'side'=>'back',  'kind'=>'logo',   'label'=>'Hát nagy logó',         'cx'=>0.50, 'top'=>0.20, 'w_mm'=>280, 'h_mm'=>280, 'text'=>''],
-    ['id'=>'sport-crest',      'mode'=>'sport', 'side'=>'front', 'kind'=>'logo',   'label'=>'Bal mell címer',        'cx'=>0.70, 'top'=>0.08, 'w_mm'=>80,  'h_mm'=>80,  'text'=>''],
-    ['id'=>'sport-front-name', 'mode'=>'sport', 'side'=>'front', 'kind'=>'text',   'label'=>'Mell közép csapatnév',  'cx'=>0.50, 'top'=>0.34, 'w_mm'=>260, 'h_mm'=>60,  'text'=>'CSAPATNÉV'],
-    ['id'=>'sport-front-num',  'mode'=>'sport', 'side'=>'front', 'kind'=>'number', 'label'=>'Jobb mell szám',        'cx'=>0.30, 'top'=>0.08, 'w_mm'=>70,  'h_mm'=>90,  'text'=>'10'],
-    ['id'=>'sport-back-name',  'mode'=>'sport', 'side'=>'back',  'kind'=>'text',   'label'=>'Hát név',               'cx'=>0.50, 'top'=>0.05, 'w_mm'=>280, 'h_mm'=>70,  'text'=>'NÉV'],
-    ['id'=>'sport-back-num',   'mode'=>'sport', 'side'=>'back',  'kind'=>'number', 'label'=>'Hát szám',              'cx'=>0.50, 'top'=>0.22, 'w_mm'=>220, 'h_mm'=>250, 'text'=>'10'],
+    ['id'=>'work-left-chest',  'mode'=>'work',  'side'=>'front', 'kind'=>'logo',   'label'=>'Bal mell logó',         'cx'=>0.70, 'top'=>0.08, 'w_mm'=>90,  'h_mm'=>90,  'text'=>'', 'bind'=>''],
+    ['id'=>'work-center',      'mode'=>'work',  'side'=>'front', 'kind'=>'logo',   'label'=>'Mell közép logó',       'cx'=>0.50, 'top'=>0.10, 'w_mm'=>250, 'h_mm'=>250, 'text'=>'', 'bind'=>''],
+    ['id'=>'work-right-text',  'mode'=>'work',  'side'=>'front', 'kind'=>'text',   'label'=>'Jobb mell felirat',     'cx'=>0.30, 'top'=>0.10, 'w_mm'=>90,  'h_mm'=>22,  'text'=>'Név / beosztás', 'bind'=>'name'],
+    ['id'=>'work-back-top',    'mode'=>'work',  'side'=>'back',  'kind'=>'text',   'label'=>'Hát felső cégnév',      'cx'=>0.50, 'top'=>0.05, 'w_mm'=>260, 'h_mm'=>50,  'text'=>'CÉGNÉV', 'bind'=>''],
+    ['id'=>'work-back-logo',   'mode'=>'work',  'side'=>'back',  'kind'=>'logo',   'label'=>'Hát nagy logó',         'cx'=>0.50, 'top'=>0.20, 'w_mm'=>280, 'h_mm'=>280, 'text'=>'', 'bind'=>''],
+    ['id'=>'sport-crest',      'mode'=>'sport', 'side'=>'front', 'kind'=>'logo',   'label'=>'Bal mell címer',        'cx'=>0.70, 'top'=>0.08, 'w_mm'=>80,  'h_mm'=>80,  'text'=>'', 'bind'=>''],
+    ['id'=>'sport-front-name', 'mode'=>'sport', 'side'=>'front', 'kind'=>'text',   'label'=>'Mell közép csapatnév',  'cx'=>0.50, 'top'=>0.34, 'w_mm'=>260, 'h_mm'=>60,  'text'=>'CSAPATNÉV', 'bind'=>''],
+    ['id'=>'sport-front-num',  'mode'=>'sport', 'side'=>'front', 'kind'=>'number', 'label'=>'Jobb mell szám',        'cx'=>0.30, 'top'=>0.08, 'w_mm'=>70,  'h_mm'=>90,  'text'=>'10', 'bind'=>'number'],
+    ['id'=>'sport-back-name',  'mode'=>'sport', 'side'=>'back',  'kind'=>'text',   'label'=>'Hát név',               'cx'=>0.50, 'top'=>0.05, 'w_mm'=>280, 'h_mm'=>70,  'text'=>'NÉV', 'bind'=>'name'],
+    ['id'=>'sport-back-num',   'mode'=>'sport', 'side'=>'back',  'kind'=>'number', 'label'=>'Hát szám',              'cx'=>0.50, 'top'=>0.22, 'w_mm'=>220, 'h_mm'=>250, 'text'=>'10', 'bind'=>'number'],
   ];
 }
 
@@ -49,6 +50,8 @@ function nb_team_defaults(){
     'gap_mm'   => 20,
     'min_qty'  => 1,
     'max_colors' => 8,
+    'personal_fee' => 0,
+    'max_players' => 100,
   ];
 }
 
@@ -99,6 +102,7 @@ function nb_team_sanitize_presets($presets){
       'w_mm'  => $w,
       'h_mm'  => $h,
       'text'  => sanitize_text_field($preset['text'] ?? ''),
+      'bind'  => $kind !== 'logo' && in_array(($preset['bind'] ?? ''), ['name', 'number'], true) ? $preset['bind'] : '',
     ];
   }
   return $clean;
@@ -116,6 +120,8 @@ function nb_team_get_settings(){
   $settings['gap_mm'] = max(0, floatval($settings['gap_mm']));
   $settings['min_qty'] = max(1, intval($settings['min_qty']));
   $settings['max_colors'] = min(20, max(1, intval($settings['max_colors'])));
+  $settings['personal_fee'] = max(0, round(floatval($settings['personal_fee']), 2));
+  $settings['max_players'] = min(300, max(1, intval($settings['max_players'])));
   return $settings;
 }
 
@@ -234,6 +240,20 @@ function nb_team_price_print($elements, $team_settings = null){
     $unit += floatval($tier['price']);
   }
   return ['placements'=>$placements, 'unit_print'=>round($unit, 2)];
+}
+
+/** "KOVÁCS (10), NAGY (7), (név nélkül)" */
+function nb_team_players_summary($players){
+  $parts = [];
+  foreach ((array)$players as $player){
+    $name = trim((string)($player['name'] ?? ''));
+    $number = trim((string)($player['number'] ?? ''));
+    if ($name !== '' && $number !== '') $parts[] = $name.' ('.$number.')';
+    elseif ($name !== '') $parts[] = $name;
+    elseif ($number !== '') $parts[] = '#'.$number;
+    else $parts[] = __('(név nélkül)', 'nb-designer');
+  }
+  return implode(', ', $parts);
 }
 
 function nb_team_placements_summary($placements){
@@ -405,6 +425,8 @@ function nb_team_public_data(){
       'gap_mm'     => $team['gap_mm'],
       'min_qty'    => $team['min_qty'],
       'max_colors' => $team['max_colors'],
+      'personal_fee' => $team['personal_fee'],
+      'max_players'  => $team['max_players'],
     ],
   ];
 }
@@ -445,6 +467,9 @@ add_filter('woocommerce_get_item_data', function($data, $item){
       'value' => sprintf(__('%1$d elhelyezés, +%2$s/db', 'nb-designer'), count($placements), wp_strip_all_tags(wc_price(floatval($item['nb_team_unit_print'] ?? 0)))),
     ];
   }
+  if (!empty($item['nb_team_players']) && is_array($item['nb_team_players'])){
+    $data[] = ['key'=>__('Játékosok', 'nb-designer'), 'value'=>nb_team_players_summary($item['nb_team_players'])];
+  }
   return $data;
 }, 10, 2);
 
@@ -457,11 +482,50 @@ add_action('woocommerce_checkout_create_order_line_item', function($order_item, 
   if ($placements){
     $order_item->add_meta_data(__('Nyomatok', 'nb-designer'), nb_team_placements_summary($placements));
   }
+  $players = isset($values['nb_team_players']) && is_array($values['nb_team_players']) ? $values['nb_team_players'] : [];
+  if ($players){
+    $order_item->add_meta_data(__('Játékosok', 'nb-designer'), nb_team_players_summary($players));
+    $order_item->add_meta_data('_nb_team_players', wp_json_encode($players));
+  }
 }, 20, 3);
 
+/** Gyártáshoz: a rendelés tételénél játékosonként a név- és számfájlok. */
+add_action('woocommerce_after_order_itemmeta', function($item_id, $item){
+  if (!is_admin() || !is_object($item) || !method_exists($item, 'get_meta')) return;
+  $players = json_decode((string)$item->get_meta('_nb_team_players'), true);
+  if (!is_array($players) || !$players) return;
+  echo '<table class="widefat striped nb-team-players" style="margin-top:8px;max-width:640px"><thead><tr><th>'.esc_html__('Név', 'nb-designer').'</th><th>'.esc_html__('Szám', 'nb-designer').'</th><th>'.esc_html__('Név/szám fájl', 'nb-designer').'</th></tr></thead><tbody>';
+  foreach ($players as $player){
+    $links = [];
+    foreach (['front'=>__('elöl', 'nb-designer'), 'back'=>__('hátul', 'nb-designer')] as $side => $label){
+      if (!empty($player[$side])) $links[] = '<a href="'.esc_url($player[$side]).'" download>'.esc_html($label).'</a>';
+    }
+    echo '<tr><td>'.esc_html($player['name'] ?? '').'</td><td>'.esc_html($player['number'] ?? '').'</td><td>'.($links ? implode(' · ', $links) : '—').'</td></tr>';
+  }
+  echo '</tbody></table>';
+}, 10, 2);
+
 /** A színenkénti tervek közös nyomdai fájljait csak az utolsó hivatkozó terv törlésekor töröljük. */
+function nb_team_upload_path($url, $pattern){
+  $uploads = wp_upload_dir(null, false);
+  $baseurl = set_url_scheme($uploads['baseurl'], 'http');
+  $plain = set_url_scheme((string)$url, 'http');
+  if ($plain === '' || strpos($plain, $baseurl.'/') !== 0) return '';
+  $relative = rawurldecode(substr($plain, strlen($baseurl) + 1));
+  if (strpos($relative, '..') !== false || !preg_match($pattern, wp_basename($relative))) return '';
+  return wp_normalize_path(trailingslashit($uploads['basedir']).$relative);
+}
+
 add_action('before_delete_post', function($post_id){
   if (get_post_type($post_id) !== 'nb_design' || get_post_meta($post_id, 'nb_module', true) !== 'team') return;
+  // A játékosfájlok színenként egy tervhez tartoznak, a tervvel együtt törölhetők.
+  $players = json_decode((string)get_post_meta($post_id, 'nb_team_roster_json', true), true);
+  foreach ((array)$players as $player){
+    foreach (['front', 'back'] as $side){
+      $path = nb_team_upload_path($player[$side] ?? '', '/^nb_team_personal_\d+_\d+_(front|back)(-\d+)?\.png$/');
+      if ($path !== '' && file_exists($path)) wp_delete_file($path);
+    }
+  }
   $uploads = wp_upload_dir(null, false);
   foreach (['nb_team_print_url', 'nb_team_print_back_url'] as $key){
     $url = (string)get_post_meta($post_id, $key, true);
@@ -512,6 +576,8 @@ add_action('admin_post_nb_team_save', function(){
     'gap_mm'     => max(0, floatval($input['gap_mm'] ?? 20)),
     'min_qty'    => max(1, intval($input['min_qty'] ?? 1)),
     'max_colors' => min(20, max(1, intval($input['max_colors'] ?? 8))),
+    'personal_fee' => max(0, round(floatval($input['personal_fee'] ?? 0), 2)),
+    'max_players'  => min(300, max(1, intval($input['max_players'] ?? 100))),
   ];
   if (empty($settings['tiers'])) $settings['tiers'] = nb_team_default_tiers();
   update_option('nb_team_settings', $settings, false);
@@ -528,7 +594,7 @@ function nb_team_admin_render(){
   $tiers = array_values($team['tiers']);
   while (count($tiers) < 5) $tiers[] = ['id'=>'', 'label'=>'', 'max_w_mm'=>'', 'max_h_mm'=>'', 'price'=>''];
   $presets = array_values($team['presets']);
-  for ($i = 0; $i < 3; $i++) $presets[] = ['id'=>'', 'mode'=>'both', 'side'=>'front', 'kind'=>'logo', 'label'=>'', 'cx'=>0.5, 'top'=>0.1, 'w_mm'=>'', 'h_mm'=>'', 'text'=>''];
+  for ($i = 0; $i < 3; $i++) $presets[] = ['id'=>'', 'mode'=>'both', 'side'=>'front', 'kind'=>'logo', 'label'=>'', 'cx'=>0.5, 'top'=>0.1, 'w_mm'=>'', 'h_mm'=>'', 'text'=>'', 'bind'=>''];
   $page_url = nb_team_designer_url();
   ?>
   <div class="wrap nb-admin nb-admin-v2 nb-team-admin">
@@ -566,13 +632,15 @@ function nb_team_admin_render(){
         <tr><th scope="row"><label for="nb-team-gap"><?php esc_html_e('Egy nyomatnak számít, ha az elemek távolsága legfeljebb (mm)', 'nb-designer'); ?></label></th><td><input id="nb-team-gap" type="number" min="0" step="1" name="nb_team[gap_mm]" value="<?php echo esc_attr($team['gap_mm']); ?>"></td></tr>
         <tr><th scope="row"><label for="nb-team-min"><?php esc_html_e('Minimum rendelés (db)', 'nb-designer'); ?></label></th><td><input id="nb-team-min" type="number" min="1" step="1" name="nb_team[min_qty]" value="<?php echo esc_attr($team['min_qty']); ?>"></td></tr>
         <tr><th scope="row"><label for="nb-team-colors"><?php esc_html_e('Színek száma egy rendelésben legfeljebb', 'nb-designer'); ?></label></th><td><input id="nb-team-colors" type="number" min="1" max="20" step="1" name="nb_team[max_colors]" value="<?php echo esc_attr($team['max_colors']); ?>"></td></tr>
+        <tr><th scope="row"><label for="nb-team-personal"><?php esc_html_e('Név/szám felár (Ft / db)', 'nb-designer'); ?></label></th><td><input id="nb-team-personal" type="number" min="0" step="1" name="nb_team[personal_fee]" value="<?php echo esc_attr($team['personal_fee']); ?>"><p class="description"><?php esc_html_e('Azokra a darabokra, amelyekre a névsorból név vagy szám kerül. 0 = nincs felár.', 'nb-designer'); ?></p></td></tr>
+        <tr><th scope="row"><label for="nb-team-players"><?php esc_html_e('Játékosok száma egy rendelésben legfeljebb', 'nb-designer'); ?></label></th><td><input id="nb-team-players" type="number" min="1" max="300" step="1" name="nb_team[max_players]" value="<?php echo esc_attr($team['max_players']); ?>"></td></tr>
       </table>
       <p class="description"><?php esc_html_e('A mennyiségi kedvezmény sávjai az Árazás oldalon állíthatók; itt a teljes darabárra (termék + nyomat) érvényesülnek.', 'nb-designer'); ?></p>
 
       <h2><?php esc_html_e('Elhelyezési segédsablonok', 'nb-designer'); ?></h2>
       <p class="description"><?php esc_html_e('A vásárló ezekkel egy kattintással a jó helyre és jó méretben teszi a logót vagy feliratot, utána szabadon módosíthatja. Vízszintes közép és felső él: 0–1 közötti arány a nyomtatási felülethez képest (0,5 = középen). Méret mm-ben. A név nélküli sor nem mentődik.', 'nb-designer'); ?></p>
       <table class="widefat striped nb-team-presets">
-        <thead><tr><th><?php esc_html_e('Megnevezés', 'nb-designer'); ?></th><th><?php esc_html_e('Mód', 'nb-designer'); ?></th><th><?php esc_html_e('Oldal', 'nb-designer'); ?></th><th><?php esc_html_e('Tartalom', 'nb-designer'); ?></th><th><?php esc_html_e('Vízsz. közép', 'nb-designer'); ?></th><th><?php esc_html_e('Felső él', 'nb-designer'); ?></th><th><?php esc_html_e('Szél. mm', 'nb-designer'); ?></th><th><?php esc_html_e('Mag. mm', 'nb-designer'); ?></th><th><?php esc_html_e('Alap szöveg', 'nb-designer'); ?></th></tr></thead>
+        <thead><tr><th><?php esc_html_e('Megnevezés', 'nb-designer'); ?></th><th><?php esc_html_e('Mód', 'nb-designer'); ?></th><th><?php esc_html_e('Oldal', 'nb-designer'); ?></th><th><?php esc_html_e('Tartalom', 'nb-designer'); ?></th><th><?php esc_html_e('Vízsz. közép', 'nb-designer'); ?></th><th><?php esc_html_e('Felső él', 'nb-designer'); ?></th><th><?php esc_html_e('Szél. mm', 'nb-designer'); ?></th><th><?php esc_html_e('Mag. mm', 'nb-designer'); ?></th><th><?php esc_html_e('Alap szöveg', 'nb-designer'); ?></th><th><?php esc_html_e('Névsorból', 'nb-designer'); ?></th></tr></thead>
         <tbody>
         <?php foreach ($presets as $i => $preset): $name = 'nb_team[presets]['.$i.']'; ?>
           <tr>
@@ -585,6 +653,7 @@ function nb_team_admin_render(){
             <td><input type="number" min="0" step="1" style="width:80px" name="<?php echo esc_attr($name); ?>[w_mm]" value="<?php echo esc_attr($preset['w_mm']); ?>"></td>
             <td><input type="number" min="0" step="1" style="width:80px" name="<?php echo esc_attr($name); ?>[h_mm]" value="<?php echo esc_attr($preset['h_mm']); ?>"></td>
             <td><input type="text" name="<?php echo esc_attr($name); ?>[text]" value="<?php echo esc_attr($preset['text']); ?>"></td>
+            <td><select name="<?php echo esc_attr($name); ?>[bind]"><option value="" <?php selected($preset['bind'], ''); ?>><?php esc_html_e('Nem (fix)', 'nb-designer'); ?></option><option value="name" <?php selected($preset['bind'], 'name'); ?>><?php esc_html_e('Játékos neve', 'nb-designer'); ?></option><option value="number" <?php selected($preset['bind'], 'number'); ?>><?php esc_html_e('Játékos száma', 'nb-designer'); ?></option></select></td>
           </tr>
         <?php endforeach; ?>
         </tbody>

@@ -35,23 +35,56 @@ function nb_team_handle_order(WP_REST_Request $req){
   $type = sanitize_text_field((string)$req->get_param('type'));
   $mode = $req->get_param('mode') === 'sport' ? 'sport' : 'work';
 
-  // Méret × szín sorok összevonása és ellenőrzése.
+  // Méret × szín sorok összevonása és ellenőrzése. Névsor esetén a sorok a
+  // játékosokból állnak össze; a névvel/számmal készülő darabok külön sorba kerülnek,
+  // mert azokra felár vonatkozhat.
   $sizes = array_map(function($s){ return trim((string)$s); }, (array)($cfg['sizes'] ?? []));
   $rows = [];
-  foreach ((array)$req->get_param('rows') as $row){
-    if (!is_array($row)) continue;
-    $qty = intval($row['qty'] ?? 0);
-    if ($qty < 1) continue;
-    if ($qty > 10000) return new WP_Error('bad_qty', 'Túl nagy darabszám', ['status'=>400]);
-    $color = sanitize_text_field((string)($row['color'] ?? ''));
-    $size = sanitize_text_field((string)($row['size'] ?? ''));
+  $add_row = function($color, $size, $qty, $player = null) use (&$rows, $sizes){
     if ($sizes && !in_array($size, $sizes, true)){
       return new WP_Error('bad_size', 'Ismeretlen méret: '.$size, ['status'=>400]);
     }
-    $key = nb_normalize_color_key($color).'|'.$size;
-    if (!isset($rows[$key])) $rows[$key] = ['color'=>$color, 'size'=>$size, 'qty'=>0];
+    // Felár csak akkor jár, ha a játékoshoz ténylegesen készül név- vagy számfájl.
+    $personal = $player !== null && !empty(array_filter((array)$player['files']));
+    $key = nb_normalize_color_key($color).'|'.$size.'|'.($personal ? 1 : 0);
+    if (!isset($rows[$key])) $rows[$key] = ['color'=>$color, 'size'=>$size, 'qty'=>0, 'personal'=>$personal, 'players'=>[]];
     $rows[$key]['qty'] += $qty;
+    if ($player !== null) $rows[$key]['players'][] = $player;
     if (count($rows) > 300) return new WP_Error('bad_rows', 'Túl sok sor', ['status'=>400]);
+    return true;
+  };
+  $players = [];
+  $roster = $req->get_param('roster');
+  if (is_array($roster) && $roster){
+    if (count($roster) > $team['max_players']){
+      return new WP_Error('too_many_players', sprintf('Egy rendelésben legfeljebb %d játékos lehet', $team['max_players']), ['status'=>400]);
+    }
+    foreach (array_values($roster) as $index => $entry){
+      if (!is_array($entry)) continue;
+      $name = sanitize_text_field((string)($entry['name'] ?? ''));
+      $name = function_exists('mb_substr') ? mb_substr($name, 0, 30) : substr($name, 0, 30);
+      $number = substr(preg_replace('/[^0-9]/', '', (string)($entry['number'] ?? '')), 0, 3);
+      $player = [
+        'index'  => $index,
+        'name'   => $name,
+        'number' => $number,
+        'color'  => sanitize_text_field((string)($entry['color'] ?? '')),
+        'size'   => sanitize_text_field((string)($entry['size'] ?? '')),
+        'files'  => is_array($entry['personal'] ?? null) ? $entry['personal'] : [],
+      ];
+      $result = $add_row($player['color'], $player['size'], 1, $player);
+      if (is_wp_error($result)) return $result;
+      $players[] = $player;
+    }
+  } else {
+    foreach ((array)$req->get_param('rows') as $row){
+      if (!is_array($row)) continue;
+      $qty = intval($row['qty'] ?? 0);
+      if ($qty < 1) continue;
+      if ($qty > 10000) return new WP_Error('bad_qty', 'Túl nagy darabszám', ['status'=>400]);
+      $result = $add_row(sanitize_text_field((string)($row['color'] ?? '')), sanitize_text_field((string)($row['size'] ?? '')), $qty);
+      if (is_wp_error($result)) return $result;
+    }
   }
   if (!$rows) return new WP_Error('no_qty', 'Adj meg legalább egy darabot', ['status'=>400]);
   $total_qty = array_sum(array_column($rows, 'qty'));
@@ -142,8 +175,41 @@ function nb_team_handle_order(WP_REST_Request $req){
 
   $design_by_color = [];
   $index = 0;
+  // Játékosonkénti név/szám fájlok: ugyanakkora átlátszó PNG, mint a közös nyomat.
+  $player_files = [];
+  foreach ($players as $player){
+    foreach (['front', 'back'] as $side){
+      if (empty($player['files'][$side])) continue;
+      $decoded = nb_decode_png_data_url($player['files'][$side], intval($limits['print_bytes']), 'bad_personal_png', 'névfájl');
+      if (is_wp_error($decoded)) return $decoded;
+      $player_files[$player['index']][$side] = $decoded;
+    }
+  }
+  $player_urls = [];
+  foreach ($player_files as $player_index => $files){
+    foreach ($files as $side => $data){
+      $result = $upload('nb_team_personal_'.$timestamp.'_'.$player_index.'_'.$side.'.png', $data);
+      if (is_wp_error($result)){ nb_team_order_rollback($paths, $design_ids); return $result; }
+      $player_urls[$player_index][$side] = esc_url_raw($result['url']);
+    }
+  }
+  $public_player = function($player) use ($player_urls){
+    return [
+      'name'   => $player['name'],
+      'number' => $player['number'],
+      'size'   => $player['size'],
+      'color'  => $player['color'],
+      'front'  => $player_urls[$player['index']]['front'] ?? '',
+      'back'   => $player_urls[$player['index']]['back'] ?? '',
+    ];
+  };
+
   foreach ($contexts as $color_key => $ctx){
     $index++;
+    $color_players = [];
+    foreach ($players as $player){
+      if (nb_normalize_color_key($player['color']) === $color_key) $color_players[] = $public_player($player);
+    }
     $front_preview = $upload('nb_preview_'.$timestamp.$index.'.png', $previews[$color_key]['front']);
     if (is_wp_error($front_preview)){ nb_team_order_rollback($paths, $design_ids); return $front_preview; }
     $back_preview = null;
@@ -165,6 +231,7 @@ function nb_team_handle_order(WP_REST_Request $req){
         'nb_team_group'           => $group_id,
         'nb_team_unit_print'      => $pricing['unit_print'],
         'nb_team_placements_json' => wp_json_encode($pricing['placements']),
+        'nb_team_roster_json'     => wp_json_encode($color_players),
         'nb_team_print_url'       => $front_print['url'],
         'nb_team_print_back_url'  => $back_print['url'],
         'preview_url'             => esc_url_raw($front_preview['url']),
@@ -208,14 +275,16 @@ function nb_team_handle_order(WP_REST_Request $req){
   $cart_keys = [];
   foreach ($rows as $row){
     $color_key = nb_normalize_color_key($row['color']);
+    $unit_print = $pricing['unit_print'] + ($row['personal'] ? floatval($team['personal_fee']) : 0);
     $result = nb_rest_cart_single_add($design_by_color[$color_key], [
       'size'     => $row['size'] !== '' ? ['value'=>$row['size'], 'label'=>$row['size']] : null,
       'quantity' => $row['qty'],
       'cart_item_data' => [
         'nb_team'                => 1,
         'nb_team_mode'           => $mode,
-        'nb_team_unit_print'     => $pricing['unit_print'],
+        'nb_team_unit_print'     => $unit_print,
         'nb_team_placements'     => $pricing['placements'],
+        'nb_team_players'        => array_map($public_player, $row['players']),
         'nb_bulk_group_id'       => $group_id,
         'nb_bulk_group_quantity' => $total_qty,
         // Csak hátoldali terv esetén ne kerüljön az előnézet a nyomdai fájl helyére.
