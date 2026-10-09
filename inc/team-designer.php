@@ -42,6 +42,7 @@ function nb_team_default_presets(){
     ['id'=>'sport-front-num',  'mode'=>'sport', 'side'=>'front', 'kind'=>'number', 'label'=>'Jobb mell szám',        'cx'=>0.30, 'top'=>0.08, 'w_mm'=>70,  'h_mm'=>90,  'text'=>'10', 'bind'=>'number'],
     ['id'=>'sport-back-name',  'mode'=>'sport', 'side'=>'back',  'kind'=>'text',   'label'=>'Hát név',               'cx'=>0.50, 'top'=>0.05, 'w_mm'=>280, 'h_mm'=>70,  'text'=>'NÉV', 'bind'=>'name'],
     ['id'=>'sport-back-num',   'mode'=>'sport', 'side'=>'back',  'kind'=>'number', 'label'=>'Hát szám',              'cx'=>0.50, 'top'=>0.22, 'w_mm'=>220, 'h_mm'=>250, 'text'=>'10', 'bind'=>'number'],
+    ['id'=>'sport-back-team',  'mode'=>'sport', 'side'=>'back',  'kind'=>'text',   'label'=>'Hát csapatnév',         'cx'=>0.50, 'top'=>0.87, 'w_mm'=>260, 'h_mm'=>40,  'text'=>'CSAPATNÉV', 'bind'=>''],
   ];
 }
 
@@ -198,6 +199,11 @@ function nb_team_sanitize_presets($presets){
   return $clean;
 }
 
+/** A 2.3.1-ig szállított alapsablonok; az ennél újabbakat a régebben mentett beállítások is egyszer megkapják. */
+function nb_team_legacy_preset_ids(){
+  return ['work-left-chest', 'work-center', 'work-right-text', 'work-back-top', 'work-back-logo', 'sport-crest', 'sport-front-name', 'sport-front-num', 'sport-back-name', 'sport-back-num'];
+}
+
 function nb_team_get_settings(){
   $defaults = nb_team_defaults();
   $stored = get_option('nb_team_settings', []);
@@ -210,6 +216,14 @@ function nb_team_get_settings(){
   $settings['prices'] = nb_team_sanitize_prices($settings['prices']);
   $settings['size_fees'] = nb_team_sanitize_size_fees($settings['size_fees']);
   $settings['presets'] = nb_team_sanitize_presets($settings['presets']);
+  // Új alapsablon a mentett listához is hozzáadódik, de amit az admin már látott és törölt, az nem jön vissza.
+  $known = isset($stored['preset_ids_known']) ? (array)$stored['preset_ids_known'] : (isset($stored['presets']) ? nb_team_legacy_preset_ids() : []);
+  $present = array_column($settings['presets'], 'id');
+  if (isset($stored['presets'])){
+    foreach (nb_team_default_presets() as $preset){
+      if (!in_array($preset['id'], $known, true) && !in_array($preset['id'], $present, true)) $settings['presets'][] = $preset;
+    }
+  }
   $settings['min_qty'] = max(1, intval($settings['min_qty']));
   $settings['max_colors'] = min(20, max(1, intval($settings['max_colors'])));
   $settings['personal_fee'] = max(0, round(floatval($settings['personal_fee']), 2));
@@ -691,6 +705,7 @@ add_action('admin_post_nb_team_save', function(){
     'max_colors' => min(20, max(1, intval($input['max_colors'] ?? 8))),
     'personal_fee' => max(0, round(floatval($input['personal_fee'] ?? 0), 2)),
     'max_players'  => min(300, max(1, intval($input['max_players'] ?? 100))),
+    'preset_ids_known' => array_column(nb_team_default_presets(), 'id'),
   ];
   if (empty($settings['bands'])) $settings['bands'] = nb_team_default_bands();
   update_option('nb_team_settings', $settings, false);

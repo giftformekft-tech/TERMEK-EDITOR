@@ -51,6 +51,7 @@ $nbt_icons = [
         <div class="nbt-canvas" data-side="front"><canvas id="nbt-canvas-front"></canvas></div>
         <div class="nbt-canvas" data-side="back" hidden><canvas id="nbt-canvas-back"></canvas></div>
         <p class="nbt-canvas-empty" id="nbt-canvas-empty">Válassz elhelyezést, vagy tölts fel logót.</p>
+        <div class="nbt-view-note" id="nbt-view-note" hidden><span id="nbt-view-text"></span><button type="button" class="nbt-btn nbt-btn--small" id="nbt-view-back">Vissza a szerkesztéshez</button></div>
       </div>
       <div class="nbt-selection" id="nbt-selection" hidden>
         <div class="nbt-selection__row nbt-selection__text">
@@ -73,6 +74,10 @@ $nbt_icons = [
     </div>
 
     <div class="nbt-panel">
+      <section class="nbt-step nbt-prices" aria-label="Darabárak">
+        <div class="nbt-bands" id="nbt-bands"></div>
+      </section>
+
       <section class="nbt-step" aria-labelledby="nbt-step1">
         <h2 id="nbt-step1"><span class="nbt-step__num">1</span>Termék és szín</h2>
         <div class="nbt-types" id="nbt-types"></div>
@@ -106,7 +111,7 @@ $nbt_icons = [
         <h2 id="nbt-step-qty-title"><span class="nbt-step__num" id="nbt-step-qty-num">3</span>Színek, méretek, darabszám</h2>
         <div id="nbt-qty-grid">
           <div class="nbt-rows" id="nbt-rows"></div>
-          <div class="nbt-add-color" id="nbt-add-color-wrap"><span>+ Másik szín hozzáadása</span><div class="nbt-add-color__list" id="nbt-add-color"></div></div>
+          <div class="nbt-add-color" id="nbt-add-color-wrap"><span id="nbt-add-color-label">+ Másik szín hozzáadása</span><div class="nbt-add-color__list" id="nbt-add-color"></div></div>
         </div>
         <div id="nbt-qty-roster" hidden>
           <p class="nbt-help">A darabszám a névsorból adódik: minden sor egy darab. Név nélküli darabot a névsorban üres sorral adhatsz hozzá.</p>
@@ -125,7 +130,6 @@ $nbt_icons = [
           <div id="nbt-sum-personal-row" hidden><dt>Név felár</dt><dd id="nbt-sum-personal"></dd></div>
           <div class="nbt-summary__total"><dt>Összesen</dt><dd id="nbt-sum-total">–</dd></div>
         </dl>
-        <div class="nbt-bands" id="nbt-bands"></div>
         <p class="nbt-next-tier" id="nbt-next-tier" hidden></p>
         <p class="nbt-error" id="nbt-error" role="alert" hidden></p>
         <button type="button" class="nbt-btn nbt-btn--primary nbt-btn--block" id="nbt-cart">Kosárba</button>
