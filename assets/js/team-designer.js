@@ -507,7 +507,7 @@
     const ghost = !!player && value === '';
     const text = value || obj.nbPlaceholder || (obj.nbBind === 'number' ? '10' : 'NÉV');
     const centerX = obj.left + obj.getScaledWidth() / 2;
-    obj.set({ text, visible: true, opacity: ghost ? 0.5 : 1, nbGhost: ghost });
+    obj.set({ text, visible: true, opacity: 1, nbGhost: ghost });
     obj.initDimensions();
     fitTextWidth(obj);
     obj.set('left', centerX - obj.getScaledWidth() / 2);
@@ -525,6 +525,7 @@
       sides[side].canvas.requestRenderAll();
     });
     syncSelection();
+    updateEmptyHint();
   }
 
   function focusTextInput() {
@@ -552,8 +553,17 @@
     updateEmptyHint();
   }
 
+  /** A vászon alján: üres oldalnál útmutató, mintaszövegnél figyelmeztetés, hogy az csak minta. */
   function updateEmptyHint() {
-    el.empty.hidden = designObjects(state.side).length > 0;
+    const objects = designObjects(state.side);
+    const ghost = objects.find(o => o.nbGhost);
+    if (ghost) {
+      el.empty.textContent = 'A „' + (ghost.nbPlaceholder || ghost.text) + '” csak minta: a névsorban add meg ' + (ghost.nbBind === 'number' ? 'a számot.' : 'a nevet.');
+      el.empty.hidden = false;
+      return;
+    }
+    el.empty.textContent = 'Válassz elhelyezést, vagy tölts fel logót.';
+    el.empty.hidden = objects.length > 0;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -1235,35 +1245,84 @@
     renderAddColor();
   }
 
-  /** Újabb szín: gombok színmintával és névvel (a legördülő lista nem tud mintát mutatni). */
+  /**
+   * Újabb szín: saját lenyíló lista, a név előtt színpöttyel (a szabványos select
+   * nem tud színmintát mutatni). Billentyűzettel is kezelhető.
+   */
   function renderAddColor() {
     const p = product();
     const used = state.rows.map(r => norm(r.color));
     const free = p ? colorsFor(p, state.option.typeKey).filter(c => !used.includes(norm(c))) : [];
     el.addColorWrap.hidden = !free.length || state.rows.length >= maxColors;
     el.addColor.innerHTML = '';
+    const dropdown = document.createElement('div');
+    dropdown.className = 'nbt-dropdown';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'nbt-dropdown__toggle';
+    toggle.setAttribute('aria-haspopup', 'listbox');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.textContent = 'Válassz színt…';
+    const list = document.createElement('div');
+    list.className = 'nbt-dropdown__list';
+    list.setAttribute('role', 'listbox');
+    list.setAttribute('aria-label', 'Szín hozzáadása');
+    list.hidden = true;
     free.forEach(color => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'nbt-add-color__btn';
-      btn.dataset.color = color;
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'nbt-add-color__btn';
+      option.setAttribute('role', 'option');
+      option.dataset.color = color;
       const dot = document.createElement('span');
       dot.className = 'nbt-dot';
       const hex = colorHex(color);
       if (hex) dot.style.setProperty('--swatch', hex);
-      btn.appendChild(dot);
-      btn.appendChild(document.createTextNode(colorLabel(color)));
-      btn.addEventListener('click', () => addColorRow(color));
-      el.addColor.appendChild(btn);
+      option.appendChild(dot);
+      option.appendChild(document.createTextNode(colorLabel(color)));
+      option.addEventListener('click', () => { close(); addColorRow(color); });
+      list.appendChild(option);
     });
+    const options = () => Array.from(list.querySelectorAll('.nbt-add-color__btn'));
+    const open = () => {
+      list.hidden = false;
+      toggle.setAttribute('aria-expanded', 'true');
+      document.addEventListener('click', outside, true);
+    };
+    const close = () => {
+      list.hidden = true;
+      toggle.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('click', outside, true);
+    };
+    const outside = e => { if (!dropdown.contains(e.target)) close(); };
+    toggle.addEventListener('click', () => { if (list.hidden) open(); else close(); });
+    toggle.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        open();
+        const first = options()[0];
+        if (first) first.focus();
+      }
+    });
+    list.addEventListener('keydown', e => {
+      const all = options();
+      const index = all.indexOf(document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); close(); toggle.focus(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); (all[index + 1] || all[0]).focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); (all[index - 1] || all[all.length - 1]).focus(); }
+    });
+    dropdown.appendChild(toggle);
+    dropdown.appendChild(list);
+    el.addColor.appendChild(dropdown);
   }
 
   function addColorRow(color) {
     state.rows.push({ color, qty: {} });
-    previewColor(color, false).then(() => {
-      const inputs = el.rows.querySelectorAll('.nbt-row:last-child input');
-      if (inputs[0] && window.matchMedia('(pointer: fine)').matches) inputs[0].focus();
-    });
+    // A sor szinkron jelenik meg; a fókusz azonnal oda kerül, nem a mockup betöltése után
+    // (különben a közben máshova gépelt szám rossz mezőbe kerülne).
+    previewColor(color, false);
+    const inputs = el.rows.querySelectorAll('.nbt-row:last-child input');
+    if (inputs[0] && window.matchMedia('(pointer: fine)').matches) inputs[0].focus();
   }
 
   /* Méretfelár ------------------------------------------------------------ */

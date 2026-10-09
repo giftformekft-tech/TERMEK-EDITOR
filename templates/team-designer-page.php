@@ -73,6 +73,10 @@ $nbt_icons = [
     </div>
 
     <div class="nbt-panel">
+      <section class="nbt-step nbt-prices" aria-label="Darabárak">
+        <div class="nbt-bands" id="nbt-bands"></div>
+      </section>
+
       <section class="nbt-step" aria-labelledby="nbt-step1">
         <h2 id="nbt-step1"><span class="nbt-step__num">1</span>Termék és szín</h2>
         <div class="nbt-types" id="nbt-types"></div>
@@ -125,7 +129,6 @@ $nbt_icons = [
           <div id="nbt-sum-personal-row" hidden><dt>Név felár</dt><dd id="nbt-sum-personal"></dd></div>
           <div class="nbt-summary__total"><dt>Összesen</dt><dd id="nbt-sum-total">–</dd></div>
         </dl>
-        <div class="nbt-bands" id="nbt-bands"></div>
         <p class="nbt-next-tier" id="nbt-next-tier" hidden></p>
         <p class="nbt-error" id="nbt-error" role="alert" hidden></p>
         <button type="button" class="nbt-btn nbt-btn--primary nbt-btn--block" id="nbt-cart">Kosárba</button>

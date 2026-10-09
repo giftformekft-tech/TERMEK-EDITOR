@@ -30,7 +30,8 @@ const fixture = {
       { id: 'work-right-text', mode: 'work', side: 'front', kind: 'text', label: 'Jobb mell felirat', cx: 0.3, top: 0.1, w_mm: 90, h_mm: 22, text: 'Név / beosztás', bind: 'name' },
       { id: 'work-back-top', mode: 'work', side: 'back', kind: 'text', label: 'Hát felső cégnév', cx: 0.5, top: 0.05, w_mm: 260, h_mm: 50, text: 'CÉGNÉV' },
       { id: 'sport-back-name', mode: 'sport', side: 'back', kind: 'text', label: 'Hát név', cx: 0.5, top: 0.05, w_mm: 280, h_mm: 70, text: 'NÉV', bind: 'name' },
-      { id: 'sport-back-num', mode: 'sport', side: 'back', kind: 'number', label: 'Hát szám', cx: 0.5, top: 0.22, w_mm: 220, h_mm: 250, text: '10', bind: 'number' }
+      { id: 'sport-back-num', mode: 'sport', side: 'back', kind: 'number', label: 'Hát szám', cx: 0.5, top: 0.22, w_mm: 220, h_mm: 250, text: '10', bind: 'number' },
+      { id: 'sport-back-team', mode: 'sport', side: 'back', kind: 'text', label: 'Hát csapatnév', cx: 0.5, top: 0.87, w_mm: 260, h_mm: 40, text: 'CSAPATNÉV', bind: '' }
     ]
   }
 };
@@ -112,6 +113,9 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     assert.match(await page.locator('#nbt-size-readout').textContent(), /9,0 × 9,0 cm/);
     assert.equal(await text(page, 'nbt-sum-sides'), 'Egyoldalas(elöl)');
     assert.equal(await text(page, 'nbt-sum-unit'), '6990Ft', 'one-sided price of the first band');
+    const pricesBox = await page.locator('.nbt-prices').boundingBox();
+    const step1Box = await page.locator('#nbt-step1').boundingBox();
+    assert.ok(pricesBox.y + pricesBox.height <= step1Box.y, 'the price bands sit above step 1');
     assert.deepEqual(await page.locator('.nbt-bands__table tbody tr').evaluateAll(rows => rows.map(r => r.innerText.replace(/\s+/g, ' ').trim())), ['1–10 db 6 990 Ft 8 490 Ft', '11 db-tól 5 990 Ft 7 190 Ft'], 'price bands with one- and two-sided unit prices');
 
     // Ugyanarra a sablonra újra kattintva nem kerül még egy logó ugyanoda.
@@ -169,7 +173,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await firstRow.locator('input').nth(1).fill('5');
     await page.waitForTimeout(250);
     assert.equal(await page.locator('#nbt-next-tier').textContent(), 'Még 1 db, és a darabár 7 190 Ft.', 'next band hint');
-    await page.click('.nbt-add-color__btn[data-color="Kék"]');
+    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-color="Kék"]');
     await page.waitForFunction(() => document.querySelectorAll('.nbt-row').length === 2);
     const secondRow = page.locator('.nbt-row').nth(1);
     await secondRow.locator('input').nth(2).fill('3');
@@ -181,14 +185,24 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     assert.equal(await text(page, 'nbt-sum-size'), '+1000Ft(2db)', 'XL size surcharge on the two XL shirts');
     assert.equal(await text(page, 'nbt-sum-total'), (15 * 7190 + 2 * 500) + 'Ft', 'total = band unit price x quantity + size surcharge');
     assert.match(await page.locator('.nbt-row').first().locator('.nbt-size').nth(3).textContent(), /XL\+500 Ft/, 'the surcharge is shown at the size');
+    // A további szín lenyíló listában, a név előtt színpöttyel; mellé kattintva bezárul.
+    assert.equal(await page.locator('.nbt-dropdown__list').isHidden(), true);
+    await page.click('.nbt-dropdown__toggle');
+    assert.equal(await page.locator('.nbt-dropdown__list').isVisible(), true);
     assert.equal(await page.locator('.nbt-add-color__btn .nbt-dot').count(), 1, 'remaining colours are offered with a swatch');
+    await page.click('#nbt-sum-qty');
+    assert.equal(await page.locator('.nbt-dropdown__list').isHidden(), true, 'clicking outside closes the list');
+    await page.focus('.nbt-dropdown__toggle'); await page.keyboard.press('ArrowDown');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.color), 'Fekete', 'keyboard opens the list on the first colour');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('.nbt-dropdown__list').isHidden(), true);
     assert.equal(await page.locator('.nbt-bands__table tr.is-current td').first().textContent(), '11 db-tól');
     assert.equal(await page.locator('#nbt-next-tier').isHidden(), true);
     assert.equal(await page.locator('.nbt-row.is-preview').textContent().then(t => /Kék/.test(t)), true, 'new colour is previewed');
 
     // Kontrasztfigyelmeztetés fekete feliratnál fekete ruhán.
     await page.evaluate(() => { const o = window.NBTeamDesigner.sides.back.canvas.getObjects().find(x => x.type === 'text'); o.set('fill', '#111111'); });
-    await page.click('.nbt-add-color__btn[data-color="Fekete"]');
+    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-color="Fekete"]');
     await page.locator('.nbt-row').nth(2).locator('input').nth(0).fill('1');
     await page.waitForTimeout(250);
     assert.match(await page.locator('#nbt-warnings').textContent(), /fekete színű ruhán alig fog látszani/);
@@ -255,7 +269,8 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await players.nth(1).locator('.nbt-player__number').press('Enter');
     assert.equal(await players.count(), 3, 'Enter in the number field adds the next player');
     assert.deepEqual(await backTexts(), ['', ''], 'a blank shirt shows no name or number');
-    assert.deepEqual(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().filter(o => o.type === 'text').map(o => [o.text, o.opacity])), [['NÉV', 0.5], ['10', 0.5]], 'the sample text stays visible, faded, so it can still be clicked');
+    assert.deepEqual(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().filter(o => o.type === 'text').map(o => [o.text, o.opacity])), [['NÉV', 1], ['10', 1]], 'the sample text stays visible in its real colour, so it can still be clicked');
+    assert.match(await page.locator('#nbt-canvas-empty').textContent(), /„NÉV” csak minta: a névsorban add meg a nevet/, 'the canvas says it is only a sample');
     // „Kaci 5” egyben: Enterre szétválik névre és számra, és jön a következő sor.
     await players.nth(2).locator('.nbt-player__name').fill('Kaci 5');
     await players.nth(2).locator('.nbt-player__name').press('Enter');
@@ -278,10 +293,11 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     assert.equal(rq.unit, 6990, 'back only: one-sided');
     assert.equal(rq.total, 6990 * 3 + 500 * 2);
     assert.equal(await text(page, 'nbt-sum-personal'), '+500Ft×2db');
-    // Csapatmezen a felirat egysoros.
-    await page.click('#nbt-add-text');
+    // Csapatmezen a háton is lehet csapatnév, egysoros.
+    await page.click('.nbt-chip:has-text("Hát csapatnév")');
+    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getActiveObject().text), 'CSAPATNÉV');
     await page.fill('#nbt-text-input', 'FC\nGIFT');
-    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getActiveObject().text), 'FC GIFT');
+    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getActiveObject().text), 'FC GIFT', 'jersey texts stay on one line');
     await page.click('#nbt-delete');
     // A 4. csempe a névsorból összesít színenként és méretenként.
     await page.waitForTimeout(250);
@@ -347,7 +363,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.click('#nbt-add-player');
     await page.click('.nbt-chip:has-text("Jobb mell felirat")');
     const ghost = await page.evaluate(() => { const o = window.NBTeamDesigner.sides.front.canvas.getObjects().find(x => x.nbBind === 'name'); return { text: o.text, opacity: o.opacity }; });
-    assert.deepEqual(ghost, { text: 'Név / beosztás', opacity: 0.5 });
+    assert.deepEqual(ghost, { text: 'Név / beosztás', opacity: 1 });
     await page.evaluate(() => window.NBTeamDesigner.sides.front.canvas.discardActiveObject().requestRenderAll());
     const ghostAt = await page.evaluate(() => { const c = window.NBTeamDesigner.sides.front.canvas; const o = c.getObjects().find(x => x.nbBind === 'name'); const p = o.getCenterPoint(); const r = c.upperCanvasEl.getBoundingClientRect(); const k = r.width / c.getWidth(); return { x: r.left + p.x * k, y: r.top + p.y * k }; });
     await page.mouse.click(ghostAt.x, ghostAt.y);

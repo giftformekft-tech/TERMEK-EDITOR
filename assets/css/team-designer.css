@@ -144,9 +144,14 @@
 .nbt-size input::-webkit-outer-spin-button, .nbt-size input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .nbt-size input.has-value { border-color: var(--nbt-accent); background: #f3f7ff; }
 .nbt-add-color { display: grid; gap: 6px; margin-top: 12px; font-weight: 700; font-size: 14px; }
-.nbt-add-color__list { display: flex; flex-wrap: wrap; gap: 8px; }
-.nbt-add-color__btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 14px 6px 8px; border: 1px dashed #b9bec7; border-radius: 999px; background: #fff; color: var(--nbt-ink); font-weight: 600; font-size: 15px; }
-.nbt-add-color__btn:hover { border-style: solid; border-color: var(--nbt-accent); background: #f3f7ff; color: var(--nbt-ink); }
+.nbt-dropdown { position: relative; }
+.nbt-dropdown__toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; padding: 8px 12px; border: 1px dashed #b9bec7; border-radius: 10px; background: #fff; color: var(--nbt-ink); font-weight: 600; font-size: 16px; text-align: left; }
+.nbt-dropdown__toggle::after { content: ""; width: 8px; height: 8px; margin-left: 12px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+.nbt-dropdown__toggle[aria-expanded="true"]::after { transform: translateY(2px) rotate(-135deg); }
+.nbt .nbt-dropdown__toggle:hover, .nbt .nbt-dropdown__toggle:focus, .nbt .nbt-dropdown__toggle:active { border-color: var(--nbt-accent); background: #fff; color: var(--nbt-ink); }
+.nbt-dropdown__list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; display: grid; max-height: 280px; overflow-y: auto; padding: 4px; border: 1px solid var(--nbt-line); border-radius: 12px; background: #fff; box-shadow: 0 12px 32px rgba(22,24,29,.16); }
+.nbt-add-color__btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 8px; background: #fff; color: var(--nbt-ink); font-weight: 600; font-size: 15px; text-align: left; }
+.nbt .nbt-add-color__btn:hover, .nbt .nbt-add-color__btn:focus, .nbt .nbt-add-color__btn:active { background: #f3f7ff; color: var(--nbt-ink); box-shadow: none; }
 .nbt-size span small { display: block; margin-top: 1px; color: var(--nbt-accent); font-size: 11px; font-weight: 700; }
 .nbt-bands__note { margin: 6px 0 0 !important; color: var(--nbt-muted); font-size: 12px; }
 
@@ -177,7 +182,8 @@
 .nbt-summary__list dd { margin: 0; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .nbt-summary__total { padding-top: 10px; border-top: 1px solid var(--nbt-line); font-size: 20px; }
 .nbt-summary__total dt { color: var(--nbt-ink) !important; font-weight: 700; }
-.nbt-bands { margin-top: 14px; }
+.nbt-prices { padding: 14px 16px; }
+.nbt-prices .nbt-bands__title { color: var(--nbt-ink); font-size: 15px; }
 .nbt-bands__title { margin: 0 0 6px !important; color: var(--nbt-muted); font-size: 13px; font-weight: 700; }
 .nbt-bands__table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
 .nbt-bands__table th, .nbt-bands__table td { padding: 7px 8px; border: 0; border-bottom: 1px solid var(--nbt-line); background: none; text-align: right; }
@@ -209,7 +215,6 @@
 .nbt .nbt-btn--primary:focus, .nbt .nbt-btn--primary:active { background: var(--nbt-accent); color: var(--nbt-accent-ink); border-color: var(--nbt-accent); }
 .nbt .nbt-chip:focus, .nbt .nbt-chip:active { background: #f3f7ff; color: var(--nbt-ink); border-color: var(--nbt-accent); box-shadow: none; }
 .nbt .nbt-type:focus, .nbt .nbt-type:active, .nbt .nbt-mode-card:focus, .nbt .nbt-mode-card:active { background: var(--nbt-card); color: var(--nbt-ink); }
-.nbt .nbt-add-color__btn:focus, .nbt .nbt-add-color__btn:active { background: #f3f7ff; color: var(--nbt-ink); }
 .nbt .nbt-swatch:focus, .nbt .nbt-swatch:active { background-color: var(--swatch); }
 .nbt .nbt-sides button:focus, .nbt .nbt-sides button:active { background: transparent; color: var(--nbt-muted); box-shadow: none; }
 .nbt .nbt-sides button[aria-selected="true"] { background: var(--nbt-card); color: var(--nbt-ink); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
