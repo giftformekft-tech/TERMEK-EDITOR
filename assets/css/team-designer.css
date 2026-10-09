@@ -82,6 +82,9 @@
 .nbt-canvas .canvas-container { touch-action: none; }
 .nbt-canvas-empty { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); padding: 8px 14px; border-radius: 999px; background: rgba(22,24,29,.78); color: #fff; font-size: 14px; text-align: center; pointer-events: none; }
 
+.nbt-view-note { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border-radius: 12px; background: rgba(22,24,29,.86); color: #fff; font-size: 14px; font-weight: 600; }
+.nbt-view-note span { flex: 1 1 200px; }
+.nbt .nbt-view-note .nbt-btn, .nbt .nbt-view-note .nbt-btn:hover, .nbt .nbt-view-note .nbt-btn:focus { background: #fff; color: var(--nbt-ink); border-color: #fff; }
 .nbt-selection { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--nbt-line); border-radius: var(--nbt-radius); background: var(--nbt-card); }
 .nbt-selection__row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
 .nbt-field { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--nbt-muted); }
@@ -170,9 +173,16 @@
 .nbt-player__remove { grid-area: del; width: 36px; height: 36px; min-height: 0; padding: 0; border: 1px solid var(--nbt-line); border-radius: 50%; background: var(--nbt-card); color: var(--nbt-muted); font-size: 20px; line-height: 1; }
 .nbt-player__remove:hover:not(:disabled) { color: var(--nbt-danger); border-color: var(--nbt-danger); background: var(--nbt-card); }
 .nbt-player__remove:disabled { opacity: .35; cursor: default; }
+.nbt-player__product { grid-area: prod; }
+.nbt-player.has-product { grid-template-areas: "name name name del" "num size color color" "prod prod prod prod"; }
+.nbt-player.has-product.no-number { grid-template-areas: "name name name del" "size size color color" "prod prod prod prod"; }
 .nbt-player.no-color { grid-template-areas: "name name name del" "num size size size"; }
 .nbt-player.no-number { grid-template-areas: "name name name del" "size size color color"; }
 .nbt-player.no-number.no-color { grid-template-areas: "name name name del" "size size size size"; }
+.nbt-player.has-product.no-color { grid-template-areas: "name name name del" "num size size size" "prod prod prod prod"; }
+.nbt-player.has-product.no-number.no-color { grid-template-areas: "name name name del" "size size size size" "prod prod prod prod"; }
+.nbt-dropdown__group { margin: 6px 8px 2px !important; color: var(--nbt-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.nbt-bands__product { margin: 12px 0 4px !important; font-weight: 700; font-size: 14px; }
 .nbt-roster-sum { margin-top: 10px !important; color: var(--nbt-muted); font-size: 13px; font-weight: 600; }
 .nbt-bind-hint { flex: 1 1 100%; margin: 0; padding: 8px 10px; border-radius: 10px; background: #f3f7ff; color: var(--nbt-ink); font-size: 13px; }
 

@@ -17,9 +17,18 @@ const fixture = {
     bands_by_type: { 'póló': [{ min: 1, max: 10, single: 6990, double: 1500 }, { min: 11, max: 0, single: 5990, double: 1200 }] },
     size_fees_by_type: { 'póló': { XL: 500 } },
     map: { 'póló|zöld': { front: 'm1', back: 'm2' }, 'póló|kék': { front: 'm1', back: 'm2' }, 'póló|fekete': { front: 'm1', back: 'm2' } }
+  }, 2: {
+    // Gyerekpóló: kisebb nyomtatási felület (22×30 cm), saját méretek és árak.
+    id: 2, title: 'Gyerekpóló', types: ['Gyerekpóló'], colors: ['Zöld', 'Kék'], colors_by_type: { 'gyerekpóló': ['Zöld', 'Kék'] },
+    sizes: ['116', '128', '140'],
+    bands_by_type: { 'gyerekpóló': [{ min: 1, max: 10, single: 4990, double: 1000 }, { min: 11, max: 0, single: 3990, double: 900 }] },
+    size_fees_by_type: { 'gyerekpóló': {} },
+    map: { 'gyerekpóló|zöld': { front: 'k1', back: 'k2' }, 'gyerekpóló|kék': { front: 'k1', back: 'k2' } }
   } },
   mockups: {
     m1: { id: 'm1', image_url: 'http://nb.test/shirt.svg', canvas_w: 480, canvas_h: 640, areas: [area] },
+    k1: { id: 'k1', image_url: 'http://nb.test/shirt.svg', canvas_w: 480, canvas_h: 640, areas: [{ role: 'front', x: 170, y: 190, w: 140, h: 191, canvas_w: 480, canvas_h: 640, width_mm: 220, height_mm: 300, dpi: 300 }] },
+    k2: { id: 'k2', image_url: 'http://nb.test/shirt.svg', canvas_w: 480, canvas_h: 640, areas: [{ role: 'back', x: 170, y: 190, w: 140, h: 191, canvas_w: 480, canvas_h: 640, width_mm: 220, height_mm: 300, dpi: 300 }] },
     m2: { id: 'm2', image_url: 'http://nb.test/shirt.svg', canvas_w: 480, canvas_h: 640, areas: [Object.assign({}, area, { id: 'area_back', role: 'back' })] }
   },
   colorMeta: {}, fonts: [],
@@ -173,7 +182,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await firstRow.locator('input').nth(1).fill('5');
     await page.waitForTimeout(250);
     assert.equal(await page.locator('#nbt-next-tier').textContent(), 'Még 1 db, és a darabár 7 190 Ft.', 'next band hint');
-    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-color="Kék"]');
+    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-product="1|póló"][data-color="Kék"]');
     await page.waitForFunction(() => document.querySelectorAll('.nbt-row').length === 2);
     const secondRow = page.locator('.nbt-row').nth(1);
     await secondRow.locator('input').nth(2).fill('3');
@@ -189,8 +198,9 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     assert.equal(await page.locator('.nbt-dropdown__list').isHidden(), true);
     await page.click('.nbt-dropdown__toggle');
     assert.equal(await page.locator('.nbt-dropdown__list').isVisible(), true);
-    assert.equal(await page.locator('.nbt-add-color__btn .nbt-dot').count(), 1, 'remaining colours are offered with a swatch');
-    await page.click('#nbt-sum-qty');
+    assert.equal(await page.locator('.nbt-add-color__btn .nbt-dot').count(), 3, 'remaining colours (and the other product) are offered with a swatch');
+    assert.deepEqual(await page.locator('.nbt-dropdown__group').allTextContents(), ['Póló (Prémium póló) (a terv alapja)', 'Gyerekpóló'], 'colours grouped by product');
+    await page.click('#nbt-step-qty-title');
     assert.equal(await page.locator('.nbt-dropdown__list').isHidden(), true, 'clicking outside closes the list');
     await page.focus('.nbt-dropdown__toggle'); await page.keyboard.press('ArrowDown');
     assert.equal(await page.evaluate(() => document.activeElement.dataset.color), 'Fekete', 'keyboard opens the list on the first colour');
@@ -202,13 +212,40 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
 
     // Kontrasztfigyelmeztetés fekete feliratnál fekete ruhán.
     await page.evaluate(() => { const o = window.NBTeamDesigner.sides.back.canvas.getObjects().find(x => x.type === 'text'); o.set('fill', '#111111'); });
-    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-color="Fekete"]');
+    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-product="1|póló"][data-color="Fekete"]');
     await page.locator('.nbt-row').nth(2).locator('input').nth(0).fill('1');
     await page.waitForTimeout(250);
     assert.match(await page.locator('#nbt-warnings').textContent(), /fekete színű ruhán alig fog látszani/);
     await page.locator('.nbt-row').nth(2).locator('.nbt-row__remove').click();
     await page.waitForTimeout(250);
     assert.equal(await text(page, 'nbt-sum-qty'), '15db');
+
+    // Gyerekpóló ugyanabban a rendelésben: a terv a kisebb felületre igazodik, a darabszám összeadódik.
+    const logoBefore = await logoAt();
+    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-product="2|gyerekpóló"][data-color="Zöld"]');
+    await page.evaluate(() => window.NBTeamDesigner.viewIdle());
+    assert.equal(await page.locator('#nbt-view-note').isVisible(), true, 'the other product is shown as a preview');
+    assert.match(await page.locator('#nbt-view-text').textContent(), /Gyerekpóló · Zöld/);
+    const kidsRow = page.locator('.nbt-row').nth(2);
+    assert.match(await kidsRow.textContent(), /Gyerekpóló · Zöld/);
+    assert.deepEqual(await kidsRow.locator('.nbt-size span').allTextContents(), ['116', '128', '140'], 'its own sizes');
+    await kidsRow.locator('input').nth(1).fill('4');
+    await page.waitForTimeout(250);
+    const kidsLayout = await page.evaluate(() => window.NBTeamDesigner.computeQuote().elements.map(e => [e.side, Math.round(e.w_mm), Math.round(e.h_mm)]));
+    assert.deepEqual(kidsLayout.find(e => e[0] === 'front'), ['front', 90, 90], 'the 9 cm chest logo fits and keeps its size');
+    const kidsBack = kidsLayout.find(e => e[0] === 'back');
+    assert.ok(kidsBack[1] <= 220, 'the wide back text is scaled down to the 22 cm print area: ' + kidsBack);
+    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.front.canvas.getObjects().filter(o => !o.nbArea).every(o => o.selectable === false)), true, 'the preview is not editable');
+    assert.equal(await text(page, 'nbt-sum-qty'), '19db');
+    assert.equal(await page.locator('.nbt-bands__product').count(), 2, 'a price table per product');
+    assert.equal(await text(page, 'nbt-sum-total'), (15 * 7190 + 2 * 500 + 4 * (3990 + 900)) + 'Ft', 'one band for 19 pieces, each product at its own price');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: 'tmp/ui-qa/team-kids-view.png' });
+    await page.click('#nbt-view-back');
+    await page.evaluate(() => window.NBTeamDesigner.viewIdle());
+    assert.equal(await page.locator('#nbt-view-note').isHidden(), true);
+    assert.deepEqual(await logoAt(), logoBefore, 'back on the main product the design is exactly where it was');
+    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.front.canvas.getObjects().filter(o => !o.nbArea).every(o => o.selectable !== false)), true);
     // A tapadó tervező oszlop kijelölt elemmel is kifér a képernyőre.
     await page.evaluate(() => { const c = window.NBTeamDesigner.sides.back.canvas; c.setActiveObject(c.getObjects().find(o => o.type === 'text')); c.fire('selection:created'); });
     await page.waitForTimeout(100);
@@ -230,15 +267,21 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     assert.match(await page.locator('#nbt-error').textContent(), /Tesztelt kosárhiba/);
     assert.equal(await page.locator('#nbt-busy').isHidden(), true);
     assert.ok(orderBody, 'order request sent');
-    assert.equal(orderBody.product_id, 1);
-    assert.equal(orderBody.type, 'Póló');
+    assert.equal(orderBody.master, '1|póló');
+    assert.deepEqual(orderBody.products.map(p => [p.key, p.pid, p.type]), [['1|póló', 1, 'Póló'], ['2|gyerekpóló', 2, 'Gyerekpóló']]);
     assert.equal(orderBody.mode, 'work');
-    assert.deepEqual(orderBody.rows.map(r => r.color + r.size + r.qty), ['ZöldS5', 'ZöldM5', 'KékL3', 'KékXL2']);
-    assert.deepEqual(orderBody.previews.map(p => p.color), ['Zöld', 'Kék']);
+    assert.deepEqual(orderBody.rows.map(r => r.product.split('|')[0] + r.color + r.size + r.qty), ['1ZöldS5', '1ZöldM5', '1KékL3', '1KékXL2', '2Zöld1284']);
+    assert.deepEqual(orderBody.previews.map(p => p.product.split('|')[0] + p.color), ['1Zöld', '1Kék', '2Zöld']);
     assert.ok(orderBody.previews.every(p => p.front.startsWith('data:image/png') && p.back.startsWith('data:image/png')));
-    assert.ok(orderBody.print.front.startsWith('data:image/png') && orderBody.print.back.startsWith('data:image/png'));
-    assert.equal(orderBody.elements.length, 2);
-    const printSize = await page.evaluate(src => new Promise(r => { const i = new Image(); i.onload = () => r([i.width, i.height]); i.src = src; }), orderBody.print.front);
+    const mainDesign = orderBody.designs['1|póló'], kidsDesign = orderBody.designs['2|gyerekpóló'];
+    assert.ok(mainDesign.print.front.startsWith('data:image/png') && mainDesign.print.back.startsWith('data:image/png'));
+    assert.ok(kidsDesign.print.front.startsWith('data:image/png') && kidsDesign.print.back.startsWith('data:image/png'), 'separate print files for the kids shirt');
+    assert.equal(mainDesign.elements.length, 2);
+    assert.ok(Math.max(...kidsDesign.elements.map(e => e.w_mm)) <= 220);
+    const printSize = await page.evaluate(src => new Promise(r => { const i = new Image(); i.onload = () => r([i.width, i.height]); i.src = src; }), mainDesign.print.front);
+    const kidsPrintSize = await page.evaluate(src => new Promise(r => { const i = new Image(); i.onload = () => r([i.width, i.height]); i.src = src; }), kidsDesign.print.front);
+    assert.ok(kidsPrintSize[0] >= 2500 && kidsPrintSize[0] <= 2650, 'kids print ~300 dpi on 22 cm: ' + kidsPrintSize);
+    assert.deepEqual(await logoAt(), logoBefore, 'exporting the kids print leaves the design in place');
     assert.ok(printSize[0] >= 3400 && printSize[0] <= 3600, 'front print ~300 dpi on 30 cm: ' + printSize);
 
     // Siker: irány a kosár, a piszkozat törlődik.
@@ -311,7 +354,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     assert.ok(orderBody.roster[0].personal.back.startsWith('data:image/png') && orderBody.roster[1].personal.back.startsWith('data:image/png'));
     assert.deepEqual(orderBody.roster[2].personal, {}, 'no file for a blank shirt');
     const inkPixels = src => page.evaluate(url => new Promise(r => { const i = new Image(); i.onload = () => { const c = document.createElement('canvas'); c.width = 300; c.height = Math.round(300 * i.height / i.width); const x = c.getContext('2d'); x.drawImage(i, 0, 0, c.width, c.height); const d = x.getImageData(0, 0, c.width, c.height).data; let n = 0; for (let k = 3; k < d.length; k += 4) if (d[k] > 10) n++; r(n); }; i.src = url; }), src);
-    assert.equal(await inkPixels(orderBody.print.back), 0, 'the shared back print leaves out the names and numbers');
+    assert.equal(await inkPixels(orderBody.designs['1|póló'].print.back), 0, 'the shared back print leaves out the names and numbers');
     assert.ok(await inkPixels(orderBody.roster[0].personal.back) > 200, 'the player file contains the name and number');
     assert.deepEqual(await backTexts(), ['KOVÁCS', '10'], 'the canvas returns to the active player');
 
@@ -357,6 +400,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.click('.nbt-mode-card[data-mode="work"]');
     assert.equal(await page.locator('#nbt-step-roster').isVisible(), true);
     assert.equal(await page.locator('.nbt-player__number').count(), 0, 'no number field for workwear');
+    assert.deepEqual(await page.locator('.nbt-player__product').first().locator('option').allTextContents(), ['Póló (Prémium póló)', 'Gyerekpóló'], 'with several products each roster row has a product choice');
     assert.equal(await page.locator('#nbt-add-player').textContent(), '+ Név');
     assert.equal(await page.locator('.nbt-player__name').first().getAttribute('placeholder'), '1. név');
     // Jobb mell felirat (névsorból) egy még üres névsorsornál: halvány mintaszöveg, rákattintva kijelölhető.

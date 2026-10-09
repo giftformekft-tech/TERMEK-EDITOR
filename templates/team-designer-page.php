@@ -51,6 +51,7 @@ $nbt_icons = [
         <div class="nbt-canvas" data-side="front"><canvas id="nbt-canvas-front"></canvas></div>
         <div class="nbt-canvas" data-side="back" hidden><canvas id="nbt-canvas-back"></canvas></div>
         <p class="nbt-canvas-empty" id="nbt-canvas-empty">Válassz elhelyezést, vagy tölts fel logót.</p>
+        <div class="nbt-view-note" id="nbt-view-note" hidden><span id="nbt-view-text"></span><button type="button" class="nbt-btn nbt-btn--small" id="nbt-view-back">Vissza a szerkesztéshez</button></div>
       </div>
       <div class="nbt-selection" id="nbt-selection" hidden>
         <div class="nbt-selection__row nbt-selection__text">
@@ -110,7 +111,7 @@ $nbt_icons = [
         <h2 id="nbt-step-qty-title"><span class="nbt-step__num" id="nbt-step-qty-num">3</span>Színek, méretek, darabszám</h2>
         <div id="nbt-qty-grid">
           <div class="nbt-rows" id="nbt-rows"></div>
-          <div class="nbt-add-color" id="nbt-add-color-wrap"><span>+ Másik szín hozzáadása</span><div class="nbt-add-color__list" id="nbt-add-color"></div></div>
+          <div class="nbt-add-color" id="nbt-add-color-wrap"><span id="nbt-add-color-label">+ Másik szín hozzáadása</span><div class="nbt-add-color__list" id="nbt-add-color"></div></div>
         </div>
         <div id="nbt-qty-roster" hidden>
           <p class="nbt-help">A darabszám a névsorból adódik: minden sor egy darab. Név nélküli darabot a névsorban üres sorral adhatsz hozzá.</p>

@@ -38,7 +38,8 @@
     busy: $('nbt-busy'), busyText: $('nbt-busy-text'), toast: $('nbt-toast'),
     draft: $('nbt-draft'), draftRestore: $('nbt-draft-restore'), draftDiscard: $('nbt-draft-discard'),
     bind: $('nbt-bind'), textField: $('nbt-text-field'), bindHint: $('nbt-bind-hint'), bindCurrent: $('nbt-bind-current'),
-    qtyGrid: $('nbt-qty-grid'), qtyRoster: $('nbt-qty-roster'), roster: $('nbt-roster'), addPlayer: $('nbt-add-player'), rosterSum: $('nbt-roster-sum')
+    qtyGrid: $('nbt-qty-grid'), qtyRoster: $('nbt-qty-roster'), roster: $('nbt-roster'), addPlayer: $('nbt-add-player'), rosterSum: $('nbt-roster-sum'),
+    viewNote: $('nbt-view-note'), viewText: $('nbt-view-text'), viewBack: $('nbt-view-back'), addColorLabel: $('nbt-add-color-label')
   };
 
   const FONTS = [
@@ -169,17 +170,25 @@
     };
   }
 
+  let optionsCache = null;
+  const allOptions = () => optionsCache || (optionsCache = productOptions());
+  const optionByKey = key => allOptions().find(o => o.key === key) || null;
+  const colorsOf = key => { const o = optionByKey(key); return o ? colorsFor(catalog[o.pid], o.typeKey) : []; };
+  const sizesOf = key => { const o = optionByKey(key); return sizesFor(o ? catalog[o.pid] : null); };
+  const optionLabel = key => { const o = optionByKey(key); return o ? (o.sub && o.sub !== o.label ? o.label + ' (' + o.sub + ')' : o.label) : ''; };
+
   function sizesFor(product) {
     const sizes = product && Array.isArray(product.sizes) ? product.sizes.map(s => String(s).trim()).filter(Boolean) : [];
     return sizes.length ? sizes : [''];
   }
 
   /** A termék (típus) ársávjai: [{min, max, single, double}] – a darabár a nyomtatással együtt. */
-  function bandsFor() {
-    const p = product();
+  function bandsOf(key) {
+    const o = optionByKey(key);
+    const p = o ? catalog[o.pid] : null;
     const map = p && p.bands_by_type && typeof p.bands_by_type === 'object' ? p.bands_by_type : null;
     if (!map) return [];
-    const list = map[state.option.typeKey] || map[''] || Object.values(map)[0];
+    const list = map[o.typeKey] || map[''] || Object.values(map)[0];
     return Array.isArray(list) ? list.map(b => ({ min: parseInt(b.min, 10) || 1, max: parseInt(b.max, 10) || 0, single: Number(b.single) || 0, double: Number(b.double) || 0 })) : [];
   }
 
@@ -198,9 +207,10 @@
     mode: 'work',
     option: null,      // kiválasztott termék + típus
     color: '',         // előnézeti szín
-    rows: [],          // [{ color, qty: { size: n } }]
+    rows: [],          // [{ product, color, qty: { size: n } }] – product: termék|típus kulcs
+    view: null,        // másik termék előnézete: { product, color }; null = a fő termék szerkesztése
     qtyMode: 'grid',   // 'grid' = darabszám, 'roster' = névsor
-    roster: [],        // [{ name, number, size, color }]
+    roster: [],        // [{ name, number, size, color, product }]
     activePlayer: -1,  // a vásznon látszó játékos
     side: 'front',
     logo: null,        // { src, name }
@@ -235,6 +245,7 @@
   const activeCanvas = () => sides[state.side].canvas;
   const designObjects = side => sides[side].canvas.getObjects().filter(o => !o.nbArea);
   const product = () => state.option ? catalog[state.option.pid] : null;
+  const masterKey = () => state.option ? state.option.key : '';
   const isSport = () => state.mode === 'sport';
   // Munkaruhán a felirat legfeljebb 3 soros lehet (pl. cégnév), csapatmezen egysoros.
   const maxTextLines = () => isSport() ? 1 : 3;
@@ -270,19 +281,21 @@
   }
 
   /** A szín mockupját állítja be mindkét oldalon; ha a nyomtatási felület változik, az elemek a fizikai méretüket megtartva követik. */
-  async function applyMockups(color) {
-    const p = product();
+  async function applyMockups(color, opts) {
+    const opt = (opts && opts.option) || state.option;
+    const p = opt ? catalog[opt.pid] : null;
     if (!p) return;
+    const skipRescale = !!(opts && opts.skipRescale);
     await Promise.all(['front', 'back'].map(async side => {
       const s = sides[side];
-      const mk = mockupFor(p, state.option.typeKey, color, side);
+      const mk = mockupFor(p, opt.typeKey, color, side);
       const area = areaFor(mk, side);
       const c = s.canvas;
       const prev = s.area;
       if (c.getWidth() !== area.canvasW || c.getHeight() !== area.canvasH) {
         c.setDimensions({ width: area.canvasW, height: area.canvasH }, { backstoreOnly: true });
       }
-      if (prev && (prev.x !== area.x || prev.y !== area.y || prev.w !== area.w || prev.h !== area.h || prev.widthMm !== area.widthMm)) {
+      if (!skipRescale && prev && (prev.x !== area.x || prev.y !== area.y || prev.w !== area.w || prev.h !== area.h || prev.widthMm !== area.widthMm)) {
         const sx = (area.w / area.widthMm) / (prev.w / prev.widthMm);
         const sy = (area.h / area.heightMm) / (prev.h / prev.heightMm);
         designObjects(side).forEach(o => {
@@ -320,6 +333,155 @@
     fitCanvasCss();
     designObjects('front').concat(designObjects('back')).forEach(o => o.setCoords());
     ['front', 'back'].forEach(side => sides[side].canvas.requestRenderAll());
+  }
+
+  /* Másik termék (pl. gyerekpóló) --------------------------------------- */
+
+  function snapshotObjects() {
+    const snap = {};
+    ['front', 'back'].forEach(side => {
+      const s = sides[side];
+      snap[side] = {
+        area: Object.assign({}, s.area), width: s.canvas.getWidth(), height: s.canvas.getHeight(),
+        objects: designObjects(side).map(o => ({ o, left: o.left, top: o.top, scaleX: o.scaleX, scaleY: o.scaleY }))
+      };
+    });
+    return snap;
+  }
+
+  function restoreObjects(snap) {
+    ['front', 'back'].forEach(side => snap[side].objects.forEach(e => {
+      e.o.set({ left: e.left, top: e.top, scaleX: e.scaleX, scaleY: e.scaleY });
+      e.o.setCoords();
+    }));
+  }
+
+  /**
+   * A terv egy oldalát átteszi egy másik termék nyomtatási felületére: az elemek együtt,
+   * arányosan ugyanott maradnak; ami elfér, eredeti (mm) méretben, ami nem, arányosan kisebben.
+   */
+  function transformSide(side, from, to) {
+    const objs = designObjects(side);
+    if (!objs.length || !from || !to) return;
+    const kx = from.widthMm / from.w, ky = from.heightMm / from.h;
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    objs.forEach(o => {
+      o.setCoords();
+      const b = o.getBoundingRect(true, true);
+      x1 = Math.min(x1, (b.left - from.x) * kx); y1 = Math.min(y1, (b.top - from.y) * ky);
+      x2 = Math.max(x2, (b.left + b.width - from.x) * kx); y2 = Math.max(y2, (b.top + b.height - from.y) * ky);
+    });
+    const bw = Math.max(1, x2 - x1), bh = Math.max(1, y2 - y1);
+    const s = Math.min(1, to.widthMm / bw, to.heightMm / bh);
+    const nw = bw * s, nh = bh * s;
+    const cx = ((x1 + x2) / 2) / from.widthMm * to.widthMm;
+    const nx1 = Math.min(Math.max(cx - nw / 2, 0), Math.max(0, to.widthMm - nw));
+    const ny1 = Math.min(Math.max(y1 / from.heightMm * to.heightMm, 0), Math.max(0, to.heightMm - nh));
+    const tkx = to.w / to.widthMm, tky = to.h / to.heightMm;
+    objs.forEach(o => {
+      const ax = (o.left - from.x) * kx, ay = (o.top - from.y) * ky;
+      o.set({
+        left: to.x + (nx1 + (ax - x1) * s) * tkx,
+        top: to.y + (ny1 + (ay - y1) * s) * tky,
+        scaleX: o.scaleX * s * tkx * kx,
+        scaleY: o.scaleY * s * tky * ky
+      });
+      o.setCoords();
+    });
+  }
+
+  /** A fn a megadott termék elrendezésében fut (háttérkép nélkül, gyors); utána minden visszaáll. */
+  function withProductLayout(key, color, fn) {
+    if (!key || key === masterKey()) return fn();
+    const opt = optionByKey(key);
+    const p = opt ? catalog[opt.pid] : null;
+    if (!p) return fn();
+    const snap = snapshotObjects();
+    try {
+      ['front', 'back'].forEach(side => {
+        const s = sides[side];
+        const to = areaFor(mockupFor(p, opt.typeKey, color, side), side);
+        if (s.canvas.getWidth() !== to.canvasW || s.canvas.getHeight() !== to.canvasH) {
+          s.canvas.setDimensions({ width: to.canvasW, height: to.canvasH }, { backstoreOnly: true });
+        }
+        transformSide(side, snap[side].area, to);
+        s.area = to;
+      });
+      return fn();
+    } finally {
+      ['front', 'back'].forEach(side => {
+        const s = sides[side];
+        s.area = snap[side].area;
+        if (s.canvas.getWidth() !== snap[side].width || s.canvas.getHeight() !== snap[side].height) {
+          s.canvas.setDimensions({ width: snap[side].width, height: snap[side].height }, { backstoreOnly: true });
+        }
+      });
+      restoreObjects(snap);
+      fitCanvasCss();
+    }
+  }
+
+  let masterSnap = null;      // a fő termék elrendezése, amíg másik terméket mutatunk
+  let viewQueue = Promise.resolve();
+  const queueView = fn => (viewQueue = viewQueue.then(fn, fn));
+
+  function lockObjects(lock) {
+    ['front', 'back'].forEach(side => {
+      designObjects(side).forEach(o => o.set({ selectable: !lock, evented: !lock }));
+      sides[side].canvas.discardActiveObject().requestRenderAll();
+    });
+  }
+
+  async function enterOtherView(key, color) {
+    const opt = optionByKey(key);
+    masterSnap = snapshotObjects();
+    state.view = { product: key, color };
+    lockObjects(true);
+    await applyMockups(color, { option: opt, skipRescale: true });
+    ['front', 'back'].forEach(side => transformSide(side, masterSnap[side].area, sides[side].area));
+    ['front', 'back'].forEach(side => sides[side].canvas.requestRenderAll());
+    el.viewText.textContent = 'Előnézet: ' + optionLabel(key) + ' · ' + colorLabel(color) + '. A tervet a fő terméken szerkesztheted.';
+    el.viewNote.hidden = false;
+    syncSelection();
+  }
+
+  async function leaveOtherView() {
+    if (!masterSnap) return;
+    const snap = masterSnap;
+    masterSnap = null;
+    state.view = null;
+    el.viewNote.hidden = true;
+    await applyMockups(state.color, { skipRescale: true });
+    restoreObjects(snap);
+    lockObjects(false);
+    ['front', 'back'].forEach(side => sides[side].canvas.requestRenderAll());
+  }
+
+  /** Szerkesztés előtt mindig a fő termék elrendezésére váltunk vissza. */
+  const ensureMasterView = () => queueView(async () => { await leaveOtherView(); renderViewMarks(); refresh(); });
+
+  /** Egy sor (termék + szín) megmutatása a vásznon. */
+  function setView(key, color) {
+    return queueView(async () => {
+      key = key || masterKey();
+      await leaveOtherView();
+      if (key === masterKey()) {
+        if (norm(color) !== norm(state.color)) await previewColorInner(color, false);
+        else displayPlayer();
+      } else {
+        displayPlayer();
+        await enterOtherView(key, color);
+      }
+      renderViewMarks();
+      refresh();
+    });
+  }
+
+  const currentView = () => state.view || { product: masterKey(), color: state.color };
+  const isViewed = (key, color) => { const v = currentView(); return v.product === key && norm(v.color) === norm(color); };
+
+  function renderViewMarks() {
+    el.rows.querySelectorAll('.nbt-row').forEach(card => card.classList.toggle('is-preview', isViewed(card.dataset.product, card.dataset.color)));
   }
 
   function keepInside(obj, side) {
@@ -454,6 +616,7 @@
 
   async function applyPreset(preset) {
     if (!state.option) { toast('Előbb válassz terméket.'); return; }
+    if (masterSnap) await ensureMasterView();
     await setSide(preset.side);
     // Ugyanarra a helyre nem rakunk le még egyet: a már elhelyezett elemet jelöljük ki.
     const existing = designObjects(preset.side).find(o => o.nbPreset === preset.id);
@@ -520,10 +683,28 @@
 
   function displayPlayer(player) {
     const shown = player === undefined ? activePlayer() : player;
-    ['front', 'back'].forEach(side => {
-      boundObjects(side).forEach(o => setBoundText(o, shown, side));
-      sides[side].canvas.requestRenderAll();
-    });
+    const run = () => {
+      ['front', 'back'].forEach(side => {
+        boundObjects(side).forEach(o => setBoundText(o, shown, side));
+        sides[side].canvas.requestRenderAll();
+      });
+    };
+    if (!masterSnap) {
+      run();
+    } else {
+      // Másik termék előnézetében a szöveget a fő termék elrendezésében írjuk át, majd újra áttesszük.
+      const target = { front: sides.front.area, back: sides.back.area };
+      restoreObjects(masterSnap);
+      ['front', 'back'].forEach(side => { sides[side].area = masterSnap[side].area; });
+      try { run(); } finally {
+        masterSnap = snapshotObjects();
+        ['front', 'back'].forEach(side => {
+          sides[side].area = target[side];
+          transformSide(side, masterSnap[side].area, target[side]);
+          sides[side].canvas.requestRenderAll();
+        });
+      }
+    }
     syncSelection();
     updateEmptyHint();
   }
@@ -717,6 +898,7 @@
   /** Saját kép (fotó, grafika): a logótól függetlenül, az aktuális oldal közepére kerül, utána szabadon mozgatható. */
   el.uploadImage.addEventListener('click', () => {
     if (!state.option) { toast('Előbb válassz terméket.'); return; }
+    if (masterSnap) ensureMasterView();
     el.imageFile.click();
   });
   el.imageFile.addEventListener('change', () => {
@@ -729,6 +911,7 @@
     reader.onload = async () => {
       const img = await loadImage(reader.result);
       if (!img) { toast('A képet nem sikerült betölteni.'); return; }
+      if (masterSnap) await ensureMasterView();
       const area = sides[state.side].area;
       img.set({ nbKind: 'image' });
       fitIntoBox(img, { left: area.x + area.w * 0.15, top: area.y + area.h * 0.12, w: area.w * 0.7, h: area.h * 0.6 });
@@ -752,6 +935,7 @@
       el.logoName.textContent = file.name;
       el.upload.textContent = 'Másik logó';
       if (!state.option) return;
+      if (masterSnap) await ensureMasterView();
       const preset = state.pendingPreset;
       state.pendingPreset = null;
       if (preset) { await applyPreset(preset); return; }
@@ -772,8 +956,9 @@
     reader.readAsDataURL(file);
   });
 
-  el.addText.addEventListener('click', () => {
+  el.addText.addEventListener('click', async () => {
     if (!state.option) { toast('Előbb válassz terméket.'); return; }
+    if (masterSnap) await ensureMasterView();
     const box = fallbackBox(state.side, 'text');
     const obj = addText('FELIRAT', { left: box.left, top: box.top, w: box.w, h: Math.min(box.h, sides[state.side].area.h * 0.12) }, state.side, 'text');
     keepInside(obj, state.side);
@@ -813,29 +998,50 @@
   }
 
   async function selectOption(opt, keepRows) {
-    const p = catalog[opt.pid];
-    const colors = colorsFor(p, opt.typeKey);
+    if (masterSnap) await ensureMasterView();
+    const prevKey = masterKey();
+    const colors = colorsOf(opt.key);
+    const sizes = sizesOf(opt.key);
     state.option = opt;
+    // A régi fő termék sorai az új fő termékre kerülnek (ami szín és méret létezik); a többi termék sorai maradnak.
+    const adapt = r => ({
+      product: opt.key,
+      color: colors.find(c => norm(c) === norm(r.color)),
+      qty: sizes.reduce((acc, s) => { if (r.qty && r.qty[s]) acc[s] = r.qty[s]; return acc; }, {})
+    });
+    state.rows.forEach(r => { if (!r.product) r.product = prevKey || opt.key; });
     if (!keepRows) {
-      const sizes = sizesFor(p);
-      const kept = state.rows.filter(r => colors.some(c => norm(c) === norm(r.color)));
-      state.rows = (kept.length ? kept : [{ color: colors[0], qty: {} }]).map(r => ({
-        color: colors.find(c => norm(c) === norm(r.color)),
-        qty: sizes.reduce((acc, s) => { if (r.qty[s]) acc[s] = r.qty[s]; return acc; }, {})
-      }));
+      const moved = state.rows.filter(r => r.product === prevKey).map(adapt).filter(r => r.color);
+      const own = state.rows.filter(r => r.product === opt.key && prevKey !== opt.key);
+      const others = state.rows.filter(r => r.product !== prevKey && r.product !== opt.key);
+      state.rows = mergeRows(moved.concat(own, others));
+      if (!state.rows.some(r => r.product === opt.key)) state.rows.unshift({ product: opt.key, color: colors[0], qty: {} });
     }
-    if (!colors.some(c => norm(c) === norm(state.color))) state.color = state.rows[0] ? state.rows[0].color : colors[0];
-    const sizes = sizesFor(p);
+    const masterRow = state.rows.find(r => r.product === opt.key);
+    if (!colors.some(c => norm(c) === norm(state.color))) state.color = masterRow ? masterRow.color : colors[0];
     state.roster.forEach(player => {
-      if (!sizes.includes(player.size)) player.size = sizes[0];
-      const match = colors.find(c => norm(c) === norm(player.color));
-      player.color = match || state.color;
+      if (!player.product || player.product === prevKey) player.product = opt.key;
+      const pSizes = sizesOf(player.product);
+      const pColors = colorsOf(player.product);
+      if (!pSizes.includes(player.size)) player.size = pSizes[Math.min(2, pSizes.length - 1)];
+      player.color = pColors.find(c => norm(c) === norm(player.color)) || (player.product === opt.key ? state.color : pColors[0]);
     });
     renderTypes();
     renderColors();
     renderQtyMode();
     await applyMockups(state.color);
     refresh();
+  }
+
+  /** Azonos termék + szín sorok összevonása. */
+  function mergeRows(rows) {
+    const out = [];
+    rows.forEach(r => {
+      const found = out.find(x => x.product === r.product && norm(x.color) === norm(r.color));
+      if (!found) { out.push({ product: r.product, color: r.color, qty: Object.assign({}, r.qty) }); return; }
+      Object.keys(r.qty || {}).forEach(size => { found.qty[size] = (found.qty[size] || 0) + r.qty[size]; });
+    });
+    return out;
   }
 
   function renderColors() {
@@ -859,10 +1065,15 @@
     el.colorName.textContent = colorLabel(state.color);
   }
 
-  /** Az alapszín választása: ha még csak egy üres sor van, az a sor is átszíneződik. */
-  async function previewColor(color, fromSwatch) {
-    if (fromSwatch && state.rows.length === 1 && rowTotal(state.rows[0]) === 0) state.rows[0].color = color;
-    if (fromSwatch && state.qtyMode === 'roster' && state.roster.length === 1 && !isPersonal(state.roster[0])) {
+  /** Az alapszín választása (a fő termék színe); bármilyen másik termék előnézetéből visszavált. */
+  function previewColor(color, fromSwatch) {
+    return queueView(async () => { await leaveOtherView(); await previewColorInner(color, fromSwatch); renderViewMarks(); });
+  }
+
+  /** Ha még csak egy üres sor van, az a sor is átszíneződik. */
+  async function previewColorInner(color, fromSwatch) {
+    if (fromSwatch && state.rows.length === 1 && state.rows[0].product === masterKey() && rowTotal(state.rows[0]) === 0) state.rows[0].color = color;
+    if (fromSwatch && state.qtyMode === 'roster' && state.roster.length === 1 && state.roster[0].product === masterKey() && !isPersonal(state.roster[0])) {
       state.roster[0].color = color;
       renderRoster();
     }
@@ -904,39 +1115,58 @@
   const rowTotal = row => Object.keys(row.qty).reduce((sum, s) => sum + (parseInt(row.qty[s], 10) || 0), 0);
   const totalQty = () => state.qtyMode === 'roster' ? state.roster.length : state.rows.reduce((sum, r) => sum + rowTotal(r), 0);
 
-  /** A rendelés sorai (szín, méret, darab, névvel/számmal), a választott módtól függetlenül. */
+  /** A rendelés sorai (termék, szín, méret, darab, névvel/számmal), a választott módtól függetlenül. */
   function orderRows() {
-    const p = product();
-    if (!p) return [];
+    if (!state.option) return [];
     const rows = [];
-    const add = (color, size, qty, personal) => {
-      const found = rows.find(r => norm(r.color) === norm(color) && r.size === size && r.personal === personal);
-      if (found) found.qty += qty; else rows.push({ color, size, qty, personal });
+    const add = (productKey, color, size, qty, personal) => {
+      const found = rows.find(r => r.product === productKey && norm(r.color) === norm(color) && r.size === size && r.personal === personal);
+      if (found) found.qty += qty; else rows.push({ product: productKey, color, size, qty, personal });
     };
     if (state.qtyMode === 'roster') {
-      state.roster.forEach(player => add(player.color, player.size, 1, playerHasPrint(player)));
+      state.roster.forEach(player => add(player.product || masterKey(), player.color, player.size, 1, playerHasPrint(player)));
     } else {
-      state.rows.forEach(r => sizesFor(p).forEach(size => {
+      state.rows.forEach(r => sizesOf(r.product).forEach(size => {
         const n = parseInt(r.qty[size], 10) || 0;
-        if (n) add(r.color, size, n, false);
+        if (n) add(r.product, r.color, size, n, false);
       }));
     }
     return rows;
   }
 
+  /** A rendelésben szereplő termék + szín párok (a fő termék elöl). */
+  function orderTargets() {
+    const list = [];
+    orderRows().forEach(r => { if (!list.some(t => t.product === r.product && norm(t.color) === norm(r.color))) list.push({ product: r.product, color: r.color }); });
+    return list.sort((a, b) => (a.product === masterKey() ? 0 : 1) - (b.product === masterKey() ? 0 : 1));
+  }
+
   function orderColors() {
     const colors = [];
-    orderRows().forEach(r => { if (!colors.some(c => norm(c) === norm(r.color))) colors.push(r.color); });
+    orderTargets().forEach(t => { if (!colors.some(c => norm(c) === norm(t.color))) colors.push(t.color); });
     return colors;
   }
+
+  /** A rendelés termékei, a fő termékkel kezdve. */
+  function orderProducts() {
+    const keys = [masterKey()];
+    orderTargets().forEach(t => { if (!keys.includes(t.product)) keys.push(t.product); });
+    return keys.filter(Boolean);
+  }
+
+  const multiProduct = () => {
+    const keys = new Set(state.qtyMode === 'roster' ? state.roster.map(pl => pl.product || masterKey()) : state.rows.map(r => r.product));
+    return keys.size > 1;
+  };
+  const targetLabel = (key, color) => (multiProduct() || key !== masterKey() ? optionLabel(key) + ' · ' : '') + colorLabel(color);
 
   /* Névsor ---------------------------------------------------------------- */
 
   function newPlayer() {
-    const p = product();
     const last = state.roster[state.roster.length - 1];
-    const sizes = sizesFor(p);
-    return { name: '', number: '', size: last ? last.size : sizes[Math.min(2, sizes.length - 1)], color: last ? last.color : state.color };
+    const key = last ? (last.product || masterKey()) : masterKey();
+    const sizes = sizesOf(key);
+    return { name: '', number: '', size: last ? last.size : sizes[Math.min(2, sizes.length - 1)], color: last ? last.color : state.color, product: key };
   }
 
   function setQtyMode(mode) {
@@ -945,9 +1175,9 @@
     if (mode === 'roster' && p) {
       if (!state.roster.length) {
         // A már megadott darabszámokból üres sorok lesznek, csak a neveket kell beírni.
-        state.rows.forEach(r => sizesFor(p).forEach(size => {
+        state.rows.forEach(r => sizesOf(r.product).forEach(size => {
           const n = parseInt(r.qty[size], 10) || 0;
-          for (let i = 0; i < n && state.roster.length < maxPlayers; i++) state.roster.push({ name: '', number: '', size, color: r.color });
+          for (let i = 0; i < n && state.roster.length < maxPlayers; i++) state.roster.push({ name: '', number: '', size, color: r.color, product: r.product });
         }));
         if (!state.roster.length) state.roster.push(newPlayer());
       }
@@ -955,8 +1185,9 @@
     } else if (mode === 'grid' && p && state.roster.length) {
       const rows = [];
       state.roster.forEach(player => {
-        let row = rows.find(r => norm(r.color) === norm(player.color));
-        if (!row) rows.push(row = { color: player.color, qty: {} });
+        const key = player.product || masterKey();
+        let row = rows.find(r => r.product === key && norm(r.color) === norm(player.color));
+        if (!row) rows.push(row = { product: key, color: player.color, qty: {} });
         row.qty[player.size] = (row.qty[player.size] || 0) + 1;
       });
       state.rows = rows;
@@ -984,14 +1215,12 @@
     if (roster) { renderRoster(); renderQtySummary(); } else renderRows();
   }
 
-  /** Névsornál a 4. csempe: színenként és méretenként hány darab jön ki a névsorból. */
+  /** Névsornál a 4. csempe: termékenként, színenként és méretenként hány darab jön ki a névsorból. */
   function renderQtySummary() {
     if (state.qtyMode !== 'roster') return;
-    const p = product();
     el.qtySummary.innerHTML = '';
-    if (!p) return;
-    const sizes = sizesFor(p);
-    orderColors().forEach(color => {
+    if (!state.option) return;
+    orderTargets().forEach(target => {
       const card = document.createElement('div');
       card.className = 'nbt-row is-summary';
       const head = document.createElement('div');
@@ -1000,11 +1229,11 @@
       name.className = 'nbt-row__color';
       const dot = document.createElement('span');
       dot.className = 'nbt-dot';
-      const hex = colorHex(color);
+      const hex = colorHex(target.color);
       if (hex) dot.style.setProperty('--swatch', hex);
       name.appendChild(dot);
-      name.appendChild(document.createTextNode(colorLabel(color)));
-      const players = state.roster.filter(pl => norm(pl.color) === norm(color));
+      name.appendChild(document.createTextNode(targetLabel(target.product, target.color)));
+      const players = state.roster.filter(pl => (pl.product || masterKey()) === target.product && norm(pl.color) === norm(target.color));
       const total = document.createElement('span');
       total.className = 'nbt-row__total';
       total.textContent = players.length + ' db';
@@ -1013,7 +1242,7 @@
       card.appendChild(head);
       const grid = document.createElement('div');
       grid.className = 'nbt-sizes';
-      sizes.forEach(size => {
+      sizesOf(target.product).forEach(size => {
         const cell = document.createElement('div');
         cell.className = 'nbt-size';
         const label = document.createElement('span');
@@ -1041,17 +1270,18 @@
     state.activePlayer = index;
     el.roster.querySelectorAll('.nbt-player').forEach((row, i) => row.classList.toggle('is-active', i === index));
     const player = state.roster[index];
-    if (player && norm(player.color) !== norm(state.color)) previewColor(player.color, false).then(() => displayPlayer());
+    if (player) setView(player.product || masterKey(), player.color);
     else displayPlayer();
   }
 
   function renderRoster() {
-    const p = product();
     el.roster.innerHTML = '';
-    if (!p) return;
-    const sizes = sizesFor(p);
-    const colors = colorsFor(p, state.option.typeKey);
+    if (!state.option) return;
+    const options = allOptions();
     state.roster.forEach((player, index) => {
+      if (!player.product) player.product = masterKey();
+      const sizes = sizesOf(player.product);
+      const colors = colorsOf(player.product);
       const row = document.createElement('div');
       row.className = 'nbt-player' + (index === state.activePlayer ? ' is-active' : '');
       row.addEventListener('focusin', () => setActivePlayer(index));
@@ -1059,6 +1289,7 @@
       const sport = isSport();
       if (!sport) row.classList.add('no-number');
       if (colors.length < 2) row.classList.add('no-color');
+      if (options.length > 1) row.classList.add('has-product');
       const name = document.createElement('input');
       name.type = 'text'; name.className = 'nbt-player__name'; name.placeholder = (index + 1) + (sport ? '. játékos neve' : '. név'); name.maxLength = 30;
       name.autocomplete = 'off'; name.value = player.name;
@@ -1106,7 +1337,7 @@
         const size = document.createElement('select');
         size.className = 'nbt-player__size';
         size.setAttribute('aria-label', (index + 1) + '. méret');
-        sizes.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = sizeLabel(s); size.appendChild(o); });
+        sizes.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = sizeLabel(s, player.product); size.appendChild(o); });
         size.value = player.size;
         size.addEventListener('change', () => { player.size = size.value; scheduleRefresh(); });
         row.appendChild(size);
@@ -1119,10 +1350,29 @@
         color.value = colors.find(c => norm(c) === norm(player.color)) || colors[0];
         color.addEventListener('change', () => {
           player.color = color.value;
-          if (index === state.activePlayer) previewColor(player.color, false).then(() => displayPlayer());
+          if (index === state.activePlayer) setView(player.product, player.color);
           scheduleRefresh();
         });
         row.appendChild(color);
+      }
+      if (options.length > 1) {
+        // Több termék egy rendelésben (pl. felnőtt és gyerekpóló): soronként választható.
+        const productSel = document.createElement('select');
+        productSel.className = 'nbt-player__product';
+        productSel.setAttribute('aria-label', (index + 1) + '. termék');
+        options.forEach(o => { const opt = document.createElement('option'); opt.value = o.key; opt.textContent = optionLabel(o.key); productSel.appendChild(opt); });
+        productSel.value = player.product;
+        productSel.addEventListener('change', () => {
+          player.product = productSel.value;
+          const pSizes = sizesOf(player.product);
+          const pColors = colorsOf(player.product);
+          if (!pSizes.includes(player.size)) player.size = pSizes[Math.min(2, pSizes.length - 1)];
+          if (!pColors.some(c => norm(c) === norm(player.color))) player.color = pColors[0];
+          renderRoster();
+          if (index === state.activePlayer) setView(player.product, player.color);
+          refresh();
+        });
+        row.appendChild(productSel);
       }
       const remove = document.createElement('button');
       remove.type = 'button';
@@ -1159,38 +1409,39 @@
 
   function renderRosterSum() {
     if (state.qtyMode !== 'roster') return;
-    const p = product();
-    const parts = orderColors().map(color => {
-      const sizes = sizesFor(p).map(size => {
-        const n = state.roster.filter(pl => norm(pl.color) === norm(color) && pl.size === size).length;
+    const parts = orderTargets().map(t => {
+      const sizes = sizesOf(t.product).map(size => {
+        const n = state.roster.filter(pl => (pl.product || masterKey()) === t.product && norm(pl.color) === norm(t.color) && pl.size === size).length;
         return n ? (size ? size + ': ' + n : n + ' db') : '';
       }).filter(Boolean).join(', ');
-      return colorLabel(color) + ' – ' + sizes;
+      return targetLabel(t.product, t.color) + ' – ' + sizes;
     });
     el.rosterSum.textContent = state.roster.length + (isSport() ? ' mez' : ' db') + (parts.length ? ' · ' + parts.join(' · ') : '');
   }
 
   function renderRows() {
-    const p = product();
     el.rows.innerHTML = '';
-    if (!p) return;
-    const sizes = sizesFor(p);
+    if (!state.option) return;
     state.rows.forEach((row, index) => {
+      if (!row.product) row.product = masterKey();
+      const sizes = sizesOf(row.product);
       const card = document.createElement('div');
-      card.className = 'nbt-row' + (norm(row.color) === norm(state.color) ? ' is-preview' : '');
+      card.className = 'nbt-row' + (isViewed(row.product, row.color) ? ' is-preview' : '');
+      card.dataset.product = row.product;
+      card.dataset.color = row.color;
       const head = document.createElement('div');
       head.className = 'nbt-row__head';
       const name = document.createElement('button');
       name.type = 'button';
       name.className = 'nbt-row__color';
-      name.title = 'Előnézet ebben a színben';
+      name.title = 'Előnézet';
       const dot = document.createElement('span');
       dot.className = 'nbt-dot';
       const hex = colorHex(row.color);
       if (hex) dot.style.setProperty('--swatch', hex);
       name.appendChild(dot);
-      name.appendChild(document.createTextNode(colorLabel(row.color)));
-      name.addEventListener('click', () => previewColor(row.color, false));
+      name.appendChild(document.createTextNode(targetLabel(row.product, row.color)));
+      name.addEventListener('click', () => setView(row.product, row.color));
       const total = document.createElement('span');
       total.className = 'nbt-row__total';
       total.textContent = rowTotal(row) + ' db';
@@ -1200,12 +1451,16 @@
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'nbt-row__remove';
-        remove.setAttribute('aria-label', colorLabel(row.color) + ' sor törlése');
+        remove.setAttribute('aria-label', targetLabel(row.product, row.color) + ' sor törlése');
         remove.textContent = '×';
         remove.addEventListener('click', () => {
+          const wasViewed = isViewed(row.product, row.color);
           state.rows.splice(index, 1);
-          if (!state.rows.some(r => norm(r.color) === norm(state.color))) previewColor(state.rows[0].color, false);
-          else { renderRows(); refresh(); }
+          renderRows();
+          if (wasViewed || !state.rows.some(r => r.product === masterKey() && norm(r.color) === norm(state.color))) {
+            const next = state.rows.find(r => r.product === masterKey()) || state.rows[0];
+            setView(next.product, next.color);
+          } else refresh();
         });
         head.appendChild(remove);
       }
@@ -1217,16 +1472,16 @@
         label.className = 'nbt-size';
         const span = document.createElement('span');
         span.textContent = size || 'Darab';
-        if (sizeFee(size) > 0) {
+        if (sizeFee(size, row.product) > 0) {
           const fee = document.createElement('small');
-          fee.textContent = '+' + formatPrice(sizeFee(size));
+          fee.textContent = '+' + formatPrice(sizeFee(size, row.product));
           span.appendChild(fee);
         }
         const input = document.createElement('input');
         input.type = 'number'; input.min = '0'; input.max = '9999'; input.step = '1'; input.inputMode = 'numeric';
         input.placeholder = '0';
         input.value = row.qty[size] ? String(row.qty[size]) : '';
-        input.setAttribute('aria-label', colorLabel(row.color) + ' ' + (size || '') + ' darabszám');
+        input.setAttribute('aria-label', targetLabel(row.product, row.color) + ' ' + (size || '') + ' darabszám');
         input.addEventListener('input', () => {
           const n = Math.max(0, Math.min(9999, parseInt(input.value, 10) || 0));
           if (n) row.qty[size] = n; else delete row.qty[size];
@@ -1250,10 +1505,16 @@
    * nem tud színmintát mutatni). Billentyűzettel is kezelhető.
    */
   function renderAddColor() {
-    const p = product();
-    const used = state.rows.map(r => norm(r.color));
-    const free = p ? colorsFor(p, state.option.typeKey).filter(c => !used.includes(norm(c))) : [];
-    el.addColorWrap.hidden = !free.length || state.rows.length >= maxColors;
+    // Termékenként a még nem rendelt színek; a fő termék elöl. Másik termék színével az a termék is bekerül.
+    const productOpts = state.option ? [state.option].concat(allOptions().filter(o => o.key !== masterKey())) : [];
+    const groups = productOpts.map(o => {
+      const rowsOf = state.rows.filter(r => r.product === o.key);
+      const used = rowsOf.map(r => norm(r.color));
+      return { key: o.key, colors: rowsOf.length >= maxColors ? [] : colorsOf(o.key).filter(c => !used.includes(norm(c))) };
+    }).filter(g => g.colors.length);
+    const many = productOpts.length > 1;
+    el.addColorWrap.hidden = !groups.length;
+    if (el.addColorLabel) el.addColorLabel.textContent = many ? '+ Másik szín vagy termék (pl. gyerekpóló)' : '+ Másik szín hozzáadása';
     el.addColor.innerHTML = '';
     const dropdown = document.createElement('div');
     dropdown.className = 'nbt-dropdown';
@@ -1262,26 +1523,35 @@
     toggle.className = 'nbt-dropdown__toggle';
     toggle.setAttribute('aria-haspopup', 'listbox');
     toggle.setAttribute('aria-expanded', 'false');
-    toggle.textContent = 'Válassz színt…';
+    toggle.textContent = many ? 'Válassz terméket és színt…' : 'Válassz színt…';
     const list = document.createElement('div');
     list.className = 'nbt-dropdown__list';
     list.setAttribute('role', 'listbox');
     list.setAttribute('aria-label', 'Szín hozzáadása');
     list.hidden = true;
-    free.forEach(color => {
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = 'nbt-add-color__btn';
-      option.setAttribute('role', 'option');
-      option.dataset.color = color;
-      const dot = document.createElement('span');
-      dot.className = 'nbt-dot';
-      const hex = colorHex(color);
-      if (hex) dot.style.setProperty('--swatch', hex);
-      option.appendChild(dot);
-      option.appendChild(document.createTextNode(colorLabel(color)));
-      option.addEventListener('click', () => { close(); addColorRow(color); });
-      list.appendChild(option);
+    groups.forEach(group => {
+      if (many) {
+        const title = document.createElement('p');
+        title.className = 'nbt-dropdown__group';
+        title.textContent = optionLabel(group.key) + (group.key === masterKey() ? ' (a terv alapja)' : '');
+        list.appendChild(title);
+      }
+      group.colors.forEach(color => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'nbt-add-color__btn';
+        option.setAttribute('role', 'option');
+        option.dataset.color = color;
+        option.dataset.product = group.key;
+        const dot = document.createElement('span');
+        dot.className = 'nbt-dot';
+        const hex = colorHex(color);
+        if (hex) dot.style.setProperty('--swatch', hex);
+        option.appendChild(dot);
+        option.appendChild(document.createTextNode(colorLabel(color)));
+        option.addEventListener('click', () => { close(); addColorRow(color, group.key); });
+        list.appendChild(option);
+      });
     });
     const options = () => Array.from(list.querySelectorAll('.nbt-add-color__btn'));
     const open = () => {
@@ -1316,25 +1586,27 @@
     el.addColor.appendChild(dropdown);
   }
 
-  function addColorRow(color) {
-    state.rows.push({ color, qty: {} });
-    // A sor szinkron jelenik meg; a fókusz azonnal oda kerül, nem a mockup betöltése után
+  function addColorRow(color, key) {
+    state.rows.push({ product: key || masterKey(), color, qty: {} });
+    renderRows();
+    // A fókusz azonnal az új sorra kerül, nem a mockup betöltése után
     // (különben a közben máshova gépelt szám rossz mezőbe kerülne).
-    previewColor(color, false);
     const inputs = el.rows.querySelectorAll('.nbt-row:last-child input');
     if (inputs[0] && window.matchMedia('(pointer: fine)').matches) inputs[0].focus();
+    setView(key || masterKey(), color);
   }
 
   /* Méretfelár ------------------------------------------------------------ */
 
-  function sizeFee(size) {
-    const p = product();
+  function sizeFee(size, key) {
+    const o = optionByKey(key || masterKey());
+    const p = o ? catalog[o.pid] : null;
     const map = p && p.size_fees_by_type && typeof p.size_fees_by_type === 'object' ? p.size_fees_by_type : null;
-    const fees = map ? (map[state.option.typeKey] || map[''] || {}) : {};
+    const fees = map ? (map[o.typeKey] || map[''] || {}) : {};
     return Math.max(0, Number(fees[String(size).trim()]) || 0);
   }
 
-  const sizeLabel = size => size ? (sizeFee(size) > 0 ? size + ' +' + formatPrice(sizeFee(size)) : size) : 'Darab';
+  const sizeLabel = (size, key) => size ? (sizeFee(size, key) > 0 ? size + ' +' + formatPrice(sizeFee(size, key)) : size) : 'Darab';
 
   /* ---------------------------------------------------------------------- */
   /* Összesítő, figyelmeztetések                                             */
@@ -1351,26 +1623,54 @@
     const sides = Array.from(new Set(elements.map(e => e.side)));
     const double = sides.length > 1;
     const qty = totalQty();
-    const bands = state.option ? bandsFor() : [];
-    const bandIndex = bandIndexFor(bands, Math.max(1, qty));
-    const band = bands[bandIndex] || null;
-    const unit = band ? band.single + (double ? band.double : 0) : NaN;
     const rows = state.option ? orderRows() : [];
+    // Minden termék a saját ársávjaival számol, de a sávot a teljes darabszám adja.
+    const keys = state.option ? orderProducts() : [];
+    const bandSets = keys.map(key => {
+      const bands = bandsOf(key);
+      const index = bandIndexFor(bands, Math.max(1, qty));
+      const band = bands[index] || null;
+      return { key, bands, index, unit: band ? band.single + (double ? band.double : 0) : NaN };
+    });
+    const unitOf = key => { const set = bandSets.find(b => b.key === key); return set ? set.unit : NaN; };
+    let total = 0;
+    rows.forEach(r => { total += (unitOf(r.product) + sizeFee(r.size, r.product) + (r.personal ? personalFee : 0)) * r.qty; });
     const personalQty = rows.reduce((sum, r) => sum + (r.personal ? r.qty : 0), 0);
-    const sizeFees = rows.reduce((sum, r) => sum + sizeFee(r.size) * r.qty, 0);
-    const sizeFeeQty = rows.reduce((sum, r) => sum + (sizeFee(r.size) > 0 ? r.qty : 0), 0);
-    const total = Number.isFinite(unit) ? unit * qty + personalFee * personalQty + sizeFees : NaN;
-    return { elements, sides, double, qty, bands, bandIndex, unit, personalQty, sizeFees, sizeFeeQty, total };
+    const sizeFees = rows.reduce((sum, r) => sum + sizeFee(r.size, r.product) * r.qty, 0);
+    const sizeFeeQty = rows.reduce((sum, r) => sum + (sizeFee(r.size, r.product) > 0 ? r.qty : 0), 0);
+    const first = bandSets[0] || { bands: [], index: -1, unit: NaN };
+    return { elements, sides, double, qty, bandSets, bands: first.bands, bandIndex: first.index, unit: bandSets.length > 1 ? NaN : first.unit, personalQty, sizeFees, sizeFeeQty, total: rows.length ? total : NaN };
   }
 
   function bandLabel(b) {
     return b.max ? (b.min === b.max ? b.min + ' db' : b.min + '–' + b.max + ' db') : b.min + ' db-tól';
   }
 
-  /** Ársávok táblázata: egyoldalas és kétoldalas darabár, kiemelve az aktuális sáv és nyomtatás. */
+  /** Ársávok táblázata termékenként: egyoldalas és kétoldalas darabár, kiemelve az aktuális sáv és nyomtatás. */
   function renderBands(q) {
     el.bands.innerHTML = '';
-    if (!q.bands.length) return;
+    if (!q.bandSets.length) return;
+    const caption = document.createElement('p');
+    caption.className = 'nbt-bands__title';
+    caption.textContent = 'Darabárak a nyomtatással együtt';
+    el.bands.appendChild(caption);
+    if (q.bandSets.length > 1) {
+      const note = document.createElement('p');
+      note.className = 'nbt-bands__note';
+      note.textContent = 'A sávot a termékek együttes darabszáma adja.';
+      el.bands.appendChild(note);
+    }
+    q.bandSets.forEach(set => renderBandTable(q, set, q.bandSets.length > 1));
+  }
+
+  function renderBandTable(q, set, titled) {
+    if (!set.bands.length) return;
+    if (titled) {
+      const title = document.createElement('p');
+      title.className = 'nbt-bands__product';
+      title.textContent = optionLabel(set.key);
+      el.bands.appendChild(title);
+    }
     const table = document.createElement('table');
     table.className = 'nbt-bands__table';
     const head = document.createElement('tr');
@@ -1384,9 +1684,9 @@
     thead.appendChild(head);
     table.appendChild(thead);
     const body = document.createElement('tbody');
-    q.bands.forEach((b, i) => {
+    set.bands.forEach((b, i) => {
       const tr = document.createElement('tr');
-      if (i === q.bandIndex && q.qty > 0) tr.className = 'is-current';
+      if (i === set.index && q.qty > 0) tr.className = 'is-current';
       [[bandLabel(b), ''], [formatPrice(b.single), q.double ? '' : 'is-active'], [formatPrice(b.single + b.double), q.double ? 'is-active' : '']].forEach(([text, cls]) => {
         const td = document.createElement('td');
         td.textContent = text;
@@ -1396,12 +1696,8 @@
       body.appendChild(tr);
     });
     table.appendChild(body);
-    const caption = document.createElement('p');
-    caption.className = 'nbt-bands__title';
-    caption.textContent = 'Darabárak a nyomtatással együtt';
-    el.bands.appendChild(caption);
     el.bands.appendChild(table);
-    const fees = sizesFor(product()).filter(size => sizeFee(size) > 0).map(size => size + ': +' + formatPrice(sizeFee(size)));
+    const fees = sizesOf(set.key).filter(size => sizeFee(size, set.key) > 0).map(size => size + ': +' + formatPrice(sizeFee(size, set.key)));
     if (fees.length) {
       const note = document.createElement('p');
       note.className = 'nbt-bands__note';
@@ -1426,12 +1722,17 @@
     renderQtySummary();
     renderBands(q);
     const hasTotal = q.qty > 0 && Number.isFinite(q.total);
-    el.sumUnit.textContent = Number.isFinite(q.unit) ? formatPrice(q.unit) : '–';
+    // Több terméknél a darabár termékenként más: az átlagot mutatjuk, a sávok fent láthatók.
+    const average = q.bandSets.length > 1;
+    el.sumUnit.previousElementSibling.textContent = average ? 'Átlagos darabár' : 'Darabár';
+    el.sumUnit.textContent = average ? (hasTotal ? formatPrice(q.total / q.qty) : '–') : (Number.isFinite(q.unit) ? formatPrice(q.unit) : '–');
     el.sumTotal.textContent = hasTotal ? formatPrice(q.total) : '–';
     el.barTotal.textContent = hasTotal ? formatPrice(q.total) : '–';
     const next = q.bands[q.bandIndex + 1];
     el.nextTier.hidden = !next || q.qty === 0;
-    if (next) el.nextTier.textContent = 'Még ' + (next.min - q.qty) + ' db, és a darabár ' + formatPrice(next.single + (q.double ? next.double : 0)) + '.';
+    if (next) el.nextTier.textContent = q.bandSets.length > 1
+      ? 'Még ' + (next.min - q.qty) + ' db, és minden termék olcsóbb sávba kerül.'
+      : 'Még ' + (next.min - q.qty) + ' db, és a darabár ' + formatPrice(next.single + (q.double ? next.double : 0)) + '.';
     const ready = readiness(q);
     if (errorIsCheck && !el.error.hidden) showError(ready, true);
     [el.cart, el.barCart].forEach(b => { b.dataset.ready = ready ? 'false' : 'true'; b.disabled = state.busy; });
@@ -1595,17 +1896,28 @@
     state.busy = true;
     el.busy.hidden = false;
     el.busyText.textContent = 'Nyomdai fájlok készítése…';
+    await queueView(leaveOtherView);
     const previewBefore = state.color;
     try {
       const families = new Set();
       ['front', 'back'].forEach(side => designObjects(side).forEach(o => { if (o.type === 'text') families.add(o.fontFamily); }));
       await Promise.all(Array.from(families).map(ensureFont));
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      const sidesUsed = quote.sides;
-      const print = {};
       const roster = state.qtyMode === 'roster';
+      const targets = orderTargets();
+      const products = orderProducts().filter(key => targets.some(t => t.product === key));
+      // Termékenként saját nyomdai fájl: a terv az adott termék nyomtatási felületére igazítva.
+      const designs = {};
       displayPlayer(null);
-      sidesUsed.forEach(side => { print[side] = exportPrint(side, roster ? 'common' : ''); });
+      products.forEach(key => {
+        const color = targets.find(t => t.product === key).color;
+        withProductLayout(key, color, () => {
+          const elements = measureElements();
+          const print = {};
+          Array.from(new Set(elements.map(e => e.side))).forEach(side => { print[side] = exportPrint(side, roster ? 'common' : ''); });
+          designs[key] = { elements: elements.map(e => ({ side: e.side, x_mm: e.x_mm, y_mm: e.y_mm, w_mm: e.w_mm, h_mm: e.h_mm })), print };
+        });
+      });
       const personal = [];
       if (roster && hasBound()) {
         for (let i = 0; i < state.roster.length; i++) {
@@ -1615,38 +1927,42 @@
           el.busyText.textContent = 'Névfájlok készítése (' + (i + 1) + '/' + state.roster.length + ')…';
           if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
           displayPlayer(player);
-          ['front', 'back'].forEach(side => {
-            if (boundObjects(side).some(o => o.visible !== false && !o.nbGhost)) personal[i][side] = exportPrint(side, 'personal');
+          withProductLayout(player.product || masterKey(), player.color, () => {
+            ['front', 'back'].forEach(side => {
+              if (boundObjects(side).some(o => o.visible !== false && !o.nbGhost)) personal[i][side] = exportPrint(side, 'personal');
+            });
           });
         }
       }
-      const colors = orderColors();
       const previews = [];
-      for (let i = 0; i < colors.length; i++) {
-        el.busyText.textContent = 'Előnézetek készítése (' + (i + 1) + '/' + colors.length + ')…';
-        displayPlayer(roster ? (state.roster.find(pl => norm(pl.color) === norm(colors[i]) && isPersonal(pl)) || null) : null);
-        await applyMockups(colors[i]);
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        el.busyText.textContent = 'Előnézetek készítése (' + (i + 1) + '/' + targets.length + ')…';
+        displayPlayer(roster ? (state.roster.find(pl => (pl.product || masterKey()) === t.product && norm(pl.color) === norm(t.color) && isPersonal(pl)) || null) : null);
+        if (t.product === masterKey()) await applyMockups(t.color);
+        else await enterOtherView(t.product, t.color);
+        const used = designs[t.product] ? Object.keys(designs[t.product].print) : [];
         previews.push({
-          color: colors[i],
+          product: t.product,
+          color: t.color,
           front: exportPreview('front'),
-          back: sidesUsed.includes('back') ? exportPreview('back') : ''
+          back: used.includes('back') ? exportPreview('back') : ''
         });
+        await leaveOtherView();
       }
       await applyMockups(previewBefore);
       displayPlayer();
-      const rows = orderRows().map(r => ({ color: r.color, size: r.size, qty: r.qty }));
-      const elements = measureElements().map(e => ({ side: e.side, x_mm: e.x_mm, y_mm: e.y_mm, w_mm: e.w_mm, h_mm: e.h_mm }));
+      const rows = orderRows().map(r => ({ product: r.product, color: r.color, size: r.size, qty: r.qty }));
       el.busyText.textContent = 'Kosárba tétel…';
       const body = {
-        product_id: parseInt(state.option.pid, 10),
-        type: state.option.type,
         mode: state.mode,
-        elements,
+        master: masterKey(),
+        products: products.map(key => { const o = optionByKey(key); return { key, pid: parseInt(o.pid, 10), type: o.type }; }),
+        designs,
         layers: { front: compactLayers(sides.front.canvas.toJSON(OBJECT_PROPS)), back: compactLayers(sides.back.canvas.toJSON(OBJECT_PROPS)) },
-        print,
         previews,
         rows,
-        roster: roster ? state.roster.map((pl, i) => ({ name: pl.name.trim(), number: pl.number, size: pl.size, color: pl.color, personal: personal[i] || {} })) : []
+        roster: roster ? state.roster.map((pl, i) => ({ product: pl.product || masterKey(), name: pl.name.trim(), number: pl.number, size: pl.size, color: pl.color, personal: personal[i] || {} })) : []
       };
       let res;
       try {
@@ -1665,8 +1981,10 @@
       el.busyText.textContent = 'Kész, irány a kosár…';
       window.location.href = json.redirect || D.cartUrl || '/';
     } catch (err) {
+      await leaveOtherView().catch(() => { });
       await applyMockups(previewBefore).catch(() => { });
       displayPlayer();
+      renderViewMarks();
       el.busy.hidden = true;
       state.busy = false;
       refresh();
@@ -1690,7 +2008,8 @@
   }
 
   function saveDraft() {
-    if (!state.option) return;
+    // Másik termék előnézetében az elemek át vannak méretezve: a fő termék elrendezését mentjük, ha visszaváltott.
+    if (!state.option || masterSnap) { saveDraftSoon(); return; }
     const data = {
       t: Date.now(), mode: state.mode, option: state.option.key, color: state.color, rows: state.rows,
       qtyMode: state.qtyMode, roster: state.roster, activePlayer: state.activePlayer,
@@ -1731,11 +2050,13 @@
     const opt = productOptions().find(o => o.key === data.option);
     if (!opt) { clearDraft(); return false; }
     state.mode = data.mode === 'sport' ? 'sport' : 'work';
-    state.rows = Array.isArray(data.rows) ? data.rows.filter(r => r && r.color).map(r => ({ color: r.color, qty: r.qty || {} })) : [];
+    const known = key => !!optionByKey(key);
+    state.rows = Array.isArray(data.rows) ? data.rows.filter(r => r && r.color).map(r => ({ product: known(r.product) ? r.product : opt.key, color: r.color, qty: r.qty || {} })) : [];
     state.color = data.color || '';
     state.logo = data.logo || null;
     state.roster = Array.isArray(data.roster) ? data.roster.filter(pl => pl && typeof pl === 'object').map(pl => ({
-      name: String(pl.name || ''), number: String(pl.number || ''), size: String(pl.size || ''), color: String(pl.color || '')
+      name: String(pl.name || ''), number: String(pl.number || ''), size: String(pl.size || ''), color: String(pl.color || ''),
+      product: known(pl.product) ? pl.product : opt.key
     })) : [];
     state.qtyMode = data.qtyMode === 'roster' && state.roster.length ? 'roster' : 'grid';
     state.activePlayer = state.qtyMode === 'roster' ? Math.min(Math.max(0, parseInt(data.activePlayer, 10) || 0), state.roster.length - 1) : -1;
@@ -1791,6 +2112,7 @@
   });
   app.querySelectorAll('.nbt-sides [data-side]').forEach(btn => btn.addEventListener('click', () => setSide(btn.dataset.side)));
   el.addPlayer.addEventListener('click', addPlayer);
+  el.viewBack.addEventListener('click', () => ensureMasterView());
 
   FONTS.forEach(f => {
     const o = document.createElement('option');
@@ -1817,5 +2139,5 @@
   const initialMode = new URLSearchParams(window.location.search).get('mode');
   if (!draft && (initialMode === 'work' || initialMode === 'sport')) startMode(initialMode);
 
-  window.NBTeamDesigner = { state, sides, computeQuote };
+  window.NBTeamDesigner = { state, sides, computeQuote, ensureMasterView, viewIdle: () => viewQueue };
 })();
