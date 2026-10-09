@@ -204,6 +204,18 @@
 @keyframes nbt-spin { to { transform: rotate(360deg); } }
 .nbt-toast { position: fixed; left: 50%; bottom: 92px; z-index: 1001; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: var(--nbt-ink); color: #fff; font-weight: 600; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
 
+/* A téma gombstílusai (fókusz, lenyomás) ne színezzék át a tervező gombjait. */
+.nbt .nbt-btn:focus, .nbt .nbt-btn:active { background: var(--nbt-card); color: var(--nbt-ink); border-color: var(--nbt-line); box-shadow: none; }
+.nbt .nbt-btn--primary:focus, .nbt .nbt-btn--primary:active { background: var(--nbt-accent); color: var(--nbt-accent-ink); border-color: var(--nbt-accent); }
+.nbt .nbt-chip:focus, .nbt .nbt-chip:active { background: #f3f7ff; color: var(--nbt-ink); border-color: var(--nbt-accent); box-shadow: none; }
+.nbt .nbt-type:focus, .nbt .nbt-type:active, .nbt .nbt-mode-card:focus, .nbt .nbt-mode-card:active { background: var(--nbt-card); color: var(--nbt-ink); }
+.nbt .nbt-add-color__btn:focus, .nbt .nbt-add-color__btn:active { background: #f3f7ff; color: var(--nbt-ink); }
+.nbt .nbt-swatch:focus, .nbt .nbt-swatch:active { background-color: var(--swatch); }
+.nbt .nbt-sides button:focus, .nbt .nbt-sides button:active { background: transparent; color: var(--nbt-muted); box-shadow: none; }
+.nbt .nbt-sides button[aria-selected="true"] { background: var(--nbt-card); color: var(--nbt-ink); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.nbt .nbt-link:focus, .nbt .nbt-link:active, .nbt .nbt-row__color:focus, .nbt .nbt-row__color:active { background: none; color: var(--nbt-ink); }
+.nbt .nbt-row__remove:focus, .nbt .nbt-row__remove:active, .nbt .nbt-player__remove:focus, .nbt .nbt-player__remove:active { background: var(--nbt-card); color: var(--nbt-muted); }
+
 @media (min-width: 720px) {
   .nbt-mode { padding: 40px 16px; }
   .nbt-mode__grid { grid-template-columns: 1fr 1fr; }

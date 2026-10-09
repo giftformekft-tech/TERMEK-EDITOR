@@ -507,7 +507,7 @@
     const ghost = !!player && value === '';
     const text = value || obj.nbPlaceholder || (obj.nbBind === 'number' ? '10' : 'NÉV');
     const centerX = obj.left + obj.getScaledWidth() / 2;
-    obj.set({ text, visible: true, opacity: ghost ? 0.35 : 1, nbGhost: ghost });
+    obj.set({ text, visible: true, opacity: ghost ? 0.5 : 1, nbGhost: ghost });
     obj.initDimensions();
     fitTextWidth(obj);
     obj.set('left', centerX - obj.getScaledWidth() / 2);

@@ -41,7 +41,7 @@ const logoPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAQMAAACXljzdAAAABlB
 // A sablont valódi PHP rendereli (tests/render-team-page.php), adminban beállított választószövegekkel és képpel.
 const teamSettings = { intro: { title: 'Mit tervezel ma?', lead: 'Első sor\nMásodik sor', cards: { sport: { title: 'Focimez', text: 'Név és szám a háton.' } }, banner: { image_id: 12, title: 'Így készül a csapatmez', text: 'Tervezd meg, add meg a neveket.' } } };
 const template = require('child_process').execFileSync(process.env.PHP_BINARY || 'php', ['tests/render-team-page.php', JSON.stringify(teamSettings)], { encoding: 'utf8' });
-const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#fff;font-family:Arial}</style><link rel="stylesheet" href="/assets/css/team-designer.css">' + template + '<script>window.NB_TEAM=' + JSON.stringify(fixture) + '</script><script src="/tmp/ui-qa/fabric.min.js"></script><script src="/assets/js/team-designer.js"></script></html>';
+const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#fff;font-family:Arial}/* téma-szerű gombstílus */button{background:#e5e5e5;padding:18px 30px}button:hover,button:focus,button:active{background:#0a5aa8;color:#10233f}</style><link rel="stylesheet" href="/assets/css/team-designer.css">' + template + '<script>window.NB_TEAM=' + JSON.stringify(fixture) + '</script><script src="/tmp/ui-qa/fabric.min.js"></script><script src="/assets/js/team-designer.js"></script></html>';
 
 const objectsOn = (page, side) => page.evaluate(s => window.NBTeamDesigner.sides[s].canvas.getObjects().filter(o => !o.nbArea).map(o => o.type), side);
 const text = async (page, id) => (await page.locator('#' + id).textContent()).replace(/\s/g, '');
@@ -116,6 +116,9 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
 
     // Ugyanarra a sablonra újra kattintva nem kerül még egy logó ugyanoda.
     await page.click('.nbt-chip:has-text("Bal mell logó")');
+    const chipColours = await page.evaluate(() => { const b = document.querySelector('.nbt-chip'); b.focus(); const st = getComputedStyle(b); return [st.backgroundColor, st.color]; });
+    assert.notEqual(chipColours[0], 'rgb(10, 90, 168)', 'the theme focus colour does not repaint the preset button');
+    assert.notEqual(chipColours[1], 'rgb(16, 35, 63)');
     assert.deepEqual(await objectsOn(page, 'front'), ['image'], 'clicking the preset again selects the placed logo');
     // Húzás után a logó elenged: az egér további mozgatása nem viszi magával.
     const logoAt = () => page.evaluate(() => { const o = window.NBTeamDesigner.sides.front.canvas.getObjects().find(x => x.type === 'image'); return [Math.round(o.left), Math.round(o.top)]; });
@@ -252,7 +255,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await players.nth(1).locator('.nbt-player__number').press('Enter');
     assert.equal(await players.count(), 3, 'Enter in the number field adds the next player');
     assert.deepEqual(await backTexts(), ['', ''], 'a blank shirt shows no name or number');
-    assert.deepEqual(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().filter(o => o.type === 'text').map(o => [o.text, o.opacity])), [['NÉV', 0.35], ['10', 0.35]], 'the sample text stays visible, faded, so it can still be clicked');
+    assert.deepEqual(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().filter(o => o.type === 'text').map(o => [o.text, o.opacity])), [['NÉV', 0.5], ['10', 0.5]], 'the sample text stays visible, faded, so it can still be clicked');
     // „Kaci 5” egyben: Enterre szétválik névre és számra, és jön a következő sor.
     await players.nth(2).locator('.nbt-player__name').fill('Kaci 5');
     await players.nth(2).locator('.nbt-player__name').press('Enter');
@@ -344,7 +347,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.click('#nbt-add-player');
     await page.click('.nbt-chip:has-text("Jobb mell felirat")');
     const ghost = await page.evaluate(() => { const o = window.NBTeamDesigner.sides.front.canvas.getObjects().find(x => x.nbBind === 'name'); return { text: o.text, opacity: o.opacity }; });
-    assert.deepEqual(ghost, { text: 'Név / beosztás', opacity: 0.35 });
+    assert.deepEqual(ghost, { text: 'Név / beosztás', opacity: 0.5 });
     await page.evaluate(() => window.NBTeamDesigner.sides.front.canvas.discardActiveObject().requestRenderAll());
     const ghostAt = await page.evaluate(() => { const c = window.NBTeamDesigner.sides.front.canvas; const o = c.getObjects().find(x => x.nbBind === 'name'); const p = o.getCenterPoint(); const r = c.upperCanvasEl.getBoundingClientRect(); const k = r.width / c.getWidth(); return { x: r.left + p.x * k, y: r.top + p.y * k }; });
     await page.mouse.click(ghostAt.x, ghostAt.y);
