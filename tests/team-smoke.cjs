@@ -13,7 +13,9 @@ const fixture = {
   rest: 'http://nb.test/api/', nonce: 'test', cartUrl: 'http://nb.test/cart-confirmed',
   catalog: { 1: {
     id: 1, title: 'Prémium póló', types: ['Póló'], colors: ['Zöld', 'Kék', 'Fekete'], colors_by_type: { 'póló': ['Zöld', 'Kék', 'Fekete'] },
-    sizes: ['S', 'M', 'L', 'XL'], price_value: 5000, prices: { 'póló|kék|XL': 5500 },
+    sizes: ['S', 'M', 'L', 'XL'],
+    bands_by_type: { 'póló': [{ min: 1, max: 10, single: 6990, double: 1500 }, { min: 11, max: 0, single: 5990, double: 1200 }] },
+    size_fees_by_type: { 'póló': { XL: 500 } },
     map: { 'póló|zöld': { front: 'm1', back: 'm2' }, 'póló|kék': { front: 'm1', back: 'm2' }, 'póló|fekete': { front: 'm1', back: 'm2' } }
   } },
   mockups: {
@@ -21,14 +23,8 @@ const fixture = {
     m2: { id: 'm2', image_url: 'http://nb.test/shirt.svg', canvas_w: 480, canvas_h: 640, areas: [Object.assign({}, area, { id: 'area_back', role: 'back' })] }
   },
   colorMeta: {}, fonts: [],
-  discounts: [{ min_qty: 10, max_qty: 0, percent: 10 }],
   team: {
-    gap_mm: 20, min_qty: 1, max_colors: 8, personal_fee: 500, max_players: 100,
-    tiers: [
-      { id: 'small', label: 'Kis nyomat', max_w_mm: 100, max_h_mm: 100, price: 990 },
-      { id: 'medium', label: 'Közepes nyomat', max_w_mm: 210, max_h_mm: 297, price: 1490 },
-      { id: 'large', label: 'Nagy nyomat', max_w_mm: 297, max_h_mm: 420, price: 1990 }
-    ],
+    min_qty: 1, max_colors: 8, personal_fee: 500, max_players: 100,
     presets: [
       { id: 'work-left-chest', mode: 'work', side: 'front', kind: 'logo', label: 'Bal mell logó', cx: 0.7, top: 0.08, w_mm: 90, h_mm: 90, text: '' },
       { id: 'work-back-top', mode: 'work', side: 'back', kind: 'text', label: 'Hát felső cégnév', cx: 0.5, top: 0.05, w_mm: 260, h_mm: 50, text: 'CÉGNÉV' },
@@ -113,29 +109,36 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     });
     assert.deepEqual(logoBox, { w: 90, h: 90, x: 210 }, 'logo sized 9x9 cm at the left chest');
     assert.match(await page.locator('#nbt-size-readout').textContent(), /9,0 × 9,0 cm/);
+    assert.equal(await text(page, 'nbt-sum-sides'), 'Egyoldalas(elöl)');
+    assert.equal(await text(page, 'nbt-sum-unit'), '6990Ft', 'one-sided price of the first band');
+    assert.deepEqual(await page.locator('.nbt-bands__table tbody tr').evaluateAll(rows => rows.map(r => r.innerText.replace(/\s+/g, ' ').trim())), ['1–10 db 6 990 Ft 8 490 Ft', '11 db-tól 5 990 Ft 7 190 Ft'], 'price bands with one- and two-sided unit prices');
 
     // Hátoldali felirat a sablonnal: átvált hátra, szerkeszthető a mezőben.
     await page.click('.nbt-chip:has-text("Hát felső cégnév")');
     assert.equal(await page.locator('.nbt-sides [data-side="back"]').getAttribute('aria-selected'), 'true');
     assert.deepEqual(await objectsOn(page, 'back'), ['text']);
-    await page.fill('#nbt-text-input', 'GIFT FOR ME KFT');
-    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().find(o => o.type === 'text').text), 'GIFT FOR ME KFT');
+    // Munkaruhán a felirat legfeljebb 3 soros.
+    assert.equal(await page.locator('#nbt-text-label').textContent(), 'Felirat (legfeljebb 3 sor)');
+    await page.fill('#nbt-text-input', 'GIFT FOR ME KFT\nBudapest\nÜzem 2\nnegyedik sor');
+    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().find(o => o.type === 'text').text), 'GIFT FOR ME KFT\nBudapest\nÜzem 2');
+    assert.equal(await page.locator('#nbt-bind-number').isHidden(), true, 'workwear texts offer the name only');
+    const backText = await page.evaluate(() => { const o = window.NBTeamDesigner.sides.back.canvas.getObjects().find(x => x.type === 'text'); return Math.round(o.getScaledWidth() * 300 / 190); });
+    assert.ok(backText <= 261, 'longer text keeps its 26 cm preset width: ' + backText);
 
-    // Két nyomat: kicsi elöl (990), közepes vagy nagy hátul.
+    // Elöl és hátul is van minta: kétoldalas, a sáv kétoldalas ára.
     await page.waitForTimeout(200);
-    const quote = await page.evaluate(() => { const q = window.NBTeamDesigner.computeQuote(); return { n: q.placements.length, unit: q.unitPrint, labels: q.placements.map(p => p.side + ':' + p.label) }; });
-    assert.equal(quote.n, 2, 'one print per side');
-    assert.ok(quote.labels.includes('front:Kis nyomat'), quote.labels.join());
-    assert.ok(quote.labels.includes('back:Közepes nyomat'), 'longer text keeps its 26 cm preset width: ' + quote.labels.join());
-    assert.equal(quote.unit, 990 + 1490);
-    assert.equal(await text(page, 'nbt-sum-print'), '+' + quote.unit + 'Ft(2nyomat)', 'print summary');
+    assert.equal(await text(page, 'nbt-sum-sides'), 'Kétoldalas(elölésháton)'.replace('háton', 'hátul'));
+    assert.equal(await text(page, 'nbt-sum-unit'), '8490Ft');
+    assert.equal(await page.locator('.nbt-bands__table th.is-active').textContent(), 'Kétoldalas');
 
     // Mennyiségek: zöld S5 M5, kék L3 XL2 = 15 db, 10% kedvezmény.
     const firstRow = page.locator('.nbt-row').first();
     assert.match(await firstRow.textContent(), /Zöld/);
     await firstRow.locator('input').nth(0).fill('5');
     await firstRow.locator('input').nth(1).fill('5');
-    await page.selectOption('#nbt-add-color', 'Kék');
+    await page.waitForTimeout(250);
+    assert.equal(await page.locator('#nbt-next-tier').textContent(), 'Még 1 db, és a darabár 7 190 Ft.', 'next band hint');
+    await page.click('.nbt-add-color__btn[data-color="Kék"]');
     await page.waitForFunction(() => document.querySelectorAll('.nbt-row').length === 2);
     const secondRow = page.locator('.nbt-row').nth(1);
     await secondRow.locator('input').nth(2).fill('3');
@@ -143,14 +146,18 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.waitForTimeout(250);
     assert.equal(await text(page, 'nbt-sum-qty'), '15db');
     assert.equal(await page.locator('#nbt-error').isHidden(), true, 'check message disappears once everything is set');
-    assert.equal(await page.locator('#nbt-sum-discount-row').isVisible(), true);
-    const expected = Math.round(((5000 + quote.unit) * 13 + (5500 + quote.unit) * 2) * 0.9);
-    assert.equal(await text(page, 'nbt-sum-total'), expected + 'Ft', 'total = (product + print) x qty, minus 10%');
+    assert.equal(await text(page, 'nbt-sum-unit'), '7190Ft', 'second band, two-sided');
+    assert.equal(await text(page, 'nbt-sum-size'), '+1000Ft(2db)', 'XL size surcharge on the two XL shirts');
+    assert.equal(await text(page, 'nbt-sum-total'), (15 * 7190 + 2 * 500) + 'Ft', 'total = band unit price x quantity + size surcharge');
+    assert.match(await page.locator('.nbt-row').first().locator('.nbt-size').nth(3).textContent(), /XL\+500 Ft/, 'the surcharge is shown at the size');
+    assert.equal(await page.locator('.nbt-add-color__btn .nbt-dot').count(), 1, 'remaining colours are offered with a swatch');
+    assert.equal(await page.locator('.nbt-bands__table tr.is-current td').first().textContent(), '11 db-tól');
+    assert.equal(await page.locator('#nbt-next-tier').isHidden(), true);
     assert.equal(await page.locator('.nbt-row.is-preview').textContent().then(t => /Kék/.test(t)), true, 'new colour is previewed');
 
     // Kontrasztfigyelmeztetés fekete feliratnál fekete ruhán.
     await page.evaluate(() => { const o = window.NBTeamDesigner.sides.back.canvas.getObjects().find(x => x.type === 'text'); o.set('fill', '#111111'); });
-    await page.selectOption('#nbt-add-color', 'Fekete');
+    await page.click('.nbt-add-color__btn[data-color="Fekete"]');
     await page.locator('.nbt-row').nth(2).locator('input').nth(0).fill('1');
     await page.waitForTimeout(250);
     assert.match(await page.locator('#nbt-warnings').textContent(), /fekete színű ruhán alig fog látszani/);
@@ -233,9 +240,16 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.waitForTimeout(250);
     assert.equal(await text(page, 'nbt-sum-qty'), '3db');
     assert.match(await page.locator('#nbt-roster-sum').textContent(), /3 mez · Zöld – M: 1, L: 2/);
-    const rq = await page.evaluate(() => { const q = window.NBTeamDesigner.computeQuote(); return { personal: q.personalQty, unit: q.unitPrint, total: Math.round(q.total) }; });
+    const rq = await page.evaluate(() => { const q = window.NBTeamDesigner.computeQuote(); return { personal: q.personalQty, unit: q.unit, total: Math.round(q.total) }; });
     assert.equal(rq.personal, 2, 'the name/number surcharge applies to the two named shirts');
-    assert.equal(rq.total, (5000 + rq.unit) * 3 + 500 * 2);
+    assert.equal(rq.unit, 6990, 'back only: one-sided');
+    assert.equal(rq.total, 6990 * 3 + 500 * 2);
+    assert.equal(await text(page, 'nbt-sum-personal'), '+500Ft×2db');
+    // Csapatmezen a felirat egysoros.
+    await page.click('#nbt-add-text');
+    await page.fill('#nbt-text-input', 'FC\nGIFT');
+    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getActiveObject().text), 'FC GIFT');
+    await page.click('#nbt-delete');
     // Darabszám fülre váltva összesítve látszik, és figyelmeztet, hogy a névhez névsor kell.
     await page.click('.nbt-tabs [data-qty="grid"]');
     assert.deepEqual(await page.locator('.nbt-row').first().locator('input').evaluateAll(els => els.map(e => e.value)), ['', '1', '2', '']);
@@ -292,6 +306,17 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
       await page.screenshot({ path: 'tmp/ui-qa/team-mobile-' + width + '.png', fullPage: true });
       await page.click('.nbt-tabs [data-qty="roster"]');
     }
+
+    // Munkaruha névsor: csak név, szám nélkül.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.click('#nbt-change-mode');
+    await page.click('.nbt-mode-card[data-mode="work"]');
+    await page.click('.nbt-tabs [data-qty="roster"]');
+    assert.equal(await page.locator('#nbt-tab-roster-sub').textContent(), 'név darabonként');
+    assert.equal(await page.locator('.nbt-player__number').count(), 0, 'no number field for workwear');
+    assert.equal(await page.locator('#nbt-add-player').textContent(), '+ Név');
+    assert.equal(await page.locator('.nbt-player__name').first().getAttribute('placeholder'), '1. név');
+    await page.screenshot({ path: 'tmp/ui-qa/team-work-roster.png' });
 
     assert.deepEqual(errors, [], 'no page errors');
     console.log('team designer smoke test passed');

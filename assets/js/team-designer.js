@@ -9,10 +9,7 @@
   const catalog = D.catalog || {};
   const mockups = D.mockups || {};
   const team = D.team || {};
-  const tiers = Array.isArray(team.tiers) ? team.tiers : [];
   const presets = Array.isArray(team.presets) ? team.presets : [];
-  const discounts = Array.isArray(D.discounts) ? D.discounts : [];
-  const gapMm = Number(team.gap_mm) >= 0 ? Number(team.gap_mm) : 20;
   const minQty = Math.max(1, parseInt(team.min_qty, 10) || 1);
   const maxColors = Math.max(1, parseInt(team.max_colors, 10) || 8);
   const personalFee = Math.max(0, Number(team.personal_fee) || 0);
@@ -33,8 +30,9 @@
     selection: $('nbt-selection'), textInput: $('nbt-text-input'), font: $('nbt-font'), textColor: $('nbt-text-color'),
     sizeReadout: $('nbt-size-readout'), center: $('nbt-center'), duplicate: $('nbt-duplicate'), del: $('nbt-delete'),
     warnings: $('nbt-warnings'),
-    sumQty: $('nbt-sum-qty'), sumPrint: $('nbt-sum-print'), sumDiscountRow: $('nbt-sum-discount-row'), sumDiscount: $('nbt-sum-discount'),
-    sumUnit: $('nbt-sum-unit'), sumTotal: $('nbt-sum-total'), placements: $('nbt-placements'), nextTier: $('nbt-next-tier'),
+    sumQty: $('nbt-sum-qty'), sumSides: $('nbt-sum-sides'), sumPersonalRow: $('nbt-sum-personal-row'), sumPersonal: $('nbt-sum-personal'),
+    sumUnit: $('nbt-sum-unit'), sumTotal: $('nbt-sum-total'), bands: $('nbt-bands'), nextTier: $('nbt-next-tier'),
+    tabRosterSub: $('nbt-tab-roster-sub'), sumSizeRow: $('nbt-sum-size-row'), sumSize: $('nbt-sum-size'), rosterHelp: $('nbt-roster-help'), textLabel: $('nbt-text-label'), bindNumber: $('nbt-bind-number'),
     error: $('nbt-error'), cart: $('nbt-cart'), barQty: $('nbt-bar-qty'), barTotal: $('nbt-bar-total'), barCart: $('nbt-bar-cart'),
     busy: $('nbt-busy'), busyText: $('nbt-busy-text'), toast: $('nbt-toast'),
     draft: $('nbt-draft'), draftRestore: $('nbt-draft-restore'), draftDiscard: $('nbt-draft-discard'),
@@ -175,28 +173,20 @@
     return sizes.length ? sizes : [''];
   }
 
-  function basePrice(product, typeKey, color, size) {
-    const key = typeKey + '|' + norm(color) + '|' + size;
-    if (product.prices && Number.isFinite(Number(product.prices[key]))) return Number(product.prices[key]);
-    return Number.isFinite(Number(product.price_value)) && product.price_value !== null ? Number(product.price_value) : NaN;
+  /** A termék (típus) ársávjai: [{min, max, single, double}] – a darabár a nyomtatással együtt. */
+  function bandsFor() {
+    const p = product();
+    const map = p && p.bands_by_type && typeof p.bands_by_type === 'object' ? p.bands_by_type : null;
+    if (!map) return [];
+    const list = map[state.option.typeKey] || map[''] || Object.values(map)[0];
+    return Array.isArray(list) ? list.map(b => ({ min: parseInt(b.min, 10) || 1, max: parseInt(b.max, 10) || 0, single: Number(b.single) || 0, double: Number(b.double) || 0 })) : [];
   }
 
-  function discountFor(qty) {
-    let best = 0;
-    discounts.forEach(t => {
-      const min = parseInt(t.min_qty, 10) || 0;
-      const max = parseInt(t.max_qty, 10) || 0;
-      const pct = Number(t.percent) || 0;
-      if (min > 0 && qty >= min && (!max || qty <= max) && pct > best) best = pct;
-    });
-    return best;
-  }
-
-  function nextDiscount(qty, current) {
-    return discounts
-      .map(t => ({ min: parseInt(t.min_qty, 10) || 0, pct: Number(t.percent) || 0 }))
-      .filter(t => t.min > qty && t.pct > current)
-      .sort((a, b) => a.min - b.min)[0] || null;
+  /** A darabszámhoz tartozó sáv: a legnagyobb, amelynek alsó határát elérte (ugyanígy számol a szerver). */
+  function bandIndexFor(bands, qty) {
+    let found = bands.length ? 0 : -1;
+    bands.forEach((b, i) => { if (qty >= b.min) found = i; });
+    return found;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -242,6 +232,9 @@
   const activeCanvas = () => sides[state.side].canvas;
   const designObjects = side => sides[side].canvas.getObjects().filter(o => !o.nbArea);
   const product = () => state.option ? catalog[state.option.pid] : null;
+  const isSport = () => state.mode === 'sport';
+  // Munkaruhán a felirat legfeljebb 3 soros lehet (pl. cégnév), csapatmezen egysoros.
+  const maxTextLines = () => isSport() ? 1 : 3;
 
   /* ---------------------------------------------------------------------- */
   /* Vászon                                                                  */
@@ -369,38 +362,6 @@
   }
 
   /** Ugyanaz a csoportosítás, mint a szerveren: közeli elemek = egy nyomat. */
-  function pricePlacements(elements) {
-    const placements = [];
-    ['front', 'back'].forEach(side => {
-      const items = elements.filter(e => e.side === side);
-      const parent = items.map((_, i) => i);
-      const find = i => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
-      for (let i = 0; i < items.length; i++) {
-        for (let j = i + 1; j < items.length; j++) {
-          const a = items[i], b = items[j];
-          if (a.x_mm <= b.x_mm + b.w_mm + gapMm && b.x_mm <= a.x_mm + a.w_mm + gapMm &&
-            a.y_mm <= b.y_mm + b.h_mm + gapMm && b.y_mm <= a.y_mm + a.h_mm + gapMm) {
-            const ri = find(i), rj = find(j);
-            if (ri !== rj) parent[rj] = ri;
-          }
-        }
-      }
-      const boxes = {};
-      items.forEach((e, i) => {
-        const r = find(i);
-        const box = boxes[r] || (boxes[r] = { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity });
-        box.x1 = Math.min(box.x1, e.x_mm); box.y1 = Math.min(box.y1, e.y_mm);
-        box.x2 = Math.max(box.x2, e.x_mm + e.w_mm); box.y2 = Math.max(box.y2, e.y_mm + e.h_mm);
-      });
-      Object.keys(boxes).forEach(r => {
-        const w = boxes[r].x2 - boxes[r].x1, h = boxes[r].y2 - boxes[r].y1;
-        const tier = tiers.find(t => (w <= t.max_w_mm + 1 && h <= t.max_h_mm + 1) || (w <= t.max_h_mm + 1 && h <= t.max_w_mm + 1)) || tiers[tiers.length - 1];
-        if (tier) placements.push({ side, w_mm: w, h_mm: h, label: tier.label, price: Number(tier.price) || 0 });
-      });
-    });
-    return placements;
-  }
-
   function presetBox(preset, side) {
     const area = sides[side].area;
     const kx = area.w / area.widthMm, ky = area.h / area.heightMm;
@@ -596,7 +557,10 @@
     el.selection.querySelectorAll('.nbt-selection__text').forEach(row => { row.hidden = !isText; });
     if (isText) {
       const bound = !!obj.nbBind;
+      el.bindNumber.hidden = !isSport() && obj.nbBind !== 'number';
       el.bind.value = obj.nbBind || '';
+      el.textInput.rows = maxTextLines();
+      el.textLabel.textContent = isSport() ? 'Felirat' : 'Felirat (legfeljebb 3 sor)';
       el.textField.hidden = bound;
       el.bindHint.hidden = !bound;
       if (bound) el.bindCurrent.textContent = obj.visible === false ? '(üres)' : (obj.text || '');
@@ -617,6 +581,11 @@
     if (!obj || obj.type !== 'text') return;
     const oldWidth = obj.getScaledWidth();
     const centerX = obj.left + oldWidth / 2;
+    const lines = el.textInput.value.split('\n');
+    if (lines.length > maxTextLines()) {
+      // Egysoros feliratnál a sortörés szóköz lesz, többsorosnál a 3. sor után levágjuk.
+      el.textInput.value = maxTextLines() > 1 ? lines.slice(0, maxTextLines()).join('\n') : lines.join(' ').replace(/\s+/g, ' ');
+    }
     obj.set('text', el.textInput.value || ' ');
     obj.initDimensions();
     fitTextWidth(obj);
@@ -641,6 +610,10 @@
     }
     displayPlayer();
     refresh();
+  });
+
+  el.textInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && el.textInput.value.split('\n').length >= maxTextLines()) e.preventDefault();
   });
 
   el.font.addEventListener('change', () => {
@@ -970,14 +943,17 @@
       row.className = 'nbt-player' + (index === state.activePlayer ? ' is-active' : '');
       row.addEventListener('focusin', () => setActivePlayer(index));
       row.addEventListener('click', () => setActivePlayer(index));
+      const sport = isSport();
+      if (!sport) row.classList.add('no-number');
+      if (colors.length < 2) row.classList.add('no-color');
       const name = document.createElement('input');
-      name.type = 'text'; name.className = 'nbt-player__name'; name.placeholder = (index + 1) + '. játékos neve'; name.maxLength = 30;
+      name.type = 'text'; name.className = 'nbt-player__name'; name.placeholder = (index + 1) + (sport ? '. játékos neve' : '. név'); name.maxLength = 30;
       name.autocomplete = 'off'; name.value = player.name;
-      name.setAttribute('aria-label', (index + 1) + '. játékos neve');
+      name.setAttribute('aria-label', (index + 1) + '. név');
       const number = document.createElement('input');
       number.type = 'text'; number.className = 'nbt-player__number'; number.placeholder = 'Szám'; number.maxLength = 3;
       number.inputMode = 'numeric'; number.autocomplete = 'off'; number.value = player.number;
-      number.setAttribute('aria-label', (index + 1) + '. játékos száma');
+      number.setAttribute('aria-label', (index + 1) + '. szám');
       name.addEventListener('input', () => { player.name = name.value; if (index === state.activePlayer) displayPlayer(); scheduleRefresh(); });
       number.addEventListener('input', () => {
         const clean = number.value.replace(/\D/g, '').slice(0, 3);
@@ -988,6 +964,7 @@
       });
       // „Kaci 5” egyben is beírható: a végén álló számot a szám mezőbe tesszük.
       const splitNameNumber = () => {
+        if (!sport) return false;
         const m = name.value.match(/^(.*\S)\s+#?(\d{1,3})$/);
         if (!m || player.number) return false;
         name.value = player.name = m[1];
@@ -1000,7 +977,7 @@
       name.addEventListener('keydown', e => {
         if (e.key !== 'Enter') return;
         e.preventDefault();
-        if (!splitNameNumber()) { number.focus(); return; }
+        if (!splitNameNumber() && sport) { number.focus(); return; }
         const next = el.roster.querySelectorAll('.nbt-player__name')[index + 1];
         if (next) next.focus(); else addPlayer();
       });
@@ -1011,12 +988,12 @@
         if (next) next.focus(); else addPlayer();
       });
       row.appendChild(name);
-      row.appendChild(number);
+      if (sport) row.appendChild(number);
       if (sizes.length > 1 || sizes[0] !== '') {
         const size = document.createElement('select');
         size.className = 'nbt-player__size';
-        size.setAttribute('aria-label', (index + 1) + '. játékos mérete');
-        sizes.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; size.appendChild(o); });
+        size.setAttribute('aria-label', (index + 1) + '. méret');
+        sizes.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = sizeLabel(s); size.appendChild(o); });
         size.value = player.size;
         size.addEventListener('change', () => { player.size = size.value; scheduleRefresh(); });
         row.appendChild(size);
@@ -1024,7 +1001,7 @@
       if (colors.length > 1) {
         const color = document.createElement('select');
         color.className = 'nbt-player__color';
-        color.setAttribute('aria-label', (index + 1) + '. játékos mezének színe');
+        color.setAttribute('aria-label', (index + 1) + '. szín');
         colors.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = colorLabel(c); color.appendChild(o); });
         color.value = colors.find(c => norm(c) === norm(player.color)) || colors[0];
         color.addEventListener('change', () => {
@@ -1038,7 +1015,7 @@
       remove.type = 'button';
       remove.className = 'nbt-player__remove';
       remove.textContent = '×';
-      remove.setAttribute('aria-label', (index + 1) + '. játékos törlése');
+      remove.setAttribute('aria-label', (index + 1) + '. sor törlése');
       remove.disabled = state.roster.length < 2;
       remove.addEventListener('click', e => {
         e.stopPropagation();
@@ -1052,11 +1029,12 @@
       el.roster.appendChild(row);
     });
     el.addPlayer.hidden = state.roster.length >= maxPlayers;
+    el.addPlayer.textContent = isSport() ? '+ Játékos' : '+ Név';
     renderRosterSum();
   }
 
   function addPlayer() {
-    if (state.roster.length >= maxPlayers) { toast('Egy rendelésben legfeljebb ' + maxPlayers + ' játékos lehet.'); return; }
+    if (state.roster.length >= maxPlayers) { toast('Egy rendelésben legfeljebb ' + maxPlayers + ' sor lehet a névsorban.'); return; }
     state.roster.push(newPlayer());
     state.activePlayer = state.roster.length - 1;
     renderRoster();
@@ -1076,7 +1054,7 @@
       }).filter(Boolean).join(', ');
       return colorLabel(color) + ' – ' + sizes;
     });
-    el.rosterSum.textContent = state.roster.length + ' mez' + (parts.length ? ' · ' + parts.join(' · ') : '');
+    el.rosterSum.textContent = state.roster.length + (isSport() ? ' mez' : ' db') + (parts.length ? ' · ' + parts.join(' · ') : '');
   }
 
   function renderRows() {
@@ -1126,6 +1104,11 @@
         label.className = 'nbt-size';
         const span = document.createElement('span');
         span.textContent = size || 'Darab';
+        if (sizeFee(size) > 0) {
+          const fee = document.createElement('small');
+          fee.textContent = '+' + formatPrice(sizeFee(size));
+          span.appendChild(fee);
+        }
         const input = document.createElement('input');
         input.type = 'number'; input.min = '0'; input.max = '9999'; input.step = '1'; input.inputMode = 'numeric';
         input.placeholder = '0';
@@ -1149,28 +1132,47 @@
     renderAddColor();
   }
 
+  /** Újabb szín: gombok színmintával és névvel (a legördülő lista nem tud mintát mutatni). */
   function renderAddColor() {
     const p = product();
     const used = state.rows.map(r => norm(r.color));
     const free = p ? colorsFor(p, state.option.typeKey).filter(c => !used.includes(norm(c))) : [];
     el.addColorWrap.hidden = !free.length || state.rows.length >= maxColors;
-    el.addColor.innerHTML = '<option value="">Válassz színt…</option>';
-    free.forEach(c => {
-      const o = document.createElement('option');
-      o.value = c; o.textContent = colorLabel(c);
-      el.addColor.appendChild(o);
+    el.addColor.innerHTML = '';
+    free.forEach(color => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'nbt-add-color__btn';
+      btn.dataset.color = color;
+      const dot = document.createElement('span');
+      dot.className = 'nbt-dot';
+      const hex = colorHex(color);
+      if (hex) dot.style.setProperty('--swatch', hex);
+      btn.appendChild(dot);
+      btn.appendChild(document.createTextNode(colorLabel(color)));
+      btn.addEventListener('click', () => addColorRow(color));
+      el.addColor.appendChild(btn);
     });
   }
 
-  el.addColor.addEventListener('change', () => {
-    const color = el.addColor.value;
-    if (!color) return;
+  function addColorRow(color) {
     state.rows.push({ color, qty: {} });
     previewColor(color, false).then(() => {
       const inputs = el.rows.querySelectorAll('.nbt-row:last-child input');
       if (inputs[0] && window.matchMedia('(pointer: fine)').matches) inputs[0].focus();
     });
-  });
+  }
+
+  /* Méretfelár ------------------------------------------------------------ */
+
+  function sizeFee(size) {
+    const p = product();
+    const map = p && p.size_fees_by_type && typeof p.size_fees_by_type === 'object' ? p.size_fees_by_type : null;
+    const fees = map ? (map[state.option.typeKey] || map[''] || {}) : {};
+    return Math.max(0, Number(fees[String(size).trim()]) || 0);
+  }
+
+  const sizeLabel = size => size ? (sizeFee(size) > 0 ? size + ' +' + formatPrice(sizeFee(size)) : size) : 'Darab';
 
   /* ---------------------------------------------------------------------- */
   /* Összesítő, figyelmeztetések                                             */
@@ -1183,53 +1185,88 @@
   }
 
   function computeQuote() {
-    const p = product();
     const elements = measureElements();
-    const placements = pricePlacements(elements);
-    const unitPrint = placements.reduce((s, x) => s + x.price, 0);
+    const sides = Array.from(new Set(elements.map(e => e.side)));
+    const double = sides.length > 1;
     const qty = totalQty();
-    let subtotal = 0;
-    let priceKnown = true;
-    let personalQty = 0;
-    if (p) {
-      orderRows().forEach(row => {
-        const base = basePrice(p, state.option.typeKey, row.color, row.size);
-        if (!Number.isFinite(base)) priceKnown = false;
-        if (row.personal) personalQty += row.qty;
-        subtotal += ((Number.isFinite(base) ? base : 0) + unitPrint + (row.personal ? personalFee : 0)) * row.qty;
+    const bands = state.option ? bandsFor() : [];
+    const bandIndex = bandIndexFor(bands, Math.max(1, qty));
+    const band = bands[bandIndex] || null;
+    const unit = band ? band.single + (double ? band.double : 0) : NaN;
+    const rows = state.option ? orderRows() : [];
+    const personalQty = rows.reduce((sum, r) => sum + (r.personal ? r.qty : 0), 0);
+    const sizeFees = rows.reduce((sum, r) => sum + sizeFee(r.size) * r.qty, 0);
+    const sizeFeeQty = rows.reduce((sum, r) => sum + (sizeFee(r.size) > 0 ? r.qty : 0), 0);
+    const total = Number.isFinite(unit) ? unit * qty + personalFee * personalQty + sizeFees : NaN;
+    return { elements, sides, double, qty, bands, bandIndex, unit, personalQty, sizeFees, sizeFeeQty, total };
+  }
+
+  function bandLabel(b) {
+    return b.max ? (b.min === b.max ? b.min + ' db' : b.min + '–' + b.max + ' db') : b.min + ' db-tól';
+  }
+
+  /** Ársávok táblázata: egyoldalas és kétoldalas darabár, kiemelve az aktuális sáv és nyomtatás. */
+  function renderBands(q) {
+    el.bands.innerHTML = '';
+    if (!q.bands.length) return;
+    const table = document.createElement('table');
+    table.className = 'nbt-bands__table';
+    const head = document.createElement('tr');
+    [['Mennyiség', ''], ['Egyoldalas', q.double ? '' : 'is-active'], ['Kétoldalas', q.double ? 'is-active' : '']].forEach(([label, cls]) => {
+      const th = document.createElement('th');
+      th.textContent = label;
+      if (cls) th.className = cls;
+      head.appendChild(th);
+    });
+    const thead = document.createElement('thead');
+    thead.appendChild(head);
+    table.appendChild(thead);
+    const body = document.createElement('tbody');
+    q.bands.forEach((b, i) => {
+      const tr = document.createElement('tr');
+      if (i === q.bandIndex && q.qty > 0) tr.className = 'is-current';
+      [[bandLabel(b), ''], [formatPrice(b.single), q.double ? '' : 'is-active'], [formatPrice(b.single + b.double), q.double ? 'is-active' : '']].forEach(([text, cls]) => {
+        const td = document.createElement('td');
+        td.textContent = text;
+        if (cls) td.className = cls;
+        tr.appendChild(td);
       });
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    const caption = document.createElement('p');
+    caption.className = 'nbt-bands__title';
+    caption.textContent = 'Darabárak a nyomtatással együtt';
+    el.bands.appendChild(caption);
+    el.bands.appendChild(table);
+    const fees = sizesFor(product()).filter(size => sizeFee(size) > 0).map(size => size + ': +' + formatPrice(sizeFee(size)));
+    if (fees.length) {
+      const note = document.createElement('p');
+      note.className = 'nbt-bands__note';
+      note.textContent = 'Méretfelár darabonként – ' + fees.join(', ');
+      el.bands.appendChild(note);
     }
-    const pct = discountFor(qty);
-    const discount = subtotal * pct / 100;
-    return { elements, placements, unitPrint, qty, personalQty, subtotal, pct, discount, total: subtotal - discount, priceKnown };
   }
 
   function refresh() {
     const q = computeQuote();
     el.sumQty.textContent = q.qty + ' db';
     el.barQty.textContent = q.qty + ' db';
-    el.sumPrint.textContent = q.placements.length ? '+' + formatPrice(q.unitPrint) + ' (' + q.placements.length + ' nyomat)' : '–';
-    el.placements.innerHTML = '';
-    q.placements.forEach(pl => {
-      const li = document.createElement('li');
-      li.textContent = (pl.side === 'front' ? 'Elöl' : 'Hátul') + ': ' + pl.label + ', ' + cm(pl.w_mm) + '×' + cm(pl.h_mm) + ' cm – ' + formatPrice(pl.price);
-      el.placements.appendChild(li);
-    });
-    if (personalFee > 0 && q.personalQty > 0) {
-      const li = document.createElement('li');
-      li.textContent = 'Név/szám felár: ' + formatPrice(personalFee) + ' × ' + q.personalQty + ' db';
-      el.placements.appendChild(li);
-    }
+    el.sumSides.textContent = !q.sides.length ? '–' : (q.double ? 'Kétoldalas (elöl és hátul)' : 'Egyoldalas (' + (q.sides[0] === 'back' ? 'hátul' : 'elöl') + ')');
+    el.sumPersonalRow.hidden = !(personalFee > 0 && q.personalQty > 0);
+    el.sumPersonalRow.querySelector('dt').textContent = isSport() ? 'Név/szám felár' : 'Név felár';
+    el.sumPersonal.textContent = '+' + formatPrice(personalFee) + ' × ' + q.personalQty + ' db';
+    el.sumSizeRow.hidden = !(q.sizeFees > 0);
+    el.sumSize.textContent = '+' + formatPrice(q.sizeFees) + ' (' + q.sizeFeeQty + ' db)';
     renderRosterSum();
-    el.sumDiscountRow.hidden = !(q.pct > 0 && q.qty > 0);
-    el.sumDiscount.textContent = '−' + String(q.pct).replace('.', ',') + '% (−' + formatPrice(q.discount) + ')';
-    const hasTotal = q.qty > 0 && q.priceKnown;
-    el.sumUnit.textContent = hasTotal ? formatPrice(q.total / q.qty) : '–';
-    el.sumTotal.textContent = hasTotal ? formatPrice(q.total) : (q.qty > 0 ? 'A kosárban látható' : '–');
+    renderBands(q);
+    const hasTotal = q.qty > 0 && Number.isFinite(q.total);
+    el.sumUnit.textContent = Number.isFinite(q.unit) ? formatPrice(q.unit) : '–';
+    el.sumTotal.textContent = hasTotal ? formatPrice(q.total) : '–';
     el.barTotal.textContent = hasTotal ? formatPrice(q.total) : '–';
-    const next = nextDiscount(q.qty, q.pct);
+    const next = q.bands[q.bandIndex + 1];
     el.nextTier.hidden = !next || q.qty === 0;
-    if (next) el.nextTier.textContent = 'Még ' + (next.min - q.qty) + ' db, és ' + String(next.pct).replace('.', ',') + '% kedvezmény jár.';
+    if (next) el.nextTier.textContent = 'Még ' + (next.min - q.qty) + ' db, és a darabár ' + formatPrice(next.single + (q.double ? next.double : 0)) + '.';
     const ready = readiness(q);
     if (errorIsCheck && !el.error.hidden) showError(ready, true);
     [el.cart, el.barCart].forEach(b => { b.dataset.ready = ready ? 'false' : 'true'; b.disabled = state.busy; });
@@ -1241,9 +1278,9 @@
 
   function readiness(q) {
     if (!state.option) return 'Válassz terméket.';
-    if (!q.placements.length) return 'Tegyél a termékre logót vagy feliratot.';
-    if (state.qtyMode === 'roster' && !state.roster.length) return 'Adj hozzá legalább egy játékost.';
-    if (state.qtyMode === 'grid' && hasBound()) return 'A tervben játékosonként változó név vagy szám van: töltsd ki a Névsort, vagy a feliratnál válaszd a „Mindenkinél ugyanaz” tartalmat.';
+    if (!q.elements.length) return 'Tegyél a termékre logót vagy feliratot.';
+    if (state.qtyMode === 'roster' && !state.roster.length) return isSport() ? 'Adj hozzá legalább egy játékost.' : 'Adj hozzá legalább egy nevet.';
+    if (state.qtyMode === 'grid' && hasBound()) return 'A tervben darabonként változó ' + (isSport() ? 'név vagy szám' : 'név') + ' van: töltsd ki a Névsort, vagy a feliratnál válaszd a „Mindenkinél ugyanaz” tartalmat.';
     if (q.qty < 1) return 'Add meg, melyik méretből hány darab kell.';
     if (q.qty < minQty) return 'A minimum rendelés ' + minQty + ' db.';
     return '';
@@ -1255,7 +1292,9 @@
     if (!colors.length && state.color) colors.push(state.color);
     if (state.qtyMode === 'roster') {
       if (!hasBound() && state.roster.some(isPersonal)) {
-        warnings.push('A névsorban megadott nevek és számok nem kerülnek a mezre, mert a tervben nincs név- vagy számmező. Adj hozzá „Hát név” vagy „Hát szám” elhelyezést, vagy egy feliratnál válaszd a „Játékos neve” tartalmat.');
+        warnings.push(isSport()
+          ? 'A névsorban megadott nevek és számok nem kerülnek a mezre, mert a tervben nincs név- vagy számmező. Adj hozzá „Hát név” vagy „Hát szám” elhelyezést, vagy egy feliratnál válaszd a „Név a névsorból” tartalmat.'
+          : 'A névsorban megadott nevek nem kerülnek a ruhára, mert a tervben nincs névmező. Adj hozzá „Jobb mell felirat” elhelyezést, vagy egy feliratnál válaszd a „Név a névsorból” tartalmat.');
       }
       const byNumber = {};
       state.roster.forEach(pl => {
@@ -1394,7 +1433,7 @@
       ['front', 'back'].forEach(side => designObjects(side).forEach(o => { if (o.type === 'text') families.add(o.fontFamily); }));
       await Promise.all(Array.from(families).map(ensureFont));
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      const sidesUsed = Array.from(new Set(quote.placements.map(p => p.side)));
+      const sidesUsed = quote.sides;
       const print = {};
       const roster = state.qtyMode === 'roster';
       displayPlayer(null);
@@ -1552,8 +1591,13 @@
     el.mode.hidden = true;
     el.work.hidden = false;
     app.dataset.view = 'work';
-    el.modeLabel.textContent = state.mode === 'sport' ? 'Csapatmez' : 'Munkaruha';
+    el.modeLabel.textContent = isSport() ? 'Csapatmez' : 'Munkaruha';
+    el.tabRosterSub.textContent = isSport() ? 'név és szám mezenként' : 'név darabonként';
+    el.rosterHelp.textContent = isSport()
+      ? 'Mezenként egy sor: név és szám párban (a névmezőbe egyben is írhatod, pl. „Kaci 5”). A darabszámot a névsorból számoljuk; név vagy szám nélkül is felvehetsz mezt. Kattints egy játékosra, és a mezen az ő neve látszik.'
+      : 'Darabonként egy sor a névvel, mérettel és színnel. A darabszámot a névsorból számoljuk; név nélküli darabot is felvehetsz. Kattints egy névre, és a ruhán az látszik.';
     renderPresets();
+    if (state.option) renderQtyMode();
     requestAnimationFrame(fitCanvasCss);
   }
 

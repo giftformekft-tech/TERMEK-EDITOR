@@ -3,9 +3,9 @@ if ( ! defined('ABSPATH') ) exit;
 
 /**
  * Csapatruha-rendelés: egy kéréssel menti a tervet (a nyomdai fájlok egyszer,
- * az előnézet színenként), majd a szín × méret sorokat egy kedvezménycsoportként
- * kosárba teszi. A darabonkénti nyomtatási árat a szerver számolja az elemek
- * méretéből; a kliens által küldött árat nem használjuk.
+ * az előnézet színenként), majd a szín × méret sorokat egy csoportként kosárba teszi.
+ * A darabárat a szerver a beállított ársávokból számolja (a kosárban újra, a csoport
+ * teljes darabszáma alapján); a kliens által küldött árat nem használjuk.
  */
 
 function nb_team_order_rollback($paths, $design_ids, $cart_keys = []){
@@ -113,11 +113,11 @@ function nb_team_handle_order(WP_REST_Request $req){
     'back'  => nb_design_physical_area($settings, $first_ctx, 'back'),
   ];
   $elements = nb_team_sanitize_elements($req->get_param('elements'), $areas);
-  $pricing = nb_team_price_print($elements, $team);
-  if (empty($pricing['placements'])){
+  $layout = nb_team_print_layout($elements);
+  if (empty($layout['placements'])){
     return new WP_Error('empty_design', 'Tegyél a termékre legalább egy logót vagy feliratot', ['status'=>400]);
   }
-  $sides_used = array_unique(array_column($pricing['placements'], 'side'));
+  $sides_used = $layout['sides'];
 
   $layers_json = wp_json_encode($req->get_param('layers'));
   if ($layers_json === false || strlen($layers_json) > intval($limits['layers_bytes'])){
@@ -229,8 +229,8 @@ function nb_team_handle_order(WP_REST_Request $req){
         'nb_module'               => 'team',
         'nb_team_mode'            => $mode,
         'nb_team_group'           => $group_id,
-        'nb_team_unit_print'      => $pricing['unit_print'],
-        'nb_team_placements_json' => wp_json_encode($pricing['placements']),
+        'nb_team_double'          => $layout['double'] ? 1 : 0,
+        'nb_team_placements_json' => wp_json_encode($layout['placements']),
         'nb_team_roster_json'     => wp_json_encode($color_players),
         'nb_team_print_url'       => $front_print['url'],
         'nb_team_print_back_url'  => $back_print['url'],
@@ -275,18 +275,20 @@ function nb_team_handle_order(WP_REST_Request $req){
   $cart_keys = [];
   foreach ($rows as $row){
     $color_key = nb_normalize_color_key($row['color']);
-    $unit_print = $pricing['unit_print'] + ($row['personal'] ? floatval($team['personal_fee']) : 0);
     $result = nb_rest_cart_single_add($design_by_color[$color_key], [
       'size'     => $row['size'] !== '' ? ['value'=>$row['size'], 'label'=>$row['size']] : null,
       'quantity' => $row['qty'],
       'cart_item_data' => [
         'nb_team'                => 1,
         'nb_team_mode'           => $mode,
-        'nb_team_unit_print'     => $unit_print,
-        'nb_team_placements'     => $pricing['placements'],
+        'nb_team_pid'            => $product_id,
+        'nb_team_type'           => $type,
+        'nb_team_double'         => $layout['double'] ? 1 : 0,
+        'nb_team_personal'       => $row['personal'] ? 1 : 0,
+        'nb_team_size'           => $row['size'],
+        'nb_team_group'          => $group_id,
+        'nb_team_placements'     => $layout['placements'],
         'nb_team_players'        => array_map($public_player, $row['players']),
-        'nb_bulk_group_id'       => $group_id,
-        'nb_bulk_group_quantity' => $total_qty,
         // Csak hátoldali terv esetén ne kerüljön az előnézet a nyomdai fájl helyére.
         'print_url'              => $front_print['url'],
       ],
@@ -306,8 +308,8 @@ function nb_team_handle_order(WP_REST_Request $req){
     'ok'         => true,
     'redirect'   => wc_get_cart_url(),
     'quantity'   => $total_qty,
-    'unit_print' => $pricing['unit_print'],
-    'placements' => $pricing['placements'],
+    'double'     => $layout['double'],
+    'unit_price' => nb_team_unit_price(nb_team_price_bands($product_id, $type, $team, $settings), $total_qty, $layout['double'], false, $team),
   ];
 }
 

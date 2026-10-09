@@ -21,5 +21,6 @@ function get_option($key, $default = false){ return $key === 'nb_team_settings' 
 function wp_get_attachment_image_url($id){ return 'http://nb.test/card-'.intval($id).'.svg'; }
 function get_post_meta($id, $key){ return $key === '_wp_attachment_image_alt' ? 'Kép '.intval($id) : ''; }
 
+require __DIR__.'/../inc/helpers.php';
 require __DIR__.'/../inc/team-designer.php';
 include __DIR__.'/../templates/team-designer-page.php';

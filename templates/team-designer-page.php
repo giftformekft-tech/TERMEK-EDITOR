@@ -54,9 +54,9 @@ $nbt_icons = [
       </div>
       <div class="nbt-selection" id="nbt-selection" hidden>
         <div class="nbt-selection__row nbt-selection__text">
-          <label class="nbt-field nbt-field--grow"><span>Tartalom</span><select id="nbt-bind"><option value="">Mindenkinél ugyanaz</option><option value="name">Játékos neve (névsorból)</option><option value="number">Játékos száma (névsorból)</option></select></label>
-          <label class="nbt-field nbt-field--grow" id="nbt-text-field"><span>Felirat</span><input type="text" id="nbt-text-input" maxlength="60" autocomplete="off"></label>
-          <p class="nbt-bind-hint" id="nbt-bind-hint" hidden>A szöveg játékosonként a névsorból jön. Most ez látszik: <strong id="nbt-bind-current"></strong></p>
+          <label class="nbt-field nbt-field--grow"><span>Tartalom</span><select id="nbt-bind"><option value="">Mindenkinél ugyanaz</option><option value="name">Név a névsorból</option><option value="number" id="nbt-bind-number">Szám a névsorból</option></select></label>
+          <label class="nbt-field nbt-field--grow" id="nbt-text-field"><span id="nbt-text-label">Felirat</span><textarea id="nbt-text-input" rows="1" maxlength="120" autocomplete="off"></textarea></label>
+          <p class="nbt-bind-hint" id="nbt-bind-hint" hidden>A szöveg darabonként a névsorból jön. Most ez látszik: <strong id="nbt-bind-current"></strong></p>
         </div>
         <div class="nbt-selection__row nbt-selection__text">
           <label class="nbt-field nbt-field--grow"><span>Betűtípus</span><select id="nbt-font"></select></label>
@@ -96,14 +96,14 @@ $nbt_icons = [
         <h2 id="nbt-step3"><span class="nbt-step__num">3</span>Színek, méretek, darabszám</h2>
         <div class="nbt-tabs" role="tablist" aria-label="Mennyiség megadása">
           <button type="button" role="tab" data-qty="grid" aria-selected="true">Darabszám</button>
-          <button type="button" role="tab" data-qty="roster" aria-selected="false">Névsor <small>név és szám mezenként</small></button>
+          <button type="button" role="tab" data-qty="roster" aria-selected="false">Névsor <small id="nbt-tab-roster-sub">név és szám mezenként</small></button>
         </div>
         <div id="nbt-qty-grid">
           <div class="nbt-rows" id="nbt-rows"></div>
-          <label class="nbt-add-color" id="nbt-add-color-wrap"><span>+ Másik szín hozzáadása</span><select id="nbt-add-color"></select></label>
+          <div class="nbt-add-color" id="nbt-add-color-wrap"><span>+ Másik szín hozzáadása</span><div class="nbt-add-color__list" id="nbt-add-color"></div></div>
         </div>
         <div id="nbt-qty-roster" hidden>
-          <p class="nbt-help">Mezenként egy sor: név és szám párban (a névmezőbe egyben is írhatod, pl. „Kaci 5”). A darabszámot a névsorból számoljuk; név vagy szám nélkül is felvehetsz mezt. Kattints egy játékosra, és a mezen az ő neve látszik.</p>
+          <p class="nbt-help" id="nbt-roster-help"></p>
           <div class="nbt-roster" id="nbt-roster"></div>
           <button type="button" class="nbt-btn" id="nbt-add-player">+ Játékos</button>
           <p class="nbt-roster-sum" id="nbt-roster-sum"></p>
@@ -114,16 +114,17 @@ $nbt_icons = [
         <h2>Összesítő</h2>
         <dl class="nbt-summary__list">
           <div><dt>Darabszám</dt><dd id="nbt-sum-qty">0 db</dd></div>
-          <div><dt>Nyomat / db</dt><dd id="nbt-sum-print">–</dd></div>
-          <div id="nbt-sum-discount-row" hidden><dt>Mennyiségi kedvezmény</dt><dd id="nbt-sum-discount"></dd></div>
+          <div><dt>Nyomtatás</dt><dd id="nbt-sum-sides">–</dd></div>
           <div><dt>Darabár</dt><dd id="nbt-sum-unit">–</dd></div>
+          <div id="nbt-sum-size-row" hidden><dt>Méretfelár</dt><dd id="nbt-sum-size"></dd></div>
+          <div id="nbt-sum-personal-row" hidden><dt>Név felár</dt><dd id="nbt-sum-personal"></dd></div>
           <div class="nbt-summary__total"><dt>Összesen</dt><dd id="nbt-sum-total">–</dd></div>
         </dl>
-        <ul class="nbt-placements" id="nbt-placements"></ul>
+        <div class="nbt-bands" id="nbt-bands"></div>
         <p class="nbt-next-tier" id="nbt-next-tier" hidden></p>
         <p class="nbt-error" id="nbt-error" role="alert" hidden></p>
         <button type="button" class="nbt-btn nbt-btn--primary nbt-btn--block" id="nbt-cart">Kosárba</button>
-        <p class="nbt-note">A végleges árat a kosár mutatja. A kedvezmény a teljes darabárra (termék + nyomat) jár, az összes szín és méret darabszáma összeadódik.</p>
+        <p class="nbt-note">A darabár a nyomtatással együtt értendő. Kétoldalas, ha elöl és hátul is van minta. Az ársávot a teljes darabszám adja: az összes szín és méret összeadódik.</p>
       </section>
     </div>
 
