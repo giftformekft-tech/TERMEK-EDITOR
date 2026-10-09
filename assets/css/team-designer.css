@@ -131,7 +131,7 @@
 .nbt-row__total { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--nbt-muted); }
 .nbt-row__remove { width: 36px; height: 36px; min-height: 0; padding: 0; border: 1px solid var(--nbt-line); border-radius: 50%; background: var(--nbt-card); color: var(--nbt-muted); font-size: 20px; line-height: 1; }
 .nbt-row__remove:hover { color: var(--nbt-danger); border-color: var(--nbt-danger); background: var(--nbt-card); }
-.nbt-sizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px; }
+.nbt-sizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
 .nbt-size { display: grid; gap: 3px; text-align: center; font-size: 13px; font-weight: 700; color: var(--nbt-muted); }
 .nbt-size input { width: 100%; min-height: 44px; padding: 6px 4px; border: 1px solid var(--nbt-line); border-radius: 10px; background: #fff; color: var(--nbt-ink); text-align: center; font-size: 17px; font-weight: 700; -moz-appearance: textfield; }
 .nbt-size input::-webkit-outer-spin-button, .nbt-size input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

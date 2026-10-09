@@ -34,8 +34,8 @@ function nb_team_default_presets(){
     ['id'=>'work-back-top',    'mode'=>'work',  'side'=>'back',  'kind'=>'text',   'label'=>'Hát felső cégnév',      'cx'=>0.50, 'top'=>0.05, 'w_mm'=>260, 'h_mm'=>50,  'text'=>'CÉGNÉV'],
     ['id'=>'work-back-logo',   'mode'=>'work',  'side'=>'back',  'kind'=>'logo',   'label'=>'Hát nagy logó',         'cx'=>0.50, 'top'=>0.20, 'w_mm'=>280, 'h_mm'=>280, 'text'=>''],
     ['id'=>'sport-crest',      'mode'=>'sport', 'side'=>'front', 'kind'=>'logo',   'label'=>'Bal mell címer',        'cx'=>0.70, 'top'=>0.08, 'w_mm'=>80,  'h_mm'=>80,  'text'=>''],
-    ['id'=>'sport-front-name', 'mode'=>'sport', 'side'=>'front', 'kind'=>'text',   'label'=>'Mell közép csapatnév',  'cx'=>0.50, 'top'=>0.10, 'w_mm'=>260, 'h_mm'=>70,  'text'=>'CSAPATNÉV'],
-    ['id'=>'sport-front-num',  'mode'=>'sport', 'side'=>'front', 'kind'=>'number', 'label'=>'Mell szám',             'cx'=>0.50, 'top'=>0.32, 'w_mm'=>120, 'h_mm'=>100, 'text'=>'10'],
+    ['id'=>'sport-front-name', 'mode'=>'sport', 'side'=>'front', 'kind'=>'text',   'label'=>'Mell közép csapatnév',  'cx'=>0.50, 'top'=>0.34, 'w_mm'=>260, 'h_mm'=>60,  'text'=>'CSAPATNÉV'],
+    ['id'=>'sport-front-num',  'mode'=>'sport', 'side'=>'front', 'kind'=>'number', 'label'=>'Jobb mell szám',        'cx'=>0.30, 'top'=>0.08, 'w_mm'=>70,  'h_mm'=>90,  'text'=>'10'],
     ['id'=>'sport-back-name',  'mode'=>'sport', 'side'=>'back',  'kind'=>'text',   'label'=>'Hát név',               'cx'=>0.50, 'top'=>0.05, 'w_mm'=>280, 'h_mm'=>70,  'text'=>'NÉV'],
     ['id'=>'sport-back-num',   'mode'=>'sport', 'side'=>'back',  'kind'=>'number', 'label'=>'Hát szám',              'cx'=>0.50, 'top'=>0.22, 'w_mm'=>220, 'h_mm'=>250, 'text'=>'10'],
   ];
