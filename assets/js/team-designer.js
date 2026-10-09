@@ -15,7 +15,7 @@
   const personalFee = Math.max(0, Number(team.personal_fee) || 0);
   const maxPlayers = Math.max(1, parseInt(team.max_players, 10) || 100);
   // Az elemek saját tulajdonságai, amelyeket mentéskor és másoláskor is meg kell tartani.
-  const OBJECT_PROPS = ['nbKind', 'nbMaxW', 'nbBaseScale', 'nbBind', 'nbPlaceholder'];
+  const OBJECT_PROPS = ['nbKind', 'nbMaxW', 'nbBaseScale', 'nbBind', 'nbPlaceholder', 'nbPreset'];
   const DRAFT_KEY = 'nb_team_draft_v1';
   const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
   const PRINT_MAX_BYTES = 24 * 1024 * 1024;
@@ -212,17 +212,19 @@
   ['front', 'back'].forEach(side => {
     const canvas = new fabric.Canvas('nbt-canvas-' + side, { preserveObjectStacking: true, selection: false, backgroundColor: '#ffffff' });
     sides[side] = { canvas, area: null, areaRect: null, token: null, wrap: app.querySelector('.nbt-canvas[data-side="' + side + '"]') };
-    canvas.on('object:moving', e => keepInside(e.target, side));
-    canvas.on('object:scaling', e => keepInside(e.target, side));
-    canvas.on('object:modified', e => {
+    // A vászon eseményeiben futó saját kód hibája nem akaszthatja meg a húzást
+    // (különben a kijelölt elem az egérhez ragad); a frissítés a húzás lezárása után fut.
+    const safe = fn => e => { try { fn(e); } catch (err) { if (window.console) console.error(err); } };
+    canvas.on('object:moving', safe(e => keepInside(e.target, side)));
+    canvas.on('object:scaling', safe(e => keepInside(e.target, side)));
+    canvas.on('object:modified', safe(e => {
       const o = e.target;
       if (o && o.type === 'text' && o.nbMaxW) o.set({ nbBaseScale: o.scaleX, nbMaxW: o.getScaledWidth() });
-      syncSelection();
-      refresh();
-    });
-    canvas.on('selection:created', syncSelection);
-    canvas.on('selection:updated', syncSelection);
-    canvas.on('selection:cleared', syncSelection);
+      setTimeout(() => { syncSelection(); refresh(); }, 0);
+    }));
+    canvas.on('selection:created', safe(syncSelection));
+    canvas.on('selection:updated', safe(syncSelection));
+    canvas.on('selection:cleared', safe(syncSelection));
   });
 
   fabric.Object.prototype.set({
@@ -453,6 +455,14 @@
   async function applyPreset(preset) {
     if (!state.option) { toast('Előbb válassz terméket.'); return; }
     await setSide(preset.side);
+    // Ugyanarra a helyre nem rakunk le még egyet: a már elhelyezett elemet jelöljük ki.
+    const existing = designObjects(preset.side).find(o => o.nbPreset === preset.id);
+    if (existing) {
+      sides[preset.side].canvas.setActiveObject(existing).requestRenderAll();
+      syncSelection();
+      if (isText(existing) && !existing.nbBind) focusTextInput();
+      return;
+    }
     const box = presetBox(preset, preset.side);
     let obj;
     if (preset.kind === 'logo') {
@@ -466,7 +476,8 @@
       obj = addText(preset.text || (preset.kind === 'number' ? '10' : 'FELIRAT'), box, preset.side, preset.kind, preset.bind);
     }
     if (!obj) return;
-    if (obj.nbBind) syncQtyMode();
+    obj.set({ nbPreset: preset.id });
+    if (obj.nbBind) { syncQtyMode(); displayPlayer(); }
     sides[preset.side].canvas.setActiveObject(obj);
     sides[preset.side].canvas.requestRenderAll();
     syncSelection();
@@ -486,12 +497,17 @@
   /** Kerül-e a játékos adatából valami a mezre (van hozzá kötött felirat és kitöltött adat). */
   const playerHasPrint = player => ['front', 'back'].some(side => boundObjects(side).some(o => playerValue(player, o.nbBind) !== ''));
 
-  /** A kötött felirat a játékos adatát mutatja; játékos nélkül a mintaszöveget. Üres adatnál a felirat nem kerül a mezre. */
+  /**
+   * A kötött felirat a játékos adatát mutatja; játékos nélkül a mintaszöveget. Ha a
+   * kiválasztott sorban még nincs adat, a mintaszöveg halványan látszik (így kattintható),
+   * de nyomdai fájlba és előnézetbe nem kerül (nbGhost).
+   */
   function setBoundText(obj, player, side) {
     const value = player ? playerValue(player, obj.nbBind) : '';
-    const text = value || obj.nbPlaceholder || ' ';
+    const ghost = !!player && value === '';
+    const text = value || obj.nbPlaceholder || (obj.nbBind === 'number' ? '10' : 'NÉV');
     const centerX = obj.left + obj.getScaledWidth() / 2;
-    obj.set({ text, visible: !player || value !== '' });
+    obj.set({ text, visible: true, opacity: ghost ? 0.35 : 1, nbGhost: ghost });
     obj.initDimensions();
     fitTextWidth(obj);
     obj.set('left', centerX - obj.getScaledWidth() / 2);
@@ -560,7 +576,7 @@
       el.textLabel.textContent = isSport() ? 'Felirat' : 'Felirat (legfeljebb 3 sor)';
       el.textField.hidden = bound;
       el.bindHint.hidden = !bound;
-      if (bound) el.bindCurrent.textContent = obj.visible === false ? '(üres)' : (obj.text || '');
+      if (bound) el.bindCurrent.textContent = obj.nbGhost ? '(üres – ezen a darabon nem lesz felirat)' : (obj.text || '');
       if (document.activeElement !== el.textInput) el.textInput.value = bound ? (obj.nbPlaceholder || '') : (obj.text || '');
       el.font.value = obj.fontFamily;
       el.textColor.value = /^#[0-9a-f]{6}$/i.test(obj.fill) ? obj.fill : '#111111';
@@ -606,6 +622,14 @@
     }
     displayPlayer();
     refresh();
+  });
+
+  // Kiürített felirat ne tűnjön el a vászonról: visszakapja a mintaszöveget.
+  el.textInput.addEventListener('blur', () => {
+    const obj = selected();
+    if (!isText(obj) || obj.nbBind || el.textInput.value.trim()) return;
+    el.textInput.value = obj.nbPlaceholder || 'FELIRAT';
+    el.textInput.dispatchEvent(new Event('input'));
   });
 
   el.textInput.addEventListener('keydown', e => {
@@ -1452,7 +1476,7 @@
     const hidden = [];
     designObjects(side).forEach(o => {
       const bound = isText(o) && !!o.nbBind;
-      if (o.visible !== false && ((only === 'common' && bound) || (only === 'personal' && !bound))) {
+      if (o.visible !== false && (o.nbGhost || (only === 'common' && bound) || (only === 'personal' && !bound))) {
         o.visible = false;
         hidden.push(o);
       }
@@ -1480,10 +1504,13 @@
     const c = s.canvas;
     c.discardActiveObject();
     if (s.areaRect) s.areaRect.visible = false;
+    const ghosts = designObjects(side).filter(o => o.nbGhost && o.visible !== false);
+    ghosts.forEach(o => { o.visible = false; });
     c.renderAll();
     try {
       return c.toDataURL({ format: 'png', multiplier: Math.min(1, 520 / c.getWidth()), enableRetinaScaling: false });
     } finally {
+      ghosts.forEach(o => { o.visible = true; });
       if (s.areaRect) s.areaRect.visible = true;
       c.renderAll();
     }
@@ -1530,7 +1557,7 @@
           if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
           displayPlayer(player);
           ['front', 'back'].forEach(side => {
-            if (boundObjects(side).some(o => o.visible !== false)) personal[i][side] = exportPrint(side, 'personal');
+            if (boundObjects(side).some(o => o.visible !== false && !o.nbGhost)) personal[i][side] = exportPrint(side, 'personal');
           });
         }
       }
