@@ -503,10 +503,15 @@ function nb_team_public_data(){
 
 add_action('wp_enqueue_scripts', function(){
   if (!nb_team_is_page()) return;
-  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '2.3.0';
-  wp_enqueue_style('nb-team-designer', NB_DESIGNER_URL.'assets/css/team-designer.css', [], $version);
+  // A fájl módosítási ideje is a verzió része, így frissítés után nem marad régi szkript a gyorsítótárban.
+  $asset_version = function($relative){
+    $base = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '2.3.1';
+    $mtime = @filemtime(NB_DESIGNER_PATH.$relative);
+    return $mtime ? $base.'.'.$mtime : $base;
+  };
+  wp_enqueue_style('nb-team-designer', NB_DESIGNER_URL.'assets/css/team-designer.css', [], $asset_version('assets/css/team-designer.css'));
   wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
-  wp_enqueue_script('nb-team-designer', NB_DESIGNER_URL.'assets/js/team-designer.js', ['fabric'], $version, true);
+  wp_enqueue_script('nb-team-designer', NB_DESIGNER_URL.'assets/js/team-designer.js', ['fabric'], $asset_version('assets/js/team-designer.js'), true);
   wp_localize_script('nb-team-designer', 'NB_TEAM', nb_team_public_data());
 });
 
