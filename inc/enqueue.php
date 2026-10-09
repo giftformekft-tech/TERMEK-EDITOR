@@ -116,14 +116,24 @@ add_action('admin_enqueue_scripts', function($hook){
   $adminPages = ['nb-designer','nb-designer-products','nb-designer-types','nb-designer-mockups','nb-designer-pricing','nb-designer-appearance','nb-designer-templates','nb-designer-designs','nb-designer-tools','nb-template-uploader'];
   $currentPage = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
   if ( in_array($currentPage, $adminPages, true) ) {
-    wp_enqueue_media();
+    // A médiatár csak a mockup könyvtárban kell (kép kiválasztása).
+    if ($currentPage === 'nb-designer-mockups') wp_enqueue_media();
     $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.7.11';
-    wp_enqueue_style('nb-admin', NB_DESIGNER_URL.'admin/css/admin.css', [], $version);
-    wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
-    wp_enqueue_script('nb-admin', NB_DESIGNER_URL.'admin/js/admin.js', ['jquery','fabric','wp-i18n'], $version, true);
+    $assetVersion = function($relative) use ($version){
+      $file = NB_DESIGNER_PATH.$relative;
+      return file_exists($file) ? $version.'.'.filemtime($file) : $version;
+    };
+    wp_enqueue_style('nb-admin', NB_DESIGNER_URL.'admin/css/admin.css', [], $assetVersion('admin/css/admin.css'));
+    // A fabric.js csak a mockup szerkesztőhöz kell; a többi oldal enélkül gyorsabban betölt.
+    $adminDeps = ['jquery','wp-i18n'];
+    if ($currentPage === 'nb-designer-mockups'){
+      wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
+      $adminDeps[] = 'fabric';
+    }
+    wp_enqueue_script('nb-admin', NB_DESIGNER_URL.'admin/js/admin.js', $adminDeps, $assetVersion('admin/js/admin.js'), true);
     if ($currentPage === 'nb-designer-appearance'){
-      wp_enqueue_style('nb-admin-appearance', NB_DESIGNER_URL.'admin/css/appearance.css', ['nb-admin'], $version);
-      wp_enqueue_script('nb-admin-appearance', NB_DESIGNER_URL.'admin/js/appearance.js', ['jquery','nb-admin'], $version, true);
+      wp_enqueue_style('nb-admin-appearance', NB_DESIGNER_URL.'admin/css/appearance.css', ['nb-admin'], $assetVersion('admin/css/appearance.css'));
+      wp_enqueue_script('nb-admin-appearance', NB_DESIGNER_URL.'admin/js/appearance.js', ['jquery','nb-admin'], $assetVersion('admin/js/appearance.js'), true);
     }
     wp_set_script_translations('nb-admin', 'nb-designer', NB_DESIGNER_PATH.'languages');
     $stored = nb_get_settings([]);

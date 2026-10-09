@@ -105,9 +105,9 @@ add_action('admin_menu', function(){
   add_submenu_page('nb-designer', __('Árazás','nb-designer'), __('Árazás','nb-designer'), $capability, 'nb-designer-pricing', 'nb_admin_render');
   add_submenu_page('nb-designer', __('Megjelenés','nb-designer'), __('Megjelenés','nb-designer'), $capability, 'nb-designer-appearance', 'nb_admin_render');
   add_submenu_page('nb-designer', __('Sablonok','nb-designer'), __('Sablonok','nb-designer'), $capability, 'nb-designer-templates', 'nb_templates_gallery_render');
+  add_submenu_page('nb-designer', __('Sablon feltöltő','nb-designer'), __('Sablon feltöltő','nb-designer'), $capability, 'nb-template-uploader', 'nb_template_uploader_render');
   add_submenu_page('nb-designer', __('Mentett tervek','nb-designer'), __('Mentett tervek','nb-designer'), $capability, 'nb-designer-designs', 'nb_designs_gallery_render');
   add_submenu_page('nb-designer', __('Eszközök','nb-designer'), __('Eszközök','nb-designer'), $capability, 'nb-designer-tools', 'nb_admin_render');
-  add_submenu_page('nb-designer', __('Sablon feltöltő','nb-designer'), __('Sablon feltöltő','nb-designer'), $capability, 'nb-template-uploader', 'nb_template_uploader_render');
 });
 
 function nb_admin_render(){
@@ -576,7 +576,7 @@ function nb_template_uploader_render(){
   
   ?>
   <div class="wrap nb-admin nb-admin-v2">
-    <header class="nb-page-header"><div><p class="nb-eyebrow"><?php esc_html_e('Tartalomkönyvtár','nb-designer'); ?></p><h1><?php esc_html_e('Sablon feltöltő','nb-designer'); ?></h1></div><a class="button" href="<?php echo esc_url(admin_url('admin.php?page=nb-designer-templates')); ?>"><?php esc_html_e('Vissza a galériához','nb-designer'); ?></a></header>
+    <header class="nb-page-header"><div><p class="nb-eyebrow"><?php esc_html_e('Tartalomkönyvtár','nb-designer'); ?></p><h1><?php esc_html_e('Sablon feltöltő','nb-designer'); ?></h1></div><a class="button" href="<?php echo esc_url(admin_url('admin.php?page=nb-designer-templates')); ?>"><?php esc_html_e('Vissza a galériához','nb-designer'); ?></a></header><hr class="wp-header-end">
     
     <?php if ($message): ?>
       <div class="notice notice-success is-dismissible"><p><?php echo esc_html($message); ?></p></div>
@@ -587,38 +587,24 @@ function nb_template_uploader_render(){
     <?php endif; ?>
     
     <div class="nb-panel" style="max-width: 900px;">
-      <h2><?php esc_html_e('Képek feltöltése sablonként','nb-designer'); ?></h2>
+      <div class="nb-panel-heading"><div><h2><?php esc_html_e('Képek feltöltése sablonként','nb-designer'); ?></h2><p><?php esc_html_e('Minden kép külön sablon lesz, amit a vásárló a tervezőben betölthet.','nb-designer'); ?></p></div></div>
       <form method="post" enctype="multipart/form-data">
         <?php wp_nonce_field('nb_template_upload', 'nb_upload_nonce'); ?>
         
-        <table class="form-table">
-          <tr>
-            <th scope="row"><label for="template_images">Képek kiválasztása</label></th>
-            <td>
-              <label class="nb-upload-dropzone" for="template_images"><span class="dashicons dashicons-upload"></span><strong><?php esc_html_e('Húzd ide a képeket, vagy válassz fájlokat','nb-designer'); ?></strong><small><?php esc_html_e('JPG, PNG, GIF vagy WebP · több fájl is lehet','nb-designer'); ?></small></label>
-              <input class="screen-reader-text" type="file" name="template_images[]" id="template_images" multiple accept="image/*" required>
-              <div id="nb-upload-previews" class="nb-upload-previews" aria-live="polite"></div>
-            </td>
-          </tr>
-          <tr>
-            <th scope="row"><label for="template_category">Kategória</label></th>
-            <td>
-              <select name="template_category" id="template_category">
-                <option value="0">-- Nincs kategória --</option>
-                <?php foreach ($categories as $cat): ?>
-                  <option value="<?php echo esc_attr($cat->term_id); ?>">
-                    <?php echo esc_html($cat->name); ?> (<?php echo $cat->count; ?>)
-                  </option>
-                <?php endforeach; ?>
-              </select>
-              <p class="description">A feltöltött sablonok ebbe a kategóriába kerülnek.</p>
-            </td>
-          </tr>
-        </table>
-        
-        <p class="submit">
-          <button type="submit" name="nb_upload_templates" class="button button-primary">Sablonok létrehozása</button>
-        </p>
+        <label class="nb-upload-dropzone" for="template_images"><span class="dashicons dashicons-upload"></span><strong><?php esc_html_e('Húzd ide a képeket, vagy válassz fájlokat','nb-designer'); ?></strong><small><?php esc_html_e('JPG, PNG, GIF vagy WebP · több fájl is lehet','nb-designer'); ?></small></label>
+        <input class="screen-reader-text" type="file" name="template_images[]" id="template_images" multiple accept="image/*" required>
+        <div id="nb-upload-previews" class="nb-upload-previews" aria-live="polite"></div>
+        <div class="nb-create-actions">
+          <label class="nb-field-inline"><span><?php esc_html_e('Kategória','nb-designer'); ?></span>
+            <select name="template_category" id="template_category">
+              <option value="0"><?php esc_html_e('Nincs kategória','nb-designer'); ?></option>
+              <?php foreach ($categories as $cat): ?>
+                <option value="<?php echo esc_attr($cat->term_id); ?>"><?php echo esc_html($cat->name); ?> (<?php echo intval($cat->count); ?>)</option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <button type="submit" name="nb_upload_templates" class="button button-primary"><?php esc_html_e('Sablonok létrehozása','nb-designer'); ?></button>
+        </div>
       </form>
     </div>
     
