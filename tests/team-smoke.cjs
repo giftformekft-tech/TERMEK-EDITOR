@@ -113,6 +113,15 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     assert.equal(await text(page, 'nbt-sum-unit'), '6990Ft', 'one-sided price of the first band');
     assert.deepEqual(await page.locator('.nbt-bands__table tbody tr').evaluateAll(rows => rows.map(r => r.innerText.replace(/\s+/g, ' ').trim())), ['1–10 db 6 990 Ft 8 490 Ft', '11 db-tól 5 990 Ft 7 190 Ft'], 'price bands with one- and two-sided unit prices');
 
+    // Saját kép a logótól függetlenül: középre kerül, a logó marad.
+    const [imageChooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('#nbt-upload-image')]);
+    await imageChooser.setFiles({ name: 'foto.png', mimeType: 'image/png', buffer: logoPng });
+    await page.waitForFunction(() => window.NBTeamDesigner.sides.front.canvas.getObjects().filter(o => o.type === 'image').length === 2);
+    assert.equal(await page.locator('#nbt-logo-name').textContent(), 'logo.png', 'the own image does not replace the logo');
+    await page.click('#nbt-delete');
+    assert.deepEqual(await objectsOn(page, 'front'), ['image']);
+    assert.match(await page.locator('.nbt-colors-note').textContent(), /további színeket is hozzáadhatsz/);
+
     // Hátoldali felirat a sablonnal: átvált hátra, szerkeszthető a mezőben.
     await page.click('.nbt-chip:has-text("Hát felső cégnév")');
     assert.equal(await page.locator('.nbt-sides [data-side="back"]').getAttribute('aria-selected'), 'true');
@@ -205,7 +214,8 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.goto('http://nb.test/');
     await page.click('.nbt-mode-card[data-mode="sport"]');
     await page.click('.nbt-chip:has-text("Hát név")');
-    assert.equal(await page.locator('.nbt-tabs [data-qty="roster"]').getAttribute('aria-selected'), 'true', 'a name preset opens the roster when nothing is ordered yet');
+    assert.equal(await page.locator('#nbt-step-roster').isVisible(), true, 'a name in the design brings up the roster as step 3');
+    assert.equal(await page.locator('#nbt-step-qty-num').textContent(), '4', 'quantities move to step 4');
     await page.click('.nbt-chip:has-text("Hát szám")');
     const backTexts = () => page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().filter(o => o.type === 'text').map(o => o.visible === false ? '' : o.text));
     const players = page.locator('.nbt-player');
@@ -250,13 +260,10 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.fill('#nbt-text-input', 'FC\nGIFT');
     assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getActiveObject().text), 'FC GIFT');
     await page.click('#nbt-delete');
-    // Darabszám fülre váltva összesítve látszik, és figyelmeztet, hogy a névhez névsor kell.
-    await page.click('.nbt-tabs [data-qty="grid"]');
-    assert.deepEqual(await page.locator('.nbt-row').first().locator('input').evaluateAll(els => els.map(e => e.value)), ['', '1', '2', '']);
-    await page.click('#nbt-cart');
-    assert.match(await page.locator('#nbt-error').textContent(), /Névsort/);
-    await page.click('.nbt-tabs [data-qty="roster"]');
-    assert.equal(await players.count(), 3, 'the roster is kept');
+    // A 4. csempe a névsorból összesít színenként és méretenként.
+    await page.waitForTimeout(250);
+    assert.deepEqual(await page.locator('#nbt-qty-summary .nbt-size b').allTextContents(), ['0', '1', '2', '0']);
+    assert.equal(await page.locator('#nbt-qty-grid').isHidden(), true, 'no separate quantity inputs next to the roster');
     // Kosárba: közös nyomat név nélkül + játékosonként név/szám fájl.
     orderStatus = 400; orderBody = null;
     await page.click('#nbt-cart');
@@ -295,28 +302,33 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
       const nameBox = await page.locator('.nbt-player__name').first().boundingBox();
       assert.ok(nameBox.height >= 42 && nameBox.width >= 160, 'roster name field is usable on phones: ' + JSON.stringify(nameBox));
       await page.screenshot({ path: 'tmp/ui-qa/team-roster-mobile-' + width + '.png', fullPage: true });
-      await page.click('.nbt-tabs [data-qty="grid"]');
-      const inputBox = await page.locator('.nbt-size input').first().boundingBox();
-      assert.ok(inputBox.height >= 44, 'size input touch target');
+      const inputBox = await page.locator('#nbt-qty-summary .nbt-size b').first().boundingBox();
+      assert.ok(inputBox.height >= 44, 'size cells keep their size');
       const mobileTile = await page.locator('.nbt-type__img').first().boundingBox();
       assert.ok(mobileTile.height <= 56, 'compact product tile on phones');
       const canvasBox = await page.locator('#nbt-canvas-frame').boundingBox();
       assert.ok(canvasBox.width <= width - 32 + 1, 'canvas fits gutters');
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: 'tmp/ui-qa/team-mobile-' + width + '.png', fullPage: true });
-      await page.click('.nbt-tabs [data-qty="roster"]');
     }
 
     // Munkaruha névsor: csak név, szám nélkül.
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.click('#nbt-change-mode');
     await page.click('.nbt-mode-card[data-mode="work"]');
-    await page.click('.nbt-tabs [data-qty="roster"]');
-    assert.equal(await page.locator('#nbt-tab-roster-sub').textContent(), 'név darabonként');
+    assert.equal(await page.locator('#nbt-step-roster').isVisible(), true);
     assert.equal(await page.locator('.nbt-player__number').count(), 0, 'no number field for workwear');
     assert.equal(await page.locator('#nbt-add-player').textContent(), '+ Név');
     assert.equal(await page.locator('.nbt-player__name').first().getAttribute('placeholder'), '1. név');
     await page.screenshot({ path: 'tmp/ui-qa/team-work-roster.png' });
+    // Ha a névmezők kikerülnek a tervből, a névsor eltűnik, és a darabszámok szerkeszthetők maradnak.
+    await page.evaluate(() => { const c = window.NBTeamDesigner.sides.back.canvas; c.getObjects().filter(o => o.nbBind).forEach(o => c.remove(o)); });
+    await page.click('#nbt-add-text');
+    await page.click('#nbt-delete');
+    await page.waitForTimeout(250);
+    assert.equal(await page.locator('#nbt-step-roster').isHidden(), true);
+    assert.equal(await page.locator('#nbt-step-qty-num').textContent(), '3');
+    assert.deepEqual(await page.locator('.nbt-row').first().locator('input').evaluateAll(els => els.map(e => e.value)), ['', '1', '2', ''], 'roster counts carry over to the quantity grid');
 
     assert.deepEqual(errors, [], 'no page errors');
     console.log('team designer smoke test passed');

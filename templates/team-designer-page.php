@@ -78,34 +78,39 @@ $nbt_icons = [
         <div class="nbt-types" id="nbt-types"></div>
         <p class="nbt-label">Alapszín <small id="nbt-color-name"></small></p>
         <div class="nbt-swatches" id="nbt-colors"></div>
+        <p class="nbt-help nbt-colors-note">Ez az előnézet színe. Később, a darabszámnál további színeket is hozzáadhatsz a rendeléshez.</p>
       </section>
 
       <section class="nbt-step" aria-labelledby="nbt-step2">
         <h2 id="nbt-step2"><span class="nbt-step__num">2</span>Logó és feliratok</h2>
         <div class="nbt-logo">
           <button type="button" class="nbt-btn nbt-btn--primary" id="nbt-upload">Logó feltöltése</button>
+          <button type="button" class="nbt-btn" id="nbt-upload-image">Saját kép feltöltése</button>
           <input type="file" id="nbt-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>
-          <span class="nbt-logo__name" id="nbt-logo-name">PNG, JPG, SVG – átlátszó hátterű PNG a legjobb.</span>
+          <input type="file" id="nbt-image-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>
+          <span class="nbt-logo__name" id="nbt-logo-name">Logó: a sablonok ezt teszik a helyére. Saját kép: bármilyen kép vagy fotó, szabadon elhelyezve. PNG, JPG, SVG.</span>
         </div>
         <p class="nbt-help">Kattints egy elhelyezésre: a jó helyre és jó méretben tesszük, utána szabadon mozgathatod és méretezheted.</p>
         <div class="nbt-presets" id="nbt-presets"></div>
         <button type="button" class="nbt-btn" id="nbt-add-text">+ Saját felirat</button>
       </section>
 
-      <section class="nbt-step" aria-labelledby="nbt-step3">
-        <h2 id="nbt-step3"><span class="nbt-step__num">3</span>Színek, méretek, darabszám</h2>
-        <div class="nbt-tabs" role="tablist" aria-label="Mennyiség megadása">
-          <button type="button" role="tab" data-qty="grid" aria-selected="true">Darabszám</button>
-          <button type="button" role="tab" data-qty="roster" aria-selected="false">Névsor <small id="nbt-tab-roster-sub">név és szám mezenként</small></button>
-        </div>
+      <section class="nbt-step" id="nbt-step-roster" aria-labelledby="nbt-step-roster-title" hidden>
+        <h2 id="nbt-step-roster-title"><span class="nbt-step__num">3</span>Névsor</h2>
+        <p class="nbt-help" id="nbt-roster-help"></p>
+        <div class="nbt-roster" id="nbt-roster"></div>
+        <button type="button" class="nbt-btn" id="nbt-add-player">+ Játékos</button>
+      </section>
+
+      <section class="nbt-step" aria-labelledby="nbt-step-qty-title">
+        <h2 id="nbt-step-qty-title"><span class="nbt-step__num" id="nbt-step-qty-num">3</span>Színek, méretek, darabszám</h2>
         <div id="nbt-qty-grid">
           <div class="nbt-rows" id="nbt-rows"></div>
           <div class="nbt-add-color" id="nbt-add-color-wrap"><span>+ Másik szín hozzáadása</span><div class="nbt-add-color__list" id="nbt-add-color"></div></div>
         </div>
         <div id="nbt-qty-roster" hidden>
-          <p class="nbt-help" id="nbt-roster-help"></p>
-          <div class="nbt-roster" id="nbt-roster"></div>
-          <button type="button" class="nbt-btn" id="nbt-add-player">+ Játékos</button>
+          <p class="nbt-help">A darabszám a névsorból adódik: minden sor egy darab. Név nélküli darabot a névsorban üres sorral adhatsz hozzá.</p>
+          <div class="nbt-qty-summary" id="nbt-qty-summary"></div>
           <p class="nbt-roster-sum" id="nbt-roster-sum"></p>
         </div>
       </section>

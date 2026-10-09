@@ -25,6 +25,7 @@
     mode: $('nbt-mode'), work: $('nbt-work'), modeLabel: $('nbt-mode-label'),
     types: $('nbt-types'), colors: $('nbt-colors'), colorName: $('nbt-color-name'),
     presets: $('nbt-presets'), upload: $('nbt-upload'), file: $('nbt-file'), logoName: $('nbt-logo-name'),
+    uploadImage: $('nbt-upload-image'), imageFile: $('nbt-image-file'),
     addText: $('nbt-add-text'), rows: $('nbt-rows'), addColor: $('nbt-add-color'), addColorWrap: $('nbt-add-color-wrap'),
     frame: $('nbt-canvas-frame'), empty: $('nbt-canvas-empty'),
     selection: $('nbt-selection'), textInput: $('nbt-text-input'), font: $('nbt-font'), textColor: $('nbt-text-color'),
@@ -32,7 +33,7 @@
     warnings: $('nbt-warnings'),
     sumQty: $('nbt-sum-qty'), sumSides: $('nbt-sum-sides'), sumPersonalRow: $('nbt-sum-personal-row'), sumPersonal: $('nbt-sum-personal'),
     sumUnit: $('nbt-sum-unit'), sumTotal: $('nbt-sum-total'), bands: $('nbt-bands'), nextTier: $('nbt-next-tier'),
-    tabRosterSub: $('nbt-tab-roster-sub'), sumSizeRow: $('nbt-sum-size-row'), sumSize: $('nbt-sum-size'), rosterHelp: $('nbt-roster-help'), textLabel: $('nbt-text-label'), bindNumber: $('nbt-bind-number'),
+    stepRoster: $('nbt-step-roster'), stepQtyNum: $('nbt-step-qty-num'), qtySummary: $('nbt-qty-summary'), sumSizeRow: $('nbt-sum-size-row'), sumSize: $('nbt-sum-size'), rosterHelp: $('nbt-roster-help'), textLabel: $('nbt-text-label'), bindNumber: $('nbt-bind-number'),
     error: $('nbt-error'), cart: $('nbt-cart'), barQty: $('nbt-bar-qty'), barTotal: $('nbt-bar-total'), barCart: $('nbt-bar-cart'),
     busy: $('nbt-busy'), busyText: $('nbt-busy-text'), toast: $('nbt-toast'),
     draft: $('nbt-draft'), draftRestore: $('nbt-draft-restore'), draftDiscard: $('nbt-draft-discard'),
@@ -465,11 +466,7 @@
       obj = addText(preset.text || (preset.kind === 'number' ? '10' : 'FELIRAT'), box, preset.side, preset.kind, preset.bind);
     }
     if (!obj) return;
-    if (obj.nbBind) {
-      // Ha még nincs megadva darabszám, a névsor a kényelmesebb indulás.
-      if (state.qtyMode === 'grid' && totalQty() === 0) setQtyMode('roster');
-      else displayPlayer();
-    }
+    if (obj.nbBind) syncQtyMode();
     sides[preset.side].canvas.setActiveObject(obj);
     sides[preset.side].canvas.requestRenderAll();
     syncSelection();
@@ -604,7 +601,6 @@
       if (!obj.nbBind) obj.set({ nbPlaceholder: obj.text });
       if (!obj.nbMaxW) obj.set({ nbMaxW: obj.getScaledWidth(), nbBaseScale: obj.scaleX });
       obj.set({ nbBind: bind });
-      if (state.qtyMode === 'grid' && totalQty() === 0) setQtyMode('roster');
     } else {
       obj.set({ nbBind: '', visible: true });
     }
@@ -683,6 +679,33 @@
   /* ---------------------------------------------------------------------- */
 
   el.upload.addEventListener('click', () => { state.pendingPreset = null; el.file.click(); });
+
+  /** Saját kép (fotó, grafika): a logótól függetlenül, az aktuális oldal közepére kerül, utána szabadon mozgatható. */
+  el.uploadImage.addEventListener('click', () => {
+    if (!state.option) { toast('Előbb válassz terméket.'); return; }
+    el.imageFile.click();
+  });
+  el.imageFile.addEventListener('change', () => {
+    const file = el.imageFile.files && el.imageFile.files[0];
+    el.imageFile.value = '';
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) { toast('PNG, JPG, WEBP vagy SVG képet tölts fel.'); return; }
+    if (file.size > MAX_UPLOAD_BYTES) { toast('A kép legfeljebb 15 MB lehet.'); return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const img = await loadImage(reader.result);
+      if (!img) { toast('A képet nem sikerült betölteni.'); return; }
+      const area = sides[state.side].area;
+      img.set({ nbKind: 'image' });
+      fitIntoBox(img, { left: area.x + area.w * 0.15, top: area.y + area.h * 0.12, w: area.w * 0.7, h: area.h * 0.6 });
+      activeCanvas().add(img);
+      keepInside(img, state.side);
+      activeCanvas().setActiveObject(img).requestRenderAll();
+      syncSelection();
+      refresh();
+    };
+    reader.readAsDataURL(file);
+  });
   el.file.addEventListener('change', () => {
     const file = el.file.files && el.file.files[0];
     el.file.value = '';
@@ -911,11 +934,67 @@
     refresh();
   }
 
+  /** Névsor akkor kell, ha a tervben van névsorból jövő felirat; ilyenkor a darabszám is abból adódik. */
+  function syncQtyMode() {
+    if (!state.option) return;
+    const want = hasBound() ? 'roster' : 'grid';
+    if (want !== state.qtyMode) setQtyMode(want);
+  }
+
   function renderQtyMode() {
-    app.querySelectorAll('.nbt-tabs [data-qty]').forEach(b => b.setAttribute('aria-selected', b.dataset.qty === state.qtyMode ? 'true' : 'false'));
-    el.qtyGrid.hidden = state.qtyMode !== 'grid';
-    el.qtyRoster.hidden = state.qtyMode !== 'roster';
-    if (state.qtyMode === 'roster') renderRoster(); else renderRows();
+    const roster = state.qtyMode === 'roster';
+    el.stepRoster.hidden = !roster;
+    el.stepQtyNum.textContent = roster ? '4' : '3';
+    el.qtyGrid.hidden = roster;
+    el.qtyRoster.hidden = !roster;
+    if (roster) { renderRoster(); renderQtySummary(); } else renderRows();
+  }
+
+  /** Névsornál a 4. csempe: színenként és méretenként hány darab jön ki a névsorból. */
+  function renderQtySummary() {
+    if (state.qtyMode !== 'roster') return;
+    const p = product();
+    el.qtySummary.innerHTML = '';
+    if (!p) return;
+    const sizes = sizesFor(p);
+    orderColors().forEach(color => {
+      const card = document.createElement('div');
+      card.className = 'nbt-row is-summary';
+      const head = document.createElement('div');
+      head.className = 'nbt-row__head';
+      const name = document.createElement('span');
+      name.className = 'nbt-row__color';
+      const dot = document.createElement('span');
+      dot.className = 'nbt-dot';
+      const hex = colorHex(color);
+      if (hex) dot.style.setProperty('--swatch', hex);
+      name.appendChild(dot);
+      name.appendChild(document.createTextNode(colorLabel(color)));
+      const players = state.roster.filter(pl => norm(pl.color) === norm(color));
+      const total = document.createElement('span');
+      total.className = 'nbt-row__total';
+      total.textContent = players.length + ' db';
+      head.appendChild(name);
+      head.appendChild(total);
+      card.appendChild(head);
+      const grid = document.createElement('div');
+      grid.className = 'nbt-sizes';
+      sizes.forEach(size => {
+        const cell = document.createElement('div');
+        cell.className = 'nbt-size';
+        const label = document.createElement('span');
+        label.textContent = size || 'Darab';
+        const value = document.createElement('b');
+        const n = players.filter(pl => pl.size === size).length;
+        value.textContent = String(n);
+        value.className = n ? 'has-value' : '';
+        cell.appendChild(label);
+        cell.appendChild(value);
+        grid.appendChild(cell);
+      });
+      card.appendChild(grid);
+      el.qtySummary.appendChild(card);
+    });
   }
 
   function setActivePlayer(index) {
@@ -1249,6 +1328,8 @@
   }
 
   function refresh() {
+    // Ha a tervbe név került (vagy kikerült), előbb a névsor/darabszám nézet vált; az újra frissít.
+    if (state.option && (hasBound() ? 'roster' : 'grid') !== state.qtyMode) { syncQtyMode(); return; }
     const q = computeQuote();
     el.sumQty.textContent = q.qty + ' db';
     el.barQty.textContent = q.qty + ' db';
@@ -1259,6 +1340,7 @@
     el.sumSizeRow.hidden = !(q.sizeFees > 0);
     el.sumSize.textContent = '+' + formatPrice(q.sizeFees) + ' (' + q.sizeFeeQty + ' db)';
     renderRosterSum();
+    renderQtySummary();
     renderBands(q);
     const hasTotal = q.qty > 0 && Number.isFinite(q.total);
     el.sumUnit.textContent = Number.isFinite(q.unit) ? formatPrice(q.unit) : '–';
@@ -1592,7 +1674,6 @@
     el.work.hidden = false;
     app.dataset.view = 'work';
     el.modeLabel.textContent = isSport() ? 'Csapatmez' : 'Munkaruha';
-    el.tabRosterSub.textContent = isSport() ? 'név és szám mezenként' : 'név darabonként';
     el.rosterHelp.textContent = isSport()
       ? 'Mezenként egy sor: név és szám párban (a névmezőbe egyben is írhatod, pl. „Kaci 5”). A darabszámot a névsorból számoljuk; név vagy szám nélkül is felvehetsz mezt. Kattints egy játékosra, és a mezen az ő neve látszik.'
       : 'Darabonként egy sor a névvel, mérettel és színnel. A darabszámot a névsorból számoljuk; név nélküli darabot is felvehetsz. Kattints egy névre, és a ruhán az látszik.';
@@ -1623,7 +1704,6 @@
     app.dataset.view = 'mode';
   });
   app.querySelectorAll('.nbt-sides [data-side]').forEach(btn => btn.addEventListener('click', () => setSide(btn.dataset.side)));
-  app.querySelectorAll('.nbt-tabs [data-qty]').forEach(btn => btn.addEventListener('click', () => setQtyMode(btn.dataset.qty)));
   el.addPlayer.addEventListener('click', addPlayer);
 
   FONTS.forEach(f => {

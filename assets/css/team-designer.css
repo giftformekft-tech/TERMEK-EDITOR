@@ -116,7 +116,8 @@
 .nbt-swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #fff, 0 0 0 3px var(--nbt-accent); }
 
 .nbt-logo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
-.nbt-logo__name { flex: 1 1 160px; color: var(--nbt-muted); font-size: 13px; overflow-wrap: anywhere; }
+.nbt-logo__name { flex: 1 1 100%; color: var(--nbt-muted); font-size: 13px; overflow-wrap: anywhere; }
+.nbt-colors-note { margin-top: 10px !important; font-size: 13px; }
 .nbt-presets { display: grid; gap: 4px; margin: 4px 0 12px; }
 .nbt-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .nbt-chip { display: grid; gap: 1px; justify-items: start; min-height: 44px; padding: 7px 12px 7px 34px; position: relative; border: 1px solid var(--nbt-line); border-radius: 10px; background: var(--nbt-card); color: var(--nbt-ink); text-align: left; line-height: 1.15; }
@@ -149,11 +150,9 @@
 .nbt-size span small { display: block; margin-top: 1px; color: var(--nbt-accent); font-size: 11px; font-weight: 700; }
 .nbt-bands__note { margin: 6px 0 0 !important; color: var(--nbt-muted); font-size: 12px; }
 
-.nbt-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 12px; border-radius: 12px; background: var(--nbt-soft); }
-.nbt-tabs button { display: grid; gap: 1px; justify-items: center; min-height: 48px; padding: 6px 8px; border: 0; border-radius: 9px; background: transparent; color: var(--nbt-muted); font-weight: 700; line-height: 1.15; }
-.nbt-tabs button small { font-weight: 500; font-size: 11px; }
-.nbt-tabs button:hover { background: rgba(255,255,255,.6); color: var(--nbt-ink); }
-.nbt-tabs button[aria-selected="true"] { background: var(--nbt-card); color: var(--nbt-ink); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.nbt-qty-summary { display: grid; gap: 10px; margin-top: 10px; }
+.nbt-qty-summary .nbt-size b { display: grid; place-items: center; min-height: 44px; border: 1px solid var(--nbt-line); border-radius: 10px; background: var(--nbt-soft); color: var(--nbt-muted); font-size: 17px; }
+.nbt-qty-summary .nbt-size b.has-value { border-color: var(--nbt-accent); background: #f3f7ff; color: var(--nbt-ink); }
 
 .nbt-roster { display: grid; gap: 6px; margin: 10px 0; }
 .nbt-player { display: grid; grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr) 36px; grid-template-areas: "name name name del" "num size color color"; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--nbt-line); border-radius: 12px; background: var(--nbt-card); }
