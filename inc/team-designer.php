@@ -6,18 +6,21 @@ if ( ! defined('ABSPATH') ) exit;
  * A meglévő katalógust, mockupokat és kedvezménysávokat csak olvassa; a saját
  * beállításai az nb_team_settings opcióban vannak, az eredeti tervezőt nem érinti.
  *
- * Árazás: darabonként a termék ára + a nyomatok fix ára. Egy nyomat a terv egy
- * oldalán egymáshoz közeli elemek csoportja; az ára a befoglaló méretéhez illő
- * méretsávból jön. A mennyiségi kedvezmény a teljes darabárra (termék + nyomat) jár.
+ * Árazás: termékenként és mennyiségi sávonként megadott darabár (a nyomtatással
+ * együtt, egyoldalas), plusz sávonként megadott kétoldalas felár, ha elöl és hátul is
+ * van minta. A sávot a rendelés teljes darabszáma dönti el; százalékos kedvezmény
+ * a modulban nincs, a sávárak helyettesítik.
  */
 
 define('NB_TEAM_PAGE_SLUG', 'csapatruha-tervezo');
 
-function nb_team_default_tiers(){
+/** Mennyiségi sávok (darabtól–darabig, 0 = felső határ nélkül), minden termékre közösek. */
+function nb_team_default_bands(){
   return [
-    ['id'=>'small',  'label'=>'Kis nyomat (max. 10×10 cm)',   'max_w_mm'=>100, 'max_h_mm'=>100, 'price'=>990],
-    ['id'=>'medium', 'label'=>'Közepes nyomat (max. A4)',      'max_w_mm'=>210, 'max_h_mm'=>297, 'price'=>1490],
-    ['id'=>'large',  'label'=>'Nagy nyomat (max. A3)',         'max_w_mm'=>297, 'max_h_mm'=>420, 'price'=>1990],
+    ['min'=>1,  'max'=>10],
+    ['min'=>11, 'max'=>25],
+    ['min'=>26, 'max'=>50],
+    ['min'=>51, 'max'=>0],
   ];
 }
 
@@ -32,7 +35,7 @@ function nb_team_default_presets(){
     ['id'=>'work-left-chest',  'mode'=>'work',  'side'=>'front', 'kind'=>'logo',   'label'=>'Bal mell logó',         'cx'=>0.70, 'top'=>0.08, 'w_mm'=>90,  'h_mm'=>90,  'text'=>'', 'bind'=>''],
     ['id'=>'work-center',      'mode'=>'work',  'side'=>'front', 'kind'=>'logo',   'label'=>'Mell közép logó',       'cx'=>0.50, 'top'=>0.10, 'w_mm'=>250, 'h_mm'=>250, 'text'=>'', 'bind'=>''],
     ['id'=>'work-right-text',  'mode'=>'work',  'side'=>'front', 'kind'=>'text',   'label'=>'Jobb mell felirat',     'cx'=>0.30, 'top'=>0.10, 'w_mm'=>90,  'h_mm'=>22,  'text'=>'Név / beosztás', 'bind'=>'name'],
-    ['id'=>'work-back-top',    'mode'=>'work',  'side'=>'back',  'kind'=>'text',   'label'=>'Hát felső cégnév',      'cx'=>0.50, 'top'=>0.05, 'w_mm'=>260, 'h_mm'=>50,  'text'=>'CÉGNÉV', 'bind'=>''],
+    ['id'=>'work-back-top',    'mode'=>'work',  'side'=>'back',  'kind'=>'text',   'label'=>'Hát felső cégnév',      'cx'=>0.50, 'top'=>0.05, 'w_mm'=>260, 'h_mm'=>50,  'text'=>'Cégnév / egyedi felirat', 'bind'=>''],
     ['id'=>'work-back-logo',   'mode'=>'work',  'side'=>'back',  'kind'=>'logo',   'label'=>'Hát nagy logó',         'cx'=>0.50, 'top'=>0.20, 'w_mm'=>280, 'h_mm'=>280, 'text'=>'', 'bind'=>''],
     ['id'=>'sport-crest',      'mode'=>'sport', 'side'=>'front', 'kind'=>'logo',   'label'=>'Bal mell címer',        'cx'=>0.70, 'top'=>0.08, 'w_mm'=>80,  'h_mm'=>80,  'text'=>'', 'bind'=>''],
     ['id'=>'sport-front-name', 'mode'=>'sport', 'side'=>'front', 'kind'=>'text',   'label'=>'Mell közép csapatnév',  'cx'=>0.50, 'top'=>0.34, 'w_mm'=>260, 'h_mm'=>60,  'text'=>'CSAPATNÉV', 'bind'=>''],
@@ -42,12 +45,65 @@ function nb_team_default_presets(){
   ];
 }
 
+/** A típusválasztó (első képernyő) szövegei és képei. */
+function nb_team_default_intro(){
+  return [
+    'kicker' => 'Csapat- és munkaruha tervező',
+    'title'  => 'Mit tervezel?',
+    'lead'   => 'Tervezd meg egyszer, add meg a színeket és a méreteket, a mennyiségi kedvezményt pedig automatikusan számoljuk.',
+    'cards'  => [
+      'work'  => ['title'=>'Munkaruha, céges ruha', 'text'=>'Logó a mellen, cégnév a háton. Egységes megjelenés a kollégáknak.'],
+      'sport' => ['title'=>'Csapatmez, sportpóló', 'text'=>'Címer elöl, csapatnév és szám a háton.'],
+    ],
+    // Nagy kép a kártyák alatt, opcionális címmel és leírással.
+    'banner' => ['image_id'=>0, 'title'=>'', 'text'=>''],
+  ];
+}
+
+function nb_team_sanitize_intro($intro){
+  $defaults = nb_team_default_intro();
+  $intro = is_array($intro) ? $intro : [];
+  $clean = [
+    'kicker' => sanitize_text_field($intro['kicker'] ?? $defaults['kicker']),
+    'title'  => sanitize_text_field($intro['title'] ?? $defaults['title']),
+    'lead'   => sanitize_textarea_field($intro['lead'] ?? $defaults['lead']),
+    'cards'  => [],
+  ];
+  foreach ($defaults['cards'] as $key => $card_defaults){
+    $card = isset($intro['cards'][$key]) && is_array($intro['cards'][$key]) ? $intro['cards'][$key] : [];
+    $title = sanitize_text_field($card['title'] ?? $card_defaults['title']);
+    $clean['cards'][$key] = [
+      'title' => $title !== '' ? $title : $card_defaults['title'],
+      'text'  => sanitize_textarea_field($card['text'] ?? $card_defaults['text']),
+    ];
+  }
+  $banner = isset($intro['banner']) && is_array($intro['banner']) ? $intro['banner'] : [];
+  $clean['banner'] = [
+    'image_id' => absint($banner['image_id'] ?? 0),
+    'title'    => sanitize_text_field($banner['title'] ?? ''),
+    'text'     => sanitize_textarea_field($banner['text'] ?? ''),
+  ];
+  return $clean;
+}
+
+/** A sablonnak: a beállított szövegek és a nagy kép URL-je. */
+function nb_team_intro_view(){
+  $intro = nb_team_get_settings()['intro'];
+  $image_id = $intro['banner']['image_id'];
+  $url = $image_id ? wp_get_attachment_image_url($image_id, 'full') : '';
+  $intro['banner']['image_url'] = $url ?: '';
+  $intro['banner']['image_alt'] = $image_id ? (string)get_post_meta($image_id, '_wp_attachment_image_alt', true) : '';
+  return $intro;
+}
+
 function nb_team_defaults(){
   return [
+    'intro'    => nb_team_default_intro(),
     'products' => [],
-    'tiers'    => nb_team_default_tiers(),
+    'bands'    => nb_team_default_bands(),
+    'prices'   => [],
+    'size_fees' => [],
     'presets'  => nb_team_default_presets(),
-    'gap_mm'   => 20,
     'min_qty'  => 1,
     'max_colors' => 8,
     'personal_fee' => 0,
@@ -55,25 +111,59 @@ function nb_team_defaults(){
   ];
 }
 
-function nb_team_sanitize_tiers($tiers){
+function nb_team_sanitize_bands($bands){
   $clean = [];
-  foreach ((array)$tiers as $index => $tier){
-    if (!is_array($tier)) continue;
-    $w = round(floatval($tier['max_w_mm'] ?? 0), 1);
-    $h = round(floatval($tier['max_h_mm'] ?? 0), 1);
-    if ($w <= 0 || $h <= 0) continue;
-    $label = sanitize_text_field($tier['label'] ?? '');
-    $id = sanitize_key($tier['id'] ?? '');
-    $clean[] = [
-      'id'       => $id !== '' ? $id : 'tier'.($index + 1),
-      'label'    => $label !== '' ? $label : sprintf('%s×%s mm', $w, $h),
-      'max_w_mm' => $w,
-      'max_h_mm' => $h,
-      'price'    => max(0, round(floatval($tier['price'] ?? 0), 2)),
-    ];
+  foreach ((array)$bands as $band){
+    if (!is_array($band)) continue;
+    $min = intval($band['min'] ?? 0);
+    $max = intval($band['max'] ?? 0);
+    if ($min < 1) continue;
+    $clean[] = ['min'=>$min, 'max'=>($max >= $min ? $max : 0)];
   }
-  usort($clean, function($a, $b){ return ($a['max_w_mm'] * $a['max_h_mm']) <=> ($b['max_w_mm'] * $b['max_h_mm']); });
+  usort($clean, function($a, $b){ return $a['min'] <=> $b['min']; });
+  return array_slice($clean, 0, 8);
+}
+
+/** Árak: [ 'termékID|típus' => [ sávindex => ['single'=>Ft, 'double'=>Ft felár] ] ]. Üres mező = nincs megadva. */
+function nb_team_sanitize_prices($prices){
+  $clean = [];
+  foreach ((array)$prices as $key => $rows){
+    $parts = explode('|', (string)$key, 2);
+    $pid = absint($parts[0]);
+    if (!$pid || !is_array($rows)) continue;
+    $key = $pid.'|'.nb_utf8_strtolower(trim($parts[1] ?? ''));
+    foreach ($rows as $index => $row){
+      if (!is_array($row)) continue;
+      $single = isset($row['single']) && $row['single'] !== '' ? max(0, round(floatval($row['single']), 2)) : null;
+      $double = isset($row['double']) && $row['double'] !== '' ? max(0, round(floatval($row['double']), 2)) : null;
+      if ($single === null && $double === null) continue;
+      $clean[$key][intval($index)] = ['single'=>$single, 'double'=>$double];
+    }
+  }
   return $clean;
+}
+
+/** Méretfelár: [ 'termékID|típus' => [ méret => Ft/db ] ] (pl. 3XL, 4XL drágább). */
+function nb_team_sanitize_size_fees($fees){
+  $clean = [];
+  foreach ((array)$fees as $key => $sizes){
+    $parts = explode('|', (string)$key, 2);
+    $pid = absint($parts[0]);
+    if (!$pid || !is_array($sizes)) continue;
+    $key = $pid.'|'.nb_utf8_strtolower(trim($parts[1] ?? ''));
+    foreach ($sizes as $size => $fee){
+      $size = trim(sanitize_text_field((string)$size));
+      if ($size === '' || $fee === '' || $fee === null) continue;
+      $fee = max(0, round(floatval($fee), 2));
+      if ($fee > 0) $clean[$key][$size] = $fee;
+    }
+  }
+  return $clean;
+}
+
+function nb_team_size_fee($team, $pid, $type, $size){
+  $key = intval($pid).'|'.nb_normalize_type_key($type);
+  return floatval($team['size_fees'][$key][trim((string)$size)] ?? 0);
 }
 
 function nb_team_sanitize_presets($presets){
@@ -113,11 +203,13 @@ function nb_team_get_settings(){
   $stored = get_option('nb_team_settings', []);
   $stored = is_array($stored) ? $stored : [];
   $settings = array_merge($defaults, $stored);
+  $settings['intro'] = nb_team_sanitize_intro($settings['intro']);
   $settings['products'] = array_values(array_filter(array_map('absint', (array)$settings['products'])));
-  $settings['tiers'] = nb_team_sanitize_tiers($settings['tiers']);
-  if (empty($settings['tiers'])) $settings['tiers'] = nb_team_default_tiers();
+  $settings['bands'] = nb_team_sanitize_bands($settings['bands']);
+  if (empty($settings['bands'])) $settings['bands'] = nb_team_default_bands();
+  $settings['prices'] = nb_team_sanitize_prices($settings['prices']);
+  $settings['size_fees'] = nb_team_sanitize_size_fees($settings['size_fees']);
   $settings['presets'] = nb_team_sanitize_presets($settings['presets']);
-  $settings['gap_mm'] = max(0, floatval($settings['gap_mm']));
   $settings['min_qty'] = max(1, intval($settings['min_qty']));
   $settings['max_colors'] = min(20, max(1, intval($settings['max_colors'])));
   $settings['personal_fee'] = max(0, round(floatval($settings['personal_fee']), 2));
@@ -211,35 +303,51 @@ function nb_team_group_elements($elements, $gap_mm){
   return $groups;
 }
 
-function nb_team_tier_for_size($w, $h, $tiers){
-  $tolerance = 1;
-  foreach ($tiers as $tier){
-    $fits = ($w <= $tier['max_w_mm'] + $tolerance && $h <= $tier['max_h_mm'] + $tolerance)
-      || ($w <= $tier['max_h_mm'] + $tolerance && $h <= $tier['max_w_mm'] + $tolerance);
-    if ($fits) return $tier;
-  }
-  return $tiers ? end($tiers) : null;
+define('NB_TEAM_GROUP_GAP_MM', 20);
+
+/** Mely oldalakon van minta (egy- vagy kétoldalas), és a gyártáshoz a nyomatok mérete. Árat nem számol. */
+function nb_team_print_layout($elements){
+  $placements = nb_team_group_elements($elements, NB_TEAM_GROUP_GAP_MM);
+  $sides = array_values(array_unique(array_column($placements, 'side')));
+  return ['placements'=>$placements, 'sides'=>$sides, 'double'=>count($sides) > 1];
 }
 
-/** Visszaadja a nyomatokat és a darabonkénti nyomtatási árat. */
-function nb_team_price_print($elements, $team_settings = null){
-  if ($team_settings === null) $team_settings = nb_team_get_settings();
-  $placements = [];
-  $unit = 0;
-  foreach (nb_team_group_elements($elements, floatval($team_settings['gap_mm'])) as $group){
-    $tier = nb_team_tier_for_size($group['w_mm'], $group['h_mm'], $team_settings['tiers']);
-    if (!$tier) continue;
-    $placements[] = [
-      'side'  => $group['side'],
-      'w_mm'  => $group['w_mm'],
-      'h_mm'  => $group['h_mm'],
-      'tier'  => $tier['id'],
-      'label' => $tier['label'],
-      'price' => floatval($tier['price']),
-    ];
-    $unit += floatval($tier['price']);
+/**
+ * A termék (és típus) ársávjai: [{min, max, single, double}]. A beállítatlan sávok
+ * kimaradnak. Ha a terméknek egyáltalán nincs ára, a WooCommerce-ár egyoldalas árként,
+ * a tervező kétoldalas felára felárként érvényes, egyetlen sávban.
+ */
+function nb_team_price_bands($pid, $type, $team = null, $designer = null){
+  if ($team === null) $team = nb_team_get_settings();
+  $key = intval($pid).'|'.nb_normalize_type_key($type);
+  $rows = isset($team['prices'][$key]) ? $team['prices'][$key] : [];
+  $bands = [];
+  foreach ($team['bands'] as $index => $band){
+    $row = $rows[$index] ?? null;
+    if (!$row || $row['single'] === null) continue;
+    $bands[] = ['min'=>$band['min'], 'max'=>$band['max'], 'single'=>floatval($row['single']), 'double'=>floatval($row['double'] ?? 0)];
   }
-  return ['placements'=>$placements, 'unit_print'=>round($unit, 2)];
+  if ($bands) return $bands;
+  if ($designer === null) $designer = nb_get_settings([]);
+  $product = function_exists('wc_get_product') ? wc_get_product(intval($pid)) : null;
+  $price = $product ? floatval($product->get_price()) : 0;
+  return [['min'=>1, 'max'=>0, 'single'=>$price, 'double'=>max(0, floatval($designer['double_sided_fee'] ?? 0)), 'fallback'=>true]];
+}
+
+/** A darabszámhoz tartozó sáv: a legnagyobb, amelynek alsó határát elérte a rendelés. */
+function nb_team_band_for_qty($bands, $qty){
+  $found = $bands ? $bands[0] : null;
+  foreach ((array)$bands as $band){
+    if ($qty >= $band['min']) $found = $band;
+  }
+  return $found;
+}
+
+function nb_team_unit_price($bands, $qty, $double, $personal, $team = null){
+  if ($team === null) $team = nb_team_get_settings();
+  $band = nb_team_band_for_qty($bands, $qty);
+  if (!$band) return 0;
+  return round($band['single'] + ($double ? $band['double'] : 0) + ($personal ? floatval($team['personal_fee']) : 0), 2);
 }
 
 /** "KOVÁCS (10), NAGY (7), (név nélkül)" */
@@ -260,7 +368,7 @@ function nb_team_placements_summary($placements){
   $parts = [];
   foreach ((array)$placements as $placement){
     $side = ($placement['side'] ?? '') === 'back' ? __('hátul', 'nb-designer') : __('elöl', 'nb-designer');
-    $parts[] = sprintf('%s, %s (%s×%s cm)', $placement['label'] ?? '', $side,
+    $parts[] = sprintf('%s %s×%s cm', $side,
       number_format_i18n(floatval($placement['w_mm'] ?? 0) / 10, 1), number_format_i18n(floatval($placement['h_mm'] ?? 0) / 10, 1));
   }
   return implode('; ', $parts);
@@ -308,53 +416,6 @@ add_filter('body_class', function($classes){
   return $classes;
 });
 
-/**
- * Variációs árak típus|szín|méret kulcson, hogy a felület a valós darabárral
- * számoljon. Ha nincs egyező variáció, a termék alapára érvényes.
- */
-function nb_team_variation_prices($product_id, $cfg){
-  if (!function_exists('wc_get_product')) return [];
-  $product = wc_get_product($product_id);
-  if (!$product || !$product->is_type('variable')) return [];
-  $variations = [];
-  foreach ($product->get_children() as $child_id){
-    $variation = wc_get_product($child_id);
-    if (!$variation || $variation->get_status() !== 'publish') continue;
-    $groups = [];
-    foreach ($variation->get_attributes() as $key => $value){
-      $group = function_exists('nb_detect_attribute_group_from_key') ? nb_detect_attribute_group_from_key($key) : '';
-      if ($group) $groups[$group] = nb_utf8_strtolower((string)$value);
-    }
-    $price = function_exists('wc_get_price_to_display') ? wc_get_price_to_display($variation) : $variation->get_price();
-    if ($price === '' || !is_numeric($price)) continue;
-    $variations[] = ['attrs'=>$groups, 'price'=>floatval($price)];
-  }
-  if (!$variations) return [];
-  $matches = function($attr, $label){
-    if ($attr === '' || $attr === null) return true;
-    $label = trim((string)$label);
-    return $attr === nb_utf8_strtolower($label) || $attr === sanitize_title($label);
-  };
-  $prices = [];
-  $types = isset($cfg['types']) && is_array($cfg['types']) ? $cfg['types'] : [''];
-  $colors = isset($cfg['colors']) && is_array($cfg['colors']) ? $cfg['colors'] : [''];
-  $sizes = isset($cfg['sizes']) && is_array($cfg['sizes']) ? $cfg['sizes'] : [''];
-  foreach ($types as $type){
-    foreach ($colors as $color){
-      foreach ($sizes as $size){
-        foreach ($variations as $variation){
-          $a = $variation['attrs'];
-          if ($matches($a['type'] ?? '', $type) && $matches($a['color'] ?? '', $color) && $matches($a['size'] ?? '', $size)){
-            $prices[nb_normalize_type_key($type).'|'.nb_normalize_color_key($color).'|'.trim((string)$size)] = $variation['price'];
-            break;
-          }
-        }
-      }
-    }
-  }
-  return $prices;
-}
-
 /** A frontend számára szükséges, szűrt adatok. */
 function nb_team_public_data(){
   $stored = nb_get_settings([]);
@@ -384,8 +445,20 @@ function nb_team_public_data(){
       'colors_by_type' => isset($cfg['colors_by_type']) && is_array($cfg['colors_by_type']) ? $cfg['colors_by_type'] : new stdClass(),
       'sizes'          => array_values((array)($cfg['sizes'] ?? [])),
       'map'            => $entries,
-      'price_value'    => isset($cfg['price_value']) ? floatval($cfg['price_value']) : null,
-      'prices'         => nb_team_variation_prices($pid, $cfg) ?: new stdClass(),
+      'size_fees_by_type' => (function() use ($pid, $cfg, $team){
+        $out = [];
+        foreach ((array)($cfg['types'] ?? ['']) ?: [''] as $type){
+          $fees = $team['size_fees'][$pid.'|'.nb_normalize_type_key($type)] ?? [];
+          $out[nb_normalize_type_key($type)] = $fees ?: new stdClass();
+        }
+        return $out ?: new stdClass();
+      })(),
+      'bands_by_type'  => (function() use ($pid, $cfg, $team, $settings){
+        $out = [];
+        foreach ((array)($cfg['types'] ?? ['']) ?: [''] as $type) $out[nb_normalize_type_key($type)] = nb_team_price_bands($pid, $type, $team, $settings);
+        if (!$out) $out[''] = nb_team_price_bands($pid, '', $team, $settings);
+        return $out;
+      })(),
     ];
   }
   $mockups = [];
@@ -418,11 +491,8 @@ function nb_team_public_data(){
     'mockups'   => $mockups ?: new stdClass(),
     'colorMeta' => isset($settings['color_meta']) && is_array($settings['color_meta']) ? $settings['color_meta'] : new stdClass(),
     'fonts'     => $fonts,
-    'discounts' => nb_normalize_bulk_discount_tiers($settings['bulk_discounts'] ?? []),
     'team'      => [
-      'tiers'      => $team['tiers'],
       'presets'    => $team['presets'],
-      'gap_mm'     => $team['gap_mm'],
       'min_qty'    => $team['min_qty'],
       'max_colors' => $team['max_colors'],
       'personal_fee' => $team['personal_fee'],
@@ -444,31 +514,39 @@ add_action('wp_enqueue_scripts', function(){
 /* Kosár és rendelés                                                         */
 /* ------------------------------------------------------------------------ */
 
-/** A csapattételek darabára: a termék friss ára + a szerveren számolt nyomtatási ár. */
+/**
+ * A csapattételek darabára a beállított ársávokból: a sávot a csoport (egy rendelés a
+ * tervezőből) teljes darabszáma adja, így ha a vevő a kosárban módosítja a darabszámot,
+ * az ár is követi.
+ */
 add_action('woocommerce_before_calculate_totals', function($cart){
   if (is_admin() && !defined('DOING_AJAX')) return;
   if (!$cart || !method_exists($cart, 'get_cart')) return;
+  $groups = [];
+  foreach ($cart->get_cart() as $item){
+    if (empty($item['nb_team'])) continue;
+    $group = (string)($item['nb_team_group'] ?? '');
+    $groups[$group] = ($groups[$group] ?? 0) + max(1, intval($item['quantity'] ?? 1));
+  }
+  if (!$groups) return;
+  $team = nb_team_get_settings();
+  $designer = nb_get_settings([]);
+  $bands_cache = [];
   foreach ($cart->get_cart() as $item){
     if (empty($item['nb_team']) || empty($item['data']) || !is_a($item['data'], 'WC_Product')) continue;
-    $source_id = !empty($item['variation_id']) ? intval($item['variation_id']) : intval($item['product_id']);
-    $fresh = wc_get_product($source_id);
-    if (!$fresh) continue;
-    $base = floatval($fresh->get_price());
-    $item['data']->set_price($base + max(0, floatval($item['nb_team_unit_print'] ?? 0)));
+    $key = intval($item['nb_team_pid'] ?? 0).'|'.nb_normalize_type_key($item['nb_team_type'] ?? '');
+    if (!isset($bands_cache[$key])) $bands_cache[$key] = nb_team_price_bands(intval($item['nb_team_pid'] ?? 0), $item['nb_team_type'] ?? '', $team, $designer);
+    $qty = $groups[(string)($item['nb_team_group'] ?? '')] ?? 1;
+    $size_fee = nb_team_size_fee($team, intval($item['nb_team_pid'] ?? 0), $item['nb_team_type'] ?? '', $item['nb_team_size'] ?? '');
+    $item['data']->set_price(nb_team_unit_price($bands_cache[$key], $qty, !empty($item['nb_team_double']), !empty($item['nb_team_personal']), $team) + $size_fee);
   }
 }, 20);
 
 add_filter('woocommerce_get_item_data', function($data, $item){
   if (empty($item['nb_team'])) return $data;
-  $placements = isset($item['nb_team_placements']) && is_array($item['nb_team_placements']) ? $item['nb_team_placements'] : [];
-  if ($placements){
-    $data[] = [
-      'key'   => __('Nyomat', 'nb-designer'),
-      'value' => sprintf(__('%1$d elhelyezés, +%2$s/db', 'nb-designer'), count($placements), wp_strip_all_tags(wc_price(floatval($item['nb_team_unit_print'] ?? 0)))),
-    ];
-  }
+  $data[] = ['key'=>__('Nyomtatás', 'nb-designer'), 'value'=>!empty($item['nb_team_double']) ? __('kétoldalas', 'nb-designer') : __('egyoldalas', 'nb-designer')];
   if (!empty($item['nb_team_players']) && is_array($item['nb_team_players'])){
-    $data[] = ['key'=>__('Játékosok', 'nb-designer'), 'value'=>nb_team_players_summary($item['nb_team_players'])];
+    $data[] = ['key'=>(($item['nb_team_mode'] ?? '') === 'sport' ? __('Játékosok', 'nb-designer') : __('Nevek', 'nb-designer')), 'value'=>nb_team_players_summary($item['nb_team_players'])];
   }
   return $data;
 }, 10, 2);
@@ -477,14 +555,14 @@ add_action('woocommerce_checkout_create_order_line_item', function($order_item, 
   if (empty($values['nb_team'])) return;
   $order_item->add_meta_data('_nb_team', 1);
   $order_item->add_meta_data('_nb_team_mode', sanitize_key($values['nb_team_mode'] ?? ''));
-  $order_item->add_meta_data('_nb_team_unit_print', floatval($values['nb_team_unit_print'] ?? 0));
+  $order_item->add_meta_data(__('Nyomtatás', 'nb-designer'), !empty($values['nb_team_double']) ? __('kétoldalas', 'nb-designer') : __('egyoldalas', 'nb-designer'));
   $placements = isset($values['nb_team_placements']) && is_array($values['nb_team_placements']) ? $values['nb_team_placements'] : [];
   if ($placements){
-    $order_item->add_meta_data(__('Nyomatok', 'nb-designer'), nb_team_placements_summary($placements));
+    $order_item->add_meta_data('_nb_team_placements', nb_team_placements_summary($placements));
   }
   $players = isset($values['nb_team_players']) && is_array($values['nb_team_players']) ? $values['nb_team_players'] : [];
   if ($players){
-    $order_item->add_meta_data(__('Játékosok', 'nb-designer'), nb_team_players_summary($players));
+    $order_item->add_meta_data(($values['nb_team_mode'] ?? '') === 'sport' ? __('Játékosok', 'nb-designer') : __('Nevek', 'nb-designer'), nb_team_players_summary($players));
     $order_item->add_meta_data('_nb_team_players', wp_json_encode($players));
   }
 }, 20, 3);
@@ -492,6 +570,8 @@ add_action('woocommerce_checkout_create_order_line_item', function($order_item, 
 /** Gyártáshoz: a rendelés tételénél játékosonként a név- és számfájlok. */
 add_action('woocommerce_after_order_itemmeta', function($item_id, $item){
   if (!is_admin() || !is_object($item) || !method_exists($item, 'get_meta')) return;
+  $layout = (string)$item->get_meta('_nb_team_placements');
+  if ($layout !== '') echo '<p class="nb-team-layout"><strong>'.esc_html__('Nyomatok mérete (gyártáshoz):', 'nb-designer').'</strong> '.esc_html($layout).'</p>';
   $players = json_decode((string)$item->get_meta('_nb_team_players'), true);
   if (!is_array($players) || !$players) return;
   echo '<table class="widefat striped nb-team-players" style="margin-top:8px;max-width:640px"><thead><tr><th>'.esc_html__('Név', 'nb-designer').'</th><th>'.esc_html__('Szám', 'nb-designer').'</th><th>'.esc_html__('Név/szám fájl', 'nb-designer').'</th></tr></thead><tbody>';
@@ -557,6 +637,32 @@ add_action('admin_enqueue_scripts', function(){
   if (sanitize_key($_GET['page'] ?? '') !== 'nb-team-designer') return;
   $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '2.3.0';
   wp_enqueue_style('nb-admin', NB_DESIGNER_URL.'admin/css/admin.css', [], $version);
+  wp_enqueue_media();
+  wp_add_inline_script('media-editor', <<<'JS'
+jQuery(function($){
+  $(document).on('click', '.nb-team-image-pick', function(e){
+    e.preventDefault();
+    var box = $(this).closest('.nb-team-image');
+    var frame = wp.media({ title: 'Kép kiválasztása', button: { text: 'Kiválasztom' }, library: { type: 'image' }, multiple: false });
+    frame.on('select', function(){
+      var file = frame.state().get('selection').first().toJSON();
+      var url = (file.sizes && (file.sizes.medium_large || file.sizes.large || file.sizes.full) || file).url;
+      box.find('input[type=hidden]').val(file.id);
+      box.find('.nb-team-image__preview').html($('<img>').attr('src', url).css({maxWidth: '360px', height: 'auto', borderRadius: '8px', display: 'block'}));
+      box.find('.nb-team-image-remove').show();
+    });
+    frame.open();
+  });
+  $(document).on('click', '.nb-team-image-remove', function(e){
+    e.preventDefault();
+    var box = $(this).closest('.nb-team-image');
+    box.find('input[type=hidden]').val('0');
+    box.find('.nb-team-image__preview').empty();
+    $(this).hide();
+  });
+});
+JS
+  );
 });
 
 add_action('admin_post_nb_team_save', function(){
@@ -570,16 +676,18 @@ add_action('admin_post_nb_team_save', function(){
     $presets = nb_team_sanitize_presets(array_values((array)($input['presets'] ?? [])));
   }
   $settings = [
+    'intro'      => nb_team_sanitize_intro($input['intro'] ?? []),
     'products'   => array_values(array_filter(array_map('absint', (array)($input['products'] ?? [])))),
-    'tiers'      => nb_team_sanitize_tiers(array_values((array)($input['tiers'] ?? []))),
+    'bands'      => nb_team_sanitize_bands(array_values((array)($input['bands'] ?? []))),
+    'prices'     => nb_team_sanitize_prices((array)($input['prices'] ?? [])),
+    'size_fees'  => nb_team_sanitize_size_fees((array)($input['size_fees'] ?? [])),
     'presets'    => $presets,
-    'gap_mm'     => max(0, floatval($input['gap_mm'] ?? 20)),
     'min_qty'    => max(1, intval($input['min_qty'] ?? 1)),
     'max_colors' => min(20, max(1, intval($input['max_colors'] ?? 8))),
     'personal_fee' => max(0, round(floatval($input['personal_fee'] ?? 0), 2)),
     'max_players'  => min(300, max(1, intval($input['max_players'] ?? 100))),
   ];
-  if (empty($settings['tiers'])) $settings['tiers'] = nb_team_default_tiers();
+  if (empty($settings['bands'])) $settings['bands'] = nb_team_default_bands();
   update_option('nb_team_settings', $settings, false);
   wp_safe_redirect(add_query_arg(['page'=>'nb-team-designer', 'updated'=>1], admin_url('admin.php')));
   exit;
@@ -588,11 +696,25 @@ add_action('admin_post_nb_team_save', function(){
 function nb_team_admin_render(){
   if (!current_user_can(nb_admin_capability())) return;
   $team = nb_team_get_settings();
+  $intro = $team['intro'];
   $designer = nb_get_settings([]);
   $catalog = isset($designer['catalog']) && is_array($designer['catalog']) ? $designer['catalog'] : [];
   $product_ids = isset($designer['products']) && is_array($designer['products']) ? array_map('absint', $designer['products']) : array_keys($catalog);
-  $tiers = array_values($team['tiers']);
-  while (count($tiers) < 5) $tiers[] = ['id'=>'', 'label'=>'', 'max_w_mm'=>'', 'max_h_mm'=>'', 'price'=>''];
+  $bands = array_values($team['bands']);
+  $band_rows = $bands;
+  while (count($band_rows) < 6) $band_rows[] = ['min'=>'', 'max'=>''];
+  $band_label = function($band){ return $band['max'] ? $band['min'].'–'.$band['max'].' db' : $band['min'].' db-tól'; };
+  // Árazandó termékek: a modulban megjelenők, típusonként.
+  $price_options = [];
+  foreach ($product_ids as $pid){
+    if (!isset($catalog[$pid]) || ($team['products'] && !in_array($pid, $team['products'], true))) continue;
+    $types = isset($catalog[$pid]['types']) && is_array($catalog[$pid]['types']) && $catalog[$pid]['types'] ? $catalog[$pid]['types'] : [''];
+    foreach ($types as $type){
+      $title = $catalog[$pid]['title'] ?? get_the_title($pid);
+      $sizes = array_values(array_filter(array_map(function($size){ return trim((string)$size); }, (array)($catalog[$pid]['sizes'] ?? [])), 'strlen'));
+      $price_options[] = ['key'=>$pid.'|'.nb_normalize_type_key($type), 'label'=>$type !== '' && $type !== $title ? $title.' – '.$type : $title, 'sizes'=>$sizes];
+    }
+  }
   $presets = array_values($team['presets']);
   for ($i = 0; $i < 3; $i++) $presets[] = ['id'=>'', 'mode'=>'both', 'side'=>'front', 'kind'=>'logo', 'label'=>'', 'cx'=>0.5, 'top'=>0.1, 'w_mm'=>'', 'h_mm'=>'', 'text'=>'', 'bind'=>''];
   $page_url = nb_team_designer_url();
@@ -605,6 +727,38 @@ function nb_team_admin_render(){
       <input type="hidden" name="action" value="nb_team_save">
       <?php wp_nonce_field('nb_team_save'); ?>
 
+      <h2><?php esc_html_e('Típusválasztó (első képernyő)', 'nb-designer'); ?></h2>
+      <p class="description"><?php esc_html_e('Ezt látja a vásárló, amikor megnyitja a tervezőt.', 'nb-designer'); ?></p>
+      <table class="form-table" role="presentation">
+        <tr><th scope="row"><label for="nb-team-kicker"><?php esc_html_e('Felső címke', 'nb-designer'); ?></label></th><td><input id="nb-team-kicker" class="regular-text" type="text" name="nb_team[intro][kicker]" value="<?php echo esc_attr($intro['kicker']); ?>"></td></tr>
+        <tr><th scope="row"><label for="nb-team-title"><?php esc_html_e('Cím', 'nb-designer'); ?></label></th><td><input id="nb-team-title" class="regular-text" type="text" name="nb_team[intro][title]" value="<?php echo esc_attr($intro['title']); ?>"></td></tr>
+        <tr><th scope="row"><label for="nb-team-lead"><?php esc_html_e('Bevezető szöveg', 'nb-designer'); ?></label></th><td><textarea id="nb-team-lead" class="large-text" rows="3" name="nb_team[intro][lead]"><?php echo esc_textarea($intro['lead']); ?></textarea></td></tr>
+        <?php foreach (['work'=>__('Munkaruha kártya', 'nb-designer'), 'sport'=>__('Csapatmez kártya', 'nb-designer')] as $card_key => $card_label): $card = $intro['cards'][$card_key]; $card_name = 'nb_team[intro][cards]['.$card_key.']'; ?>
+          <tr>
+            <th scope="row"><?php echo esc_html($card_label); ?></th>
+            <td>
+              <p><label><?php esc_html_e('Cím', 'nb-designer'); ?><br><input class="regular-text" type="text" name="<?php echo esc_attr($card_name); ?>[title]" value="<?php echo esc_attr($card['title']); ?>"></label></p>
+              <p><label><?php esc_html_e('Leírás', 'nb-designer'); ?><br><textarea class="large-text" rows="2" name="<?php echo esc_attr($card_name); ?>[text]"><?php echo esc_textarea($card['text']); ?></textarea></label></p>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        <?php $banner = $intro['banner']; $banner_image = $banner['image_id'] ? wp_get_attachment_image_url($banner['image_id'], 'medium_large') : ''; ?>
+        <tr>
+          <th scope="row"><?php esc_html_e('Nagy kép a kártyák alatt', 'nb-designer'); ?></th>
+          <td>
+            <div class="nb-team-image">
+              <input type="hidden" name="nb_team[intro][banner][image_id]" value="<?php echo esc_attr($banner['image_id']); ?>">
+              <div class="nb-team-image__preview" style="margin:0 0 6px"><?php if ($banner_image): ?><img src="<?php echo esc_url($banner_image); ?>" alt="" style="max-width:360px;height:auto;border-radius:8px;display:block"><?php endif; ?></div>
+              <button type="button" class="button nb-team-image-pick"><?php esc_html_e('Kép kiválasztása', 'nb-designer'); ?></button>
+              <button type="button" class="button-link nb-team-image-remove" style="margin-left:8px;<?php echo $banner_image ? '' : 'display:none'; ?>"><?php esc_html_e('Kép eltávolítása', 'nb-designer'); ?></button>
+            </div>
+            <p class="description"><?php esc_html_e('Teljes szélességben jelenik meg a két kártya alatt. Ajánlott: fekvő kép, legalább 1600 px széles.', 'nb-designer'); ?></p>
+            <p><label><?php esc_html_e('Cím (nem kötelező)', 'nb-designer'); ?><br><input class="regular-text" type="text" name="nb_team[intro][banner][title]" value="<?php echo esc_attr($banner['title']); ?>"></label></p>
+            <p><label><?php esc_html_e('Leírás (nem kötelező)', 'nb-designer'); ?><br><textarea class="large-text" rows="4" name="nb_team[intro][banner][text]"><?php echo esc_textarea($banner['text']); ?></textarea></label></p>
+          </td>
+        </tr>
+      </table>
+
       <h2><?php esc_html_e('Termékek', 'nb-designer'); ?></h2>
       <p class="description"><?php esc_html_e('Ha egyet sem jelölsz ki, a tervező összes terméke megjelenik.', 'nb-designer'); ?></p>
       <fieldset class="nb-team-products">
@@ -613,29 +767,56 @@ function nb_team_admin_render(){
         <?php endforeach; ?>
       </fieldset>
 
-      <h2><?php esc_html_e('Nyomatok ára (darabonként)', 'nb-designer'); ?></h2>
-      <p class="description"><?php esc_html_e('Egy nyomat a terv egy oldalán egymáshoz közeli elemek csoportja (pl. logó és alatta a felirat). Az árat a befoglaló méretéhez illő legkisebb sáv adja; a legnagyobbnál nagyobb nyomat a legnagyobb sáv árát kapja. Üres sor nem mentődik.', 'nb-designer'); ?></p>
-      <table class="widefat striped" style="max-width:820px">
-        <thead><tr><th><?php esc_html_e('Megnevezés', 'nb-designer'); ?></th><th><?php esc_html_e('Max. szélesség (mm)', 'nb-designer'); ?></th><th><?php esc_html_e('Max. magasság (mm)', 'nb-designer'); ?></th><th><?php esc_html_e('Ár / db', 'nb-designer'); ?></th></tr></thead>
+      <h2><?php esc_html_e('Árak', 'nb-designer'); ?></h2>
+      <p class="description"><?php esc_html_e('A darabár a nyomtatással együtt értendő; a vevő csak ezt látja, külön nyomatárat nem. A sávot a rendelés teljes darabszáma dönti el (minden szín és méret együtt). Kétoldalas, ha elöl és hátul is van minta: ilyenkor a darabárhoz a kétoldalas felár adódik.', 'nb-designer'); ?></p>
+      <h3><?php esc_html_e('Mennyiségi sávok', 'nb-designer'); ?></h3>
+      <table class="widefat striped" style="max-width:420px">
+        <thead><tr><th><?php esc_html_e('Darabtól', 'nb-designer'); ?></th><th><?php esc_html_e('Darabig (üres = felette)', 'nb-designer'); ?></th></tr></thead>
         <tbody>
-        <?php foreach ($tiers as $i => $tier): ?>
+        <?php foreach ($band_rows as $i => $band): ?>
           <tr>
-            <td><input type="hidden" name="nb_team[tiers][<?php echo esc_attr($i); ?>][id]" value="<?php echo esc_attr($tier['id']); ?>"><input type="text" class="regular-text" name="nb_team[tiers][<?php echo esc_attr($i); ?>][label]" value="<?php echo esc_attr($tier['label']); ?>"></td>
-            <td><input type="number" min="0" step="1" name="nb_team[tiers][<?php echo esc_attr($i); ?>][max_w_mm]" value="<?php echo esc_attr($tier['max_w_mm']); ?>"></td>
-            <td><input type="number" min="0" step="1" name="nb_team[tiers][<?php echo esc_attr($i); ?>][max_h_mm]" value="<?php echo esc_attr($tier['max_h_mm']); ?>"></td>
-            <td><input type="number" min="0" step="1" name="nb_team[tiers][<?php echo esc_attr($i); ?>][price]" value="<?php echo esc_attr($tier['price']); ?>"></td>
+            <td><input type="number" min="1" step="1" style="width:110px" name="nb_team[bands][<?php echo esc_attr($i); ?>][min]" value="<?php echo esc_attr($band['min']); ?>"></td>
+            <td><input type="number" min="0" step="1" style="width:110px" name="nb_team[bands][<?php echo esc_attr($i); ?>][max]" value="<?php echo esc_attr($band['max'] ?: ''); ?>"></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
       </table>
+      <p class="description"><?php esc_html_e('Ha a sávokat módosítod, mentsd el, és utána ellenőrizd a termékek árait: az árak a sávok sorrendjéhez tartoznak.', 'nb-designer'); ?></p>
+      <h3><?php esc_html_e('Darabárak termékenként', 'nb-designer'); ?></h3>
+      <?php if (!$price_options): ?><p><?php esc_html_e('Nincs termék a modulban.', 'nb-designer'); ?></p><?php endif; ?>
+      <?php foreach ($price_options as $option): $rows = $team['prices'][$option['key']] ?? []; $option_sizes = $option['sizes']; $fees = $team['size_fees'][$option['key']] ?? []; ?>
+        <table class="widefat striped" style="max-width:620px;margin:0 0 18px">
+          <thead><tr><th><?php echo esc_html($option['label']); ?><?php if (!$rows): ?> <span style="color:#b32d2e;font-weight:400"><?php esc_html_e('(nincs ár megadva: most a WooCommerce-ár és a tervező kétoldalas felára számol)', 'nb-designer'); ?></span><?php endif; ?></th><th><?php esc_html_e('Egyoldalas darabár (Ft)', 'nb-designer'); ?></th><th><?php esc_html_e('Kétoldalas felár (Ft / db)', 'nb-designer'); ?></th></tr></thead>
+          <tbody>
+          <?php foreach ($bands as $i => $band): $row = $rows[$i] ?? ['single'=>null, 'double'=>null]; $field = 'nb_team[prices]['.$option['key'].']['.$i.']'; ?>
+            <tr>
+              <td><?php echo esc_html($band_label($band)); ?></td>
+              <td><input type="number" min="0" step="1" style="width:120px" name="<?php echo esc_attr($field); ?>[single]" value="<?php echo esc_attr($row['single'] ?? ''); ?>"></td>
+              <td><input type="number" min="0" step="1" style="width:120px" name="<?php echo esc_attr($field); ?>[double]" value="<?php echo esc_attr($row['double'] ?? ''); ?>"></td>
+            </tr>
+          <?php endforeach; ?>
+          <?php if ($option_sizes): ?>
+            <tr>
+              <td><?php esc_html_e('Méretfelár (Ft / db)', 'nb-designer'); ?></td>
+              <td colspan="2">
+                <?php foreach ($option_sizes as $size): ?>
+                  <label style="display:inline-block;margin:0 10px 6px 0"><?php echo esc_html($size); ?> <input type="number" min="0" step="1" style="width:84px" name="<?php echo esc_attr('nb_team[size_fees]['.$option['key'].']['.$size.']'); ?>" value="<?php echo esc_attr(isset($fees[$size]) ? $fees[$size] : ''); ?>"></label>
+                <?php endforeach; ?>
+                <p class="description" style="margin:0"><?php esc_html_e('Minden sávban hozzáadódik a darabárhoz (pl. 3XL, 4XL). Üres vagy 0 = nincs felár.', 'nb-designer'); ?></p>
+              </td>
+            </tr>
+          <?php endif; ?>
+          </tbody>
+        </table>
+      <?php endforeach; ?>
+
+      <h2><?php esc_html_e('Egyéb', 'nb-designer'); ?></h2>
       <table class="form-table" role="presentation">
-        <tr><th scope="row"><label for="nb-team-gap"><?php esc_html_e('Egy nyomatnak számít, ha az elemek távolsága legfeljebb (mm)', 'nb-designer'); ?></label></th><td><input id="nb-team-gap" type="number" min="0" step="1" name="nb_team[gap_mm]" value="<?php echo esc_attr($team['gap_mm']); ?>"></td></tr>
         <tr><th scope="row"><label for="nb-team-min"><?php esc_html_e('Minimum rendelés (db)', 'nb-designer'); ?></label></th><td><input id="nb-team-min" type="number" min="1" step="1" name="nb_team[min_qty]" value="<?php echo esc_attr($team['min_qty']); ?>"></td></tr>
         <tr><th scope="row"><label for="nb-team-colors"><?php esc_html_e('Színek száma egy rendelésben legfeljebb', 'nb-designer'); ?></label></th><td><input id="nb-team-colors" type="number" min="1" max="20" step="1" name="nb_team[max_colors]" value="<?php echo esc_attr($team['max_colors']); ?>"></td></tr>
-        <tr><th scope="row"><label for="nb-team-personal"><?php esc_html_e('Név/szám felár (Ft / db)', 'nb-designer'); ?></label></th><td><input id="nb-team-personal" type="number" min="0" step="1" name="nb_team[personal_fee]" value="<?php echo esc_attr($team['personal_fee']); ?>"><p class="description"><?php esc_html_e('Azokra a darabokra, amelyekre a névsorból név vagy szám kerül. 0 = nincs felár.', 'nb-designer'); ?></p></td></tr>
-        <tr><th scope="row"><label for="nb-team-players"><?php esc_html_e('Játékosok száma egy rendelésben legfeljebb', 'nb-designer'); ?></label></th><td><input id="nb-team-players" type="number" min="1" max="300" step="1" name="nb_team[max_players]" value="<?php echo esc_attr($team['max_players']); ?>"></td></tr>
+        <tr><th scope="row"><label for="nb-team-personal"><?php esc_html_e('Név/szám felár a névsorból (Ft / db)', 'nb-designer'); ?></label></th><td><input id="nb-team-personal" type="number" min="0" step="1" name="nb_team[personal_fee]" value="<?php echo esc_attr($team['personal_fee']); ?>"><p class="description"><?php esc_html_e('Azokra a darabokra, amelyekre a névsorból név vagy szám kerül. 0 = nincs felár.', 'nb-designer'); ?></p></td></tr>
+        <tr><th scope="row"><label for="nb-team-players"><?php esc_html_e('Névsor sorainak száma egy rendelésben legfeljebb', 'nb-designer'); ?></label></th><td><input id="nb-team-players" type="number" min="1" max="300" step="1" name="nb_team[max_players]" value="<?php echo esc_attr($team['max_players']); ?>"></td></tr>
       </table>
-      <p class="description"><?php esc_html_e('A mennyiségi kedvezmény sávjai az Árazás oldalon állíthatók; itt a teljes darabárra (termék + nyomat) érvényesülnek.', 'nb-designer'); ?></p>
 
       <h2><?php esc_html_e('Elhelyezési segédsablonok', 'nb-designer'); ?></h2>
       <p class="description"><?php esc_html_e('A vásárló ezekkel egy kattintással a jó helyre és jó méretben teszi a logót vagy feliratot, utána szabadon módosíthatja. Vízszintes közép és felső él: 0–1 közötti arány a nyomtatási felülethez képest (0,5 = középen). Méret mm-ben. A név nélküli sor nem mentődik.', 'nb-designer'); ?></p>

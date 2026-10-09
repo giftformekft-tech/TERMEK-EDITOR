@@ -13,7 +13,9 @@ const fixture = {
   rest: 'http://nb.test/api/', nonce: 'test', cartUrl: 'http://nb.test/cart-confirmed',
   catalog: { 1: {
     id: 1, title: 'Prémium póló', types: ['Póló'], colors: ['Zöld', 'Kék', 'Fekete'], colors_by_type: { 'póló': ['Zöld', 'Kék', 'Fekete'] },
-    sizes: ['S', 'M', 'L', 'XL'], price_value: 5000, prices: { 'póló|kék|XL': 5500 },
+    sizes: ['S', 'M', 'L', 'XL'],
+    bands_by_type: { 'póló': [{ min: 1, max: 10, single: 6990, double: 1500 }, { min: 11, max: 0, single: 5990, double: 1200 }] },
+    size_fees_by_type: { 'póló': { XL: 500 } },
     map: { 'póló|zöld': { front: 'm1', back: 'm2' }, 'póló|kék': { front: 'm1', back: 'm2' }, 'póló|fekete': { front: 'm1', back: 'm2' } }
   } },
   mockups: {
@@ -21,14 +23,8 @@ const fixture = {
     m2: { id: 'm2', image_url: 'http://nb.test/shirt.svg', canvas_w: 480, canvas_h: 640, areas: [Object.assign({}, area, { id: 'area_back', role: 'back' })] }
   },
   colorMeta: {}, fonts: [],
-  discounts: [{ min_qty: 10, max_qty: 0, percent: 10 }],
   team: {
-    gap_mm: 20, min_qty: 1, max_colors: 8, personal_fee: 500, max_players: 100,
-    tiers: [
-      { id: 'small', label: 'Kis nyomat', max_w_mm: 100, max_h_mm: 100, price: 990 },
-      { id: 'medium', label: 'Közepes nyomat', max_w_mm: 210, max_h_mm: 297, price: 1490 },
-      { id: 'large', label: 'Nagy nyomat', max_w_mm: 297, max_h_mm: 420, price: 1990 }
-    ],
+    min_qty: 1, max_colors: 8, personal_fee: 500, max_players: 100,
     presets: [
       { id: 'work-left-chest', mode: 'work', side: 'front', kind: 'logo', label: 'Bal mell logó', cx: 0.7, top: 0.08, w_mm: 90, h_mm: 90, text: '' },
       { id: 'work-back-top', mode: 'work', side: 'back', kind: 'text', label: 'Hát felső cégnév', cx: 0.5, top: 0.05, w_mm: 260, h_mm: 50, text: 'CÉGNÉV' },
@@ -38,8 +34,12 @@ const fixture = {
   }
 };
 const shirt = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="640" viewBox="0 0 480 640"><rect width="480" height="640" fill="#f7f6f2"/><path d="M165 75 60 120 20 235 105 265 135 205 125 550Q240 575 355 550L345 205 375 265 460 235 420 120 315 75Q240 120 165 75Z" fill="#e9e1ce" stroke="#d4cbb8" stroke-width="2"/></svg>';
+const jerseyPath = (x, fill) => '<path transform="translate(' + x + ' 40)" d="M120 0 40 34 8 120 70 142 92 100 86 330Q170 346 254 330L248 100 270 142 332 120 300 34 220 0Q170 30 120 0Z" fill="' + fill + '"/>';
+const banner = '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="560" viewBox="0 0 1600 560"><rect width="1600" height="560" fill="#e8efe9"/><rect y="420" width="1600" height="140" fill="#cfe0d2"/>' + jerseyPath(330, '#1f7a3a') + jerseyPath(630, '#1b2a4a') + jerseyPath(930, '#1f7a3a') + '<text x="800" y="250" text-anchor="middle" font-family="Arial" font-weight="700" font-size="64" fill="#fff">10</text><text x="500" y="250" text-anchor="middle" font-family="Arial" font-weight="700" font-size="64" fill="#fff">7</text><text x="1100" y="250" text-anchor="middle" font-family="Arial" font-weight="700" font-size="64" fill="#fff">5</text></svg>';
 const logoPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAQMAAACXljzdAAAABlBMVEUAAAD/AAAb/40iAAAAAXRSTlMAQObYZgAAAB9JREFUaN7twTEBAAAAwqD1T20LL6AAAAAAAAAAAP4GHMgAAX2Nc0QAAAAASUVORK5CYII=', 'base64');
-const template = fs.readFileSync('templates/team-designer-page.php', 'utf8').replace(/<\?php[\s\S]*?\?>/, '');
+// A sablont valódi PHP rendereli (tests/render-team-page.php), adminban beállított választószövegekkel és képpel.
+const teamSettings = { intro: { title: 'Mit tervezel ma?', lead: 'Első sor\nMásodik sor', cards: { sport: { title: 'Focimez', text: 'Név és szám a háton.' } }, banner: { image_id: 12, title: 'Így készül a csapatmez', text: 'Tervezd meg, add meg a neveket.' } } };
+const template = require('child_process').execFileSync(process.env.PHP_BINARY || 'php', ['tests/render-team-page.php', JSON.stringify(teamSettings)], { encoding: 'utf8' });
 const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#fff;font-family:Arial}</style><link rel="stylesheet" href="/assets/css/team-designer.css">' + template + '<script>window.NB_TEAM=' + JSON.stringify(fixture) + '</script><script src="/tmp/ui-qa/fabric.min.js"></script><script src="/assets/js/team-designer.js"></script></html>';
 
 const objectsOn = (page, side) => page.evaluate(s => window.NBTeamDesigner.sides[s].canvas.getObjects().filter(o => !o.nbArea).map(o => o.type), side);
@@ -57,6 +57,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     if (u.pathname === '/') return route.fulfill({ contentType: 'text/html', body: html });
     if (u.pathname === '/tmp/ui-qa/fabric.min.js') return route.fulfill({ path: fabricPath, contentType: 'application/javascript' });
     if (u.pathname === '/shirt.svg') return route.fulfill({ contentType: 'image/svg+xml', body: shirt });
+    if (u.pathname === '/card-12.svg') return route.fulfill({ contentType: 'image/svg+xml', body: banner });
     if (u.pathname === '/api/team/order') {
       orderBody = JSON.parse(route.request().postData());
       return route.fulfill({ status: orderStatus, contentType: 'application/json', body: JSON.stringify(orderStatus === 200 ? { ok: true, redirect: 'http://nb.test/cart-confirmed' } : { message: 'Tesztelt kosárhiba' }) });
@@ -70,6 +71,21 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
   try {
     await page.goto('http://nb.test/');
     assert.equal(await page.locator('#nbt-work').isHidden(), true, 'workspace hidden before choosing a mode');
+    // Az adminban megadott választószövegek és kép; ami nincs megadva, az alapértéket kapja.
+    assert.equal(await page.locator('#nbt-mode-title').textContent(), 'Mit tervezel ma?');
+    assert.equal(await page.locator('.nbt-lead br').count(), 1, 'line breaks of the lead text are kept');
+    assert.equal(await page.locator('.nbt-kicker').textContent(), 'Csapat- és munkaruha tervező');
+    assert.equal(await page.locator('.nbt-mode-card[data-mode="sport"] strong').textContent(), 'Focimez');
+    assert.equal(await page.locator('.nbt-mode-card .nbt-mode-card__icon').count(), 2, 'the cards keep their icons');
+    assert.equal(await page.locator('.nbt-mode-card[data-mode="work"] strong').textContent(), 'Munkaruha, céges ruha');
+    // A nagy kép a kártyák alatt, teljes szélességben, alatta a cím és a leírás.
+    assert.equal(await page.locator('.nbt-mode-banner img').getAttribute('alt'), 'Kép 12');
+    assert.equal(await page.locator('.nbt-mode-banner h2').textContent(), 'Így készül a csapatmez');
+    await page.waitForFunction(() => document.querySelector('.nbt-mode-banner img').complete);
+    const grid = await page.locator('.nbt-mode__grid').boundingBox();
+    const banner = await page.locator('.nbt-mode-banner img').boundingBox();
+    assert.ok(banner.y > grid.y + grid.height && Math.abs(banner.width - grid.width) < 2, 'banner is below the cards at full width');
+    await page.screenshot({ path: 'tmp/ui-qa/team-mode.png', fullPage: true });
     await page.click('.nbt-mode-card[data-mode="work"]');
     await page.waitForSelector('#nbt-work:not([hidden])');
     assert.equal(await page.locator('.nbt-type[aria-pressed="true"]').count(), 1, 'first product preselected');
@@ -93,29 +109,45 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     });
     assert.deepEqual(logoBox, { w: 90, h: 90, x: 210 }, 'logo sized 9x9 cm at the left chest');
     assert.match(await page.locator('#nbt-size-readout').textContent(), /9,0 × 9,0 cm/);
+    assert.equal(await text(page, 'nbt-sum-sides'), 'Egyoldalas(elöl)');
+    assert.equal(await text(page, 'nbt-sum-unit'), '6990Ft', 'one-sided price of the first band');
+    assert.deepEqual(await page.locator('.nbt-bands__table tbody tr').evaluateAll(rows => rows.map(r => r.innerText.replace(/\s+/g, ' ').trim())), ['1–10 db 6 990 Ft 8 490 Ft', '11 db-tól 5 990 Ft 7 190 Ft'], 'price bands with one- and two-sided unit prices');
+
+    // Saját kép a logótól függetlenül: középre kerül, a logó marad.
+    const [imageChooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('#nbt-upload-image')]);
+    await imageChooser.setFiles({ name: 'foto.png', mimeType: 'image/png', buffer: logoPng });
+    await page.waitForFunction(() => window.NBTeamDesigner.sides.front.canvas.getObjects().filter(o => o.type === 'image').length === 2);
+    assert.equal(await page.locator('#nbt-logo-name').textContent(), 'logo.png', 'the own image does not replace the logo');
+    await page.click('#nbt-delete');
+    assert.deepEqual(await objectsOn(page, 'front'), ['image']);
+    assert.match(await page.locator('.nbt-colors-note').textContent(), /további színeket is hozzáadhatsz/);
 
     // Hátoldali felirat a sablonnal: átvált hátra, szerkeszthető a mezőben.
     await page.click('.nbt-chip:has-text("Hát felső cégnév")');
     assert.equal(await page.locator('.nbt-sides [data-side="back"]').getAttribute('aria-selected'), 'true');
     assert.deepEqual(await objectsOn(page, 'back'), ['text']);
-    await page.fill('#nbt-text-input', 'GIFT FOR ME KFT');
-    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().find(o => o.type === 'text').text), 'GIFT FOR ME KFT');
+    // Munkaruhán a felirat legfeljebb 3 soros.
+    assert.equal(await page.locator('#nbt-text-label').textContent(), 'Felirat (legfeljebb 3 sor)');
+    await page.fill('#nbt-text-input', 'GIFT FOR ME KFT\nBudapest\nÜzem 2\nnegyedik sor');
+    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().find(o => o.type === 'text').text), 'GIFT FOR ME KFT\nBudapest\nÜzem 2');
+    assert.equal(await page.locator('#nbt-bind-number').isHidden(), true, 'workwear texts offer the name only');
+    const backText = await page.evaluate(() => { const o = window.NBTeamDesigner.sides.back.canvas.getObjects().find(x => x.type === 'text'); return Math.round(o.getScaledWidth() * 300 / 190); });
+    assert.ok(backText <= 261, 'longer text keeps its 26 cm preset width: ' + backText);
 
-    // Két nyomat: kicsi elöl (990), közepes vagy nagy hátul.
+    // Elöl és hátul is van minta: kétoldalas, a sáv kétoldalas ára.
     await page.waitForTimeout(200);
-    const quote = await page.evaluate(() => { const q = window.NBTeamDesigner.computeQuote(); return { n: q.placements.length, unit: q.unitPrint, labels: q.placements.map(p => p.side + ':' + p.label) }; });
-    assert.equal(quote.n, 2, 'one print per side');
-    assert.ok(quote.labels.includes('front:Kis nyomat'), quote.labels.join());
-    assert.ok(quote.labels.includes('back:Közepes nyomat'), 'longer text keeps its 26 cm preset width: ' + quote.labels.join());
-    assert.equal(quote.unit, 990 + 1490);
-    assert.equal(await text(page, 'nbt-sum-print'), '+' + quote.unit + 'Ft(2nyomat)', 'print summary');
+    assert.equal(await text(page, 'nbt-sum-sides'), 'Kétoldalas(elölésháton)'.replace('háton', 'hátul'));
+    assert.equal(await text(page, 'nbt-sum-unit'), '8490Ft');
+    assert.equal(await page.locator('.nbt-bands__table th.is-active').textContent(), 'Kétoldalas');
 
     // Mennyiségek: zöld S5 M5, kék L3 XL2 = 15 db, 10% kedvezmény.
     const firstRow = page.locator('.nbt-row').first();
     assert.match(await firstRow.textContent(), /Zöld/);
     await firstRow.locator('input').nth(0).fill('5');
     await firstRow.locator('input').nth(1).fill('5');
-    await page.selectOption('#nbt-add-color', 'Kék');
+    await page.waitForTimeout(250);
+    assert.equal(await page.locator('#nbt-next-tier').textContent(), 'Még 1 db, és a darabár 7 190 Ft.', 'next band hint');
+    await page.click('.nbt-add-color__btn[data-color="Kék"]');
     await page.waitForFunction(() => document.querySelectorAll('.nbt-row').length === 2);
     const secondRow = page.locator('.nbt-row').nth(1);
     await secondRow.locator('input').nth(2).fill('3');
@@ -123,14 +155,18 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.waitForTimeout(250);
     assert.equal(await text(page, 'nbt-sum-qty'), '15db');
     assert.equal(await page.locator('#nbt-error').isHidden(), true, 'check message disappears once everything is set');
-    assert.equal(await page.locator('#nbt-sum-discount-row').isVisible(), true);
-    const expected = Math.round(((5000 + quote.unit) * 13 + (5500 + quote.unit) * 2) * 0.9);
-    assert.equal(await text(page, 'nbt-sum-total'), expected + 'Ft', 'total = (product + print) x qty, minus 10%');
+    assert.equal(await text(page, 'nbt-sum-unit'), '7190Ft', 'second band, two-sided');
+    assert.equal(await text(page, 'nbt-sum-size'), '+1000Ft(2db)', 'XL size surcharge on the two XL shirts');
+    assert.equal(await text(page, 'nbt-sum-total'), (15 * 7190 + 2 * 500) + 'Ft', 'total = band unit price x quantity + size surcharge');
+    assert.match(await page.locator('.nbt-row').first().locator('.nbt-size').nth(3).textContent(), /XL\+500 Ft/, 'the surcharge is shown at the size');
+    assert.equal(await page.locator('.nbt-add-color__btn .nbt-dot').count(), 1, 'remaining colours are offered with a swatch');
+    assert.equal(await page.locator('.nbt-bands__table tr.is-current td').first().textContent(), '11 db-tól');
+    assert.equal(await page.locator('#nbt-next-tier').isHidden(), true);
     assert.equal(await page.locator('.nbt-row.is-preview').textContent().then(t => /Kék/.test(t)), true, 'new colour is previewed');
 
     // Kontrasztfigyelmeztetés fekete feliratnál fekete ruhán.
     await page.evaluate(() => { const o = window.NBTeamDesigner.sides.back.canvas.getObjects().find(x => x.type === 'text'); o.set('fill', '#111111'); });
-    await page.selectOption('#nbt-add-color', 'Fekete');
+    await page.click('.nbt-add-color__btn[data-color="Fekete"]');
     await page.locator('.nbt-row').nth(2).locator('input').nth(0).fill('1');
     await page.waitForTimeout(250);
     assert.match(await page.locator('#nbt-warnings').textContent(), /fekete színű ruhán alig fog látszani/);
@@ -178,7 +214,8 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.goto('http://nb.test/');
     await page.click('.nbt-mode-card[data-mode="sport"]');
     await page.click('.nbt-chip:has-text("Hát név")');
-    assert.equal(await page.locator('.nbt-tabs [data-qty="roster"]').getAttribute('aria-selected'), 'true', 'a name preset opens the roster when nothing is ordered yet');
+    assert.equal(await page.locator('#nbt-step-roster').isVisible(), true, 'a name in the design brings up the roster as step 3');
+    assert.equal(await page.locator('#nbt-step-qty-num').textContent(), '4', 'quantities move to step 4');
     await page.click('.nbt-chip:has-text("Hát szám")');
     const backTexts = () => page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getObjects().filter(o => o.type === 'text').map(o => o.visible === false ? '' : o.text));
     const players = page.locator('.nbt-player');
@@ -213,16 +250,20 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.waitForTimeout(250);
     assert.equal(await text(page, 'nbt-sum-qty'), '3db');
     assert.match(await page.locator('#nbt-roster-sum').textContent(), /3 mez · Zöld – M: 1, L: 2/);
-    const rq = await page.evaluate(() => { const q = window.NBTeamDesigner.computeQuote(); return { personal: q.personalQty, unit: q.unitPrint, total: Math.round(q.total) }; });
+    const rq = await page.evaluate(() => { const q = window.NBTeamDesigner.computeQuote(); return { personal: q.personalQty, unit: q.unit, total: Math.round(q.total) }; });
     assert.equal(rq.personal, 2, 'the name/number surcharge applies to the two named shirts');
-    assert.equal(rq.total, (5000 + rq.unit) * 3 + 500 * 2);
-    // Darabszám fülre váltva összesítve látszik, és figyelmeztet, hogy a névhez névsor kell.
-    await page.click('.nbt-tabs [data-qty="grid"]');
-    assert.deepEqual(await page.locator('.nbt-row').first().locator('input').evaluateAll(els => els.map(e => e.value)), ['', '1', '2', '']);
-    await page.click('#nbt-cart');
-    assert.match(await page.locator('#nbt-error').textContent(), /Névsort/);
-    await page.click('.nbt-tabs [data-qty="roster"]');
-    assert.equal(await players.count(), 3, 'the roster is kept');
+    assert.equal(rq.unit, 6990, 'back only: one-sided');
+    assert.equal(rq.total, 6990 * 3 + 500 * 2);
+    assert.equal(await text(page, 'nbt-sum-personal'), '+500Ft×2db');
+    // Csapatmezen a felirat egysoros.
+    await page.click('#nbt-add-text');
+    await page.fill('#nbt-text-input', 'FC\nGIFT');
+    assert.equal(await page.evaluate(() => window.NBTeamDesigner.sides.back.canvas.getActiveObject().text), 'FC GIFT');
+    await page.click('#nbt-delete');
+    // A 4. csempe a névsorból összesít színenként és méretenként.
+    await page.waitForTimeout(250);
+    assert.deepEqual(await page.locator('#nbt-qty-summary .nbt-size b').allTextContents(), ['0', '1', '2', '0']);
+    assert.equal(await page.locator('#nbt-qty-grid').isHidden(), true, 'no separate quantity inputs next to the roster');
     // Kosárba: közös nyomat név nélkül + játékosonként név/szám fájl.
     orderStatus = 400; orderBody = null;
     await page.click('#nbt-cart');
@@ -261,17 +302,33 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
       const nameBox = await page.locator('.nbt-player__name').first().boundingBox();
       assert.ok(nameBox.height >= 42 && nameBox.width >= 160, 'roster name field is usable on phones: ' + JSON.stringify(nameBox));
       await page.screenshot({ path: 'tmp/ui-qa/team-roster-mobile-' + width + '.png', fullPage: true });
-      await page.click('.nbt-tabs [data-qty="grid"]');
-      const inputBox = await page.locator('.nbt-size input').first().boundingBox();
-      assert.ok(inputBox.height >= 44, 'size input touch target');
+      const inputBox = await page.locator('#nbt-qty-summary .nbt-size b').first().boundingBox();
+      assert.ok(inputBox.height >= 44, 'size cells keep their size');
       const mobileTile = await page.locator('.nbt-type__img').first().boundingBox();
       assert.ok(mobileTile.height <= 56, 'compact product tile on phones');
       const canvasBox = await page.locator('#nbt-canvas-frame').boundingBox();
       assert.ok(canvasBox.width <= width - 32 + 1, 'canvas fits gutters');
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: 'tmp/ui-qa/team-mobile-' + width + '.png', fullPage: true });
-      await page.click('.nbt-tabs [data-qty="roster"]');
     }
+
+    // Munkaruha névsor: csak név, szám nélkül.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.click('#nbt-change-mode');
+    await page.click('.nbt-mode-card[data-mode="work"]');
+    assert.equal(await page.locator('#nbt-step-roster').isVisible(), true);
+    assert.equal(await page.locator('.nbt-player__number').count(), 0, 'no number field for workwear');
+    assert.equal(await page.locator('#nbt-add-player').textContent(), '+ Név');
+    assert.equal(await page.locator('.nbt-player__name').first().getAttribute('placeholder'), '1. név');
+    await page.screenshot({ path: 'tmp/ui-qa/team-work-roster.png' });
+    // Ha a névmezők kikerülnek a tervből, a névsor eltűnik, és a darabszámok szerkeszthetők maradnak.
+    await page.evaluate(() => { const c = window.NBTeamDesigner.sides.back.canvas; c.getObjects().filter(o => o.nbBind).forEach(o => c.remove(o)); });
+    await page.click('#nbt-add-text');
+    await page.click('#nbt-delete');
+    await page.waitForTimeout(250);
+    assert.equal(await page.locator('#nbt-step-roster').isHidden(), true);
+    assert.equal(await page.locator('#nbt-step-qty-num').textContent(), '3');
+    assert.deepEqual(await page.locator('.nbt-row').first().locator('input').evaluateAll(els => els.map(e => e.value)), ['', '1', '2', ''], 'roster counts carry over to the quantity grid');
 
     assert.deepEqual(errors, [], 'no page errors');
     console.log('team designer smoke test passed');
