@@ -49,9 +49,11 @@ function nb_team_default_intro(){
     'title'  => 'Mit tervezel?',
     'lead'   => 'Tervezd meg egyszer, add meg a színeket és a méreteket, a mennyiségi kedvezményt pedig automatikusan számoljuk.',
     'cards'  => [
-      'work'  => ['title'=>'Munkaruha, céges ruha', 'text'=>'Logó a mellen, cégnév a háton. Egységes megjelenés a kollégáknak.', 'image_id'=>0],
-      'sport' => ['title'=>'Csapatmez, sportpóló', 'text'=>'Címer elöl, csapatnév és szám a háton.', 'image_id'=>0],
+      'work'  => ['title'=>'Munkaruha, céges ruha', 'text'=>'Logó a mellen, cégnév a háton. Egységes megjelenés a kollégáknak.'],
+      'sport' => ['title'=>'Csapatmez, sportpóló', 'text'=>'Címer elöl, csapatnév és szám a háton.'],
     ],
+    // Nagy kép a kártyák alatt, opcionális címmel és leírással.
+    'banner' => ['image_id'=>0, 'title'=>'', 'text'=>''],
   ];
 }
 
@@ -68,22 +70,26 @@ function nb_team_sanitize_intro($intro){
     $card = isset($intro['cards'][$key]) && is_array($intro['cards'][$key]) ? $intro['cards'][$key] : [];
     $title = sanitize_text_field($card['title'] ?? $card_defaults['title']);
     $clean['cards'][$key] = [
-      'title'    => $title !== '' ? $title : $card_defaults['title'],
-      'text'     => sanitize_textarea_field($card['text'] ?? $card_defaults['text']),
-      'image_id' => absint($card['image_id'] ?? 0),
+      'title' => $title !== '' ? $title : $card_defaults['title'],
+      'text'  => sanitize_textarea_field($card['text'] ?? $card_defaults['text']),
     ];
   }
+  $banner = isset($intro['banner']) && is_array($intro['banner']) ? $intro['banner'] : [];
+  $clean['banner'] = [
+    'image_id' => absint($banner['image_id'] ?? 0),
+    'title'    => sanitize_text_field($banner['title'] ?? ''),
+    'text'     => sanitize_textarea_field($banner['text'] ?? ''),
+  ];
   return $clean;
 }
 
-/** A sablonnak: a beállított szövegek és a képek URL-je. */
+/** A sablonnak: a beállított szövegek és a nagy kép URL-je. */
 function nb_team_intro_view(){
   $intro = nb_team_get_settings()['intro'];
-  foreach ($intro['cards'] as $key => $card){
-    $url = $card['image_id'] ? wp_get_attachment_image_url($card['image_id'], 'large') : '';
-    $intro['cards'][$key]['image_url'] = $url ?: '';
-    $intro['cards'][$key]['image_alt'] = $card['image_id'] ? (string)get_post_meta($card['image_id'], '_wp_attachment_image_alt', true) : '';
-  }
+  $image_id = $intro['banner']['image_id'];
+  $url = $image_id ? wp_get_attachment_image_url($image_id, 'full') : '';
+  $intro['banner']['image_url'] = $url ?: '';
+  $intro['banner']['image_alt'] = $image_id ? (string)get_post_meta($image_id, '_wp_attachment_image_alt', true) : '';
   return $intro;
 }
 
@@ -613,9 +619,9 @@ jQuery(function($){
     var frame = wp.media({ title: 'Kép kiválasztása', button: { text: 'Kiválasztom' }, library: { type: 'image' }, multiple: false });
     frame.on('select', function(){
       var file = frame.state().get('selection').first().toJSON();
-      var url = (file.sizes && (file.sizes.medium || file.sizes.full) || file).url;
+      var url = (file.sizes && (file.sizes.medium_large || file.sizes.large || file.sizes.full) || file).url;
       box.find('input[type=hidden]').val(file.id);
-      box.find('.nb-team-image__preview').html($('<img>').attr('src', url).css({maxWidth: '220px', height: 'auto', borderRadius: '8px', display: 'block'}));
+      box.find('.nb-team-image__preview').html($('<img>').attr('src', url).css({maxWidth: '360px', height: 'auto', borderRadius: '8px', display: 'block'}));
       box.find('.nb-team-image-remove').show();
     });
     frame.open();
@@ -681,26 +687,35 @@ function nb_team_admin_render(){
       <?php wp_nonce_field('nb_team_save'); ?>
 
       <h2><?php esc_html_e('Típusválasztó (első képernyő)', 'nb-designer'); ?></h2>
-      <p class="description"><?php esc_html_e('Ezt látja a vásárló, amikor megnyitja a tervezőt. Ha egy kártyához képet adsz, az ikon helyett az jelenik meg.', 'nb-designer'); ?></p>
+      <p class="description"><?php esc_html_e('Ezt látja a vásárló, amikor megnyitja a tervezőt.', 'nb-designer'); ?></p>
       <table class="form-table" role="presentation">
         <tr><th scope="row"><label for="nb-team-kicker"><?php esc_html_e('Felső címke', 'nb-designer'); ?></label></th><td><input id="nb-team-kicker" class="regular-text" type="text" name="nb_team[intro][kicker]" value="<?php echo esc_attr($intro['kicker']); ?>"></td></tr>
         <tr><th scope="row"><label for="nb-team-title"><?php esc_html_e('Cím', 'nb-designer'); ?></label></th><td><input id="nb-team-title" class="regular-text" type="text" name="nb_team[intro][title]" value="<?php echo esc_attr($intro['title']); ?>"></td></tr>
         <tr><th scope="row"><label for="nb-team-lead"><?php esc_html_e('Bevezető szöveg', 'nb-designer'); ?></label></th><td><textarea id="nb-team-lead" class="large-text" rows="3" name="nb_team[intro][lead]"><?php echo esc_textarea($intro['lead']); ?></textarea></td></tr>
-        <?php foreach (['work'=>__('Munkaruha kártya', 'nb-designer'), 'sport'=>__('Csapatmez kártya', 'nb-designer')] as $card_key => $card_label): $card = $intro['cards'][$card_key]; $card_name = 'nb_team[intro][cards]['.$card_key.']'; $card_image = $card['image_id'] ? wp_get_attachment_image_url($card['image_id'], 'medium') : ''; ?>
+        <?php foreach (['work'=>__('Munkaruha kártya', 'nb-designer'), 'sport'=>__('Csapatmez kártya', 'nb-designer')] as $card_key => $card_label): $card = $intro['cards'][$card_key]; $card_name = 'nb_team[intro][cards]['.$card_key.']'; ?>
           <tr>
             <th scope="row"><?php echo esc_html($card_label); ?></th>
             <td>
               <p><label><?php esc_html_e('Cím', 'nb-designer'); ?><br><input class="regular-text" type="text" name="<?php echo esc_attr($card_name); ?>[title]" value="<?php echo esc_attr($card['title']); ?>"></label></p>
               <p><label><?php esc_html_e('Leírás', 'nb-designer'); ?><br><textarea class="large-text" rows="2" name="<?php echo esc_attr($card_name); ?>[text]"><?php echo esc_textarea($card['text']); ?></textarea></label></p>
-              <div class="nb-team-image">
-                <input type="hidden" name="<?php echo esc_attr($card_name); ?>[image_id]" value="<?php echo esc_attr($card['image_id']); ?>">
-                <div class="nb-team-image__preview" style="margin:6px 0"><?php if ($card_image): ?><img src="<?php echo esc_url($card_image); ?>" alt="" style="max-width:220px;height:auto;border-radius:8px;display:block"><?php endif; ?></div>
-                <button type="button" class="button nb-team-image-pick"><?php esc_html_e('Kép kiválasztása', 'nb-designer'); ?></button>
-                <button type="button" class="button-link nb-team-image-remove" style="margin-left:8px;<?php echo $card_image ? '' : 'display:none'; ?>"><?php esc_html_e('Kép eltávolítása', 'nb-designer'); ?></button>
-              </div>
             </td>
           </tr>
         <?php endforeach; ?>
+        <?php $banner = $intro['banner']; $banner_image = $banner['image_id'] ? wp_get_attachment_image_url($banner['image_id'], 'medium_large') : ''; ?>
+        <tr>
+          <th scope="row"><?php esc_html_e('Nagy kép a kártyák alatt', 'nb-designer'); ?></th>
+          <td>
+            <div class="nb-team-image">
+              <input type="hidden" name="nb_team[intro][banner][image_id]" value="<?php echo esc_attr($banner['image_id']); ?>">
+              <div class="nb-team-image__preview" style="margin:0 0 6px"><?php if ($banner_image): ?><img src="<?php echo esc_url($banner_image); ?>" alt="" style="max-width:360px;height:auto;border-radius:8px;display:block"><?php endif; ?></div>
+              <button type="button" class="button nb-team-image-pick"><?php esc_html_e('Kép kiválasztása', 'nb-designer'); ?></button>
+              <button type="button" class="button-link nb-team-image-remove" style="margin-left:8px;<?php echo $banner_image ? '' : 'display:none'; ?>"><?php esc_html_e('Kép eltávolítása', 'nb-designer'); ?></button>
+            </div>
+            <p class="description"><?php esc_html_e('Teljes szélességben jelenik meg a két kártya alatt. Ajánlott: fekvő kép, legalább 1600 px széles.', 'nb-designer'); ?></p>
+            <p><label><?php esc_html_e('Cím (nem kötelező)', 'nb-designer'); ?><br><input class="regular-text" type="text" name="nb_team[intro][banner][title]" value="<?php echo esc_attr($banner['title']); ?>"></label></p>
+            <p><label><?php esc_html_e('Leírás (nem kötelező)', 'nb-designer'); ?><br><textarea class="large-text" rows="4" name="nb_team[intro][banner][text]"><?php echo esc_textarea($banner['text']); ?></textarea></label></p>
+          </td>
+        </tr>
       </table>
 
       <h2><?php esc_html_e('Termékek', 'nb-designer'); ?></h2>

@@ -13,12 +13,8 @@ $nbt_icons = [
     <?php if (!empty($nbt_intro['lead'])): ?><p class="nbt-lead"><?php echo nl2br(esc_html($nbt_intro['lead'])); ?></p><?php endif; ?>
     <div class="nbt-mode__grid">
       <?php foreach (['work', 'sport'] as $nbt_key): $nbt_card = $nbt_intro['cards'][$nbt_key] ?? []; ?>
-        <button type="button" class="nbt-mode-card<?php echo !empty($nbt_card['image_url']) ? ' has-image' : ''; ?>" data-mode="<?php echo esc_attr($nbt_key); ?>">
-          <?php if (!empty($nbt_card['image_url'])): ?>
-            <span class="nbt-mode-card__media"><img src="<?php echo esc_url($nbt_card['image_url']); ?>" alt="<?php echo esc_attr($nbt_card['image_alt'] ?? ''); ?>" loading="lazy"></span>
-          <?php else: ?>
-            <span class="nbt-mode-card__icon" aria-hidden="true"><?php echo $nbt_icons[$nbt_key]; // statikus SVG ?></span>
-          <?php endif; ?>
+        <button type="button" class="nbt-mode-card" data-mode="<?php echo esc_attr($nbt_key); ?>">
+          <span class="nbt-mode-card__icon" aria-hidden="true"><?php echo $nbt_icons[$nbt_key]; // statikus SVG ?></span>
           <strong><?php echo esc_html($nbt_card['title'] ?? ''); ?></strong>
           <?php if (!empty($nbt_card['text'])): ?><span class="nbt-mode-card__text"><?php echo nl2br(esc_html($nbt_card['text'])); ?></span><?php endif; ?>
         </button>
@@ -29,6 +25,17 @@ $nbt_icons = [
       <button type="button" class="nbt-btn nbt-btn--primary" id="nbt-draft-restore">Folytatom</button>
       <button type="button" class="nbt-btn" id="nbt-draft-discard">Újat kezdek</button>
     </div>
+    <?php $nbt_banner = $nbt_intro['banner'] ?? []; if (!empty($nbt_banner['image_url']) || !empty($nbt_banner['title']) || !empty($nbt_banner['text'])): ?>
+      <figure class="nbt-mode-banner">
+        <?php if (!empty($nbt_banner['image_url'])): ?><img src="<?php echo esc_url($nbt_banner['image_url']); ?>" alt="<?php echo esc_attr($nbt_banner['image_alt'] ?? ''); ?>" loading="lazy"><?php endif; ?>
+        <?php if (!empty($nbt_banner['title']) || !empty($nbt_banner['text'])): ?>
+          <figcaption>
+            <?php if (!empty($nbt_banner['title'])): ?><h2><?php echo esc_html($nbt_banner['title']); ?></h2><?php endif; ?>
+            <?php if (!empty($nbt_banner['text'])): ?><p><?php echo nl2br(esc_html($nbt_banner['text'])); ?></p><?php endif; ?>
+          </figcaption>
+        <?php endif; ?>
+      </figure>
+    <?php endif; ?>
   </section>
 
   <section class="nbt-work" id="nbt-work" hidden>

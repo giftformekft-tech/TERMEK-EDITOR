@@ -38,9 +38,11 @@ const fixture = {
   }
 };
 const shirt = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="640" viewBox="0 0 480 640"><rect width="480" height="640" fill="#f7f6f2"/><path d="M165 75 60 120 20 235 105 265 135 205 125 550Q240 575 355 550L345 205 375 265 460 235 420 120 315 75Q240 120 165 75Z" fill="#e9e1ce" stroke="#d4cbb8" stroke-width="2"/></svg>';
+const jerseyPath = (x, fill) => '<path transform="translate(' + x + ' 40)" d="M120 0 40 34 8 120 70 142 92 100 86 330Q170 346 254 330L248 100 270 142 332 120 300 34 220 0Q170 30 120 0Z" fill="' + fill + '"/>';
+const banner = '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="560" viewBox="0 0 1600 560"><rect width="1600" height="560" fill="#e8efe9"/><rect y="420" width="1600" height="140" fill="#cfe0d2"/>' + jerseyPath(330, '#1f7a3a') + jerseyPath(630, '#1b2a4a') + jerseyPath(930, '#1f7a3a') + '<text x="800" y="250" text-anchor="middle" font-family="Arial" font-weight="700" font-size="64" fill="#fff">10</text><text x="500" y="250" text-anchor="middle" font-family="Arial" font-weight="700" font-size="64" fill="#fff">7</text><text x="1100" y="250" text-anchor="middle" font-family="Arial" font-weight="700" font-size="64" fill="#fff">5</text></svg>';
 const logoPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAQMAAACXljzdAAAABlBMVEUAAAD/AAAb/40iAAAAAXRSTlMAQObYZgAAAB9JREFUaN7twTEBAAAAwqD1T20LL6AAAAAAAAAAAP4GHMgAAX2Nc0QAAAAASUVORK5CYII=', 'base64');
 // A sablont valódi PHP rendereli (tests/render-team-page.php), adminban beállított választószövegekkel és képpel.
-const teamSettings = { intro: { title: 'Mit tervezel ma?', lead: 'Első sor\nMásodik sor', cards: { sport: { title: 'Focimez', text: 'Név és szám a háton.', image_id: 12 } } } };
+const teamSettings = { intro: { title: 'Mit tervezel ma?', lead: 'Első sor\nMásodik sor', cards: { sport: { title: 'Focimez', text: 'Név és szám a háton.' } }, banner: { image_id: 12, title: 'Így készül a csapatmez', text: 'Tervezd meg, add meg a neveket.' } } };
 const template = require('child_process').execFileSync(process.env.PHP_BINARY || 'php', ['tests/render-team-page.php', JSON.stringify(teamSettings)], { encoding: 'utf8' });
 const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#fff;font-family:Arial}</style><link rel="stylesheet" href="/assets/css/team-designer.css">' + template + '<script>window.NB_TEAM=' + JSON.stringify(fixture) + '</script><script src="/tmp/ui-qa/fabric.min.js"></script><script src="/assets/js/team-designer.js"></script></html>';
 
@@ -58,7 +60,8 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     if (u.hostname !== 'nb.test') return route.abort();
     if (u.pathname === '/') return route.fulfill({ contentType: 'text/html', body: html });
     if (u.pathname === '/tmp/ui-qa/fabric.min.js') return route.fulfill({ path: fabricPath, contentType: 'application/javascript' });
-    if (u.pathname === '/shirt.svg' || u.pathname === '/card-12.svg') return route.fulfill({ contentType: 'image/svg+xml', body: shirt });
+    if (u.pathname === '/shirt.svg') return route.fulfill({ contentType: 'image/svg+xml', body: shirt });
+    if (u.pathname === '/card-12.svg') return route.fulfill({ contentType: 'image/svg+xml', body: banner });
     if (u.pathname === '/api/team/order') {
       orderBody = JSON.parse(route.request().postData());
       return route.fulfill({ status: orderStatus, contentType: 'application/json', body: JSON.stringify(orderStatus === 200 ? { ok: true, redirect: 'http://nb.test/cart-confirmed' } : { message: 'Tesztelt kosárhiba' }) });
@@ -77,12 +80,16 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     assert.equal(await page.locator('.nbt-lead br').count(), 1, 'line breaks of the lead text are kept');
     assert.equal(await page.locator('.nbt-kicker').textContent(), 'Csapat- és munkaruha tervező');
     assert.equal(await page.locator('.nbt-mode-card[data-mode="sport"] strong').textContent(), 'Focimez');
-    assert.equal(await page.locator('.nbt-mode-card[data-mode="sport"] img').getAttribute('alt'), 'Kép 12');
-    assert.equal(await page.locator('.nbt-mode-card[data-mode="sport"] .nbt-mode-card__icon').count(), 0, 'the image replaces the icon');
-    assert.equal(await page.locator('.nbt-mode-card[data-mode="work"] .nbt-mode-card__icon').count(), 1, 'a card without an image keeps its icon');
+    assert.equal(await page.locator('.nbt-mode-card .nbt-mode-card__icon').count(), 2, 'the cards keep their icons');
     assert.equal(await page.locator('.nbt-mode-card[data-mode="work"] strong').textContent(), 'Munkaruha, céges ruha');
-    await page.waitForFunction(() => document.querySelector('.nbt-mode-card img').complete);
-    await page.screenshot({ path: 'tmp/ui-qa/team-mode.png' });
+    // A nagy kép a kártyák alatt, teljes szélességben, alatta a cím és a leírás.
+    assert.equal(await page.locator('.nbt-mode-banner img').getAttribute('alt'), 'Kép 12');
+    assert.equal(await page.locator('.nbt-mode-banner h2').textContent(), 'Így készül a csapatmez');
+    await page.waitForFunction(() => document.querySelector('.nbt-mode-banner img').complete);
+    const grid = await page.locator('.nbt-mode__grid').boundingBox();
+    const banner = await page.locator('.nbt-mode-banner img').boundingBox();
+    assert.ok(banner.y > grid.y + grid.height && Math.abs(banner.width - grid.width) < 2, 'banner is below the cards at full width');
+    await page.screenshot({ path: 'tmp/ui-qa/team-mode.png', fullPage: true });
     await page.click('.nbt-mode-card[data-mode="work"]');
     await page.waitForSelector('#nbt-work:not([hidden])');
     assert.equal(await page.locator('.nbt-type[aria-pressed="true"]').count(), 1, 'first product preselected');

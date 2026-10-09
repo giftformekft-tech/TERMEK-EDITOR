@@ -59,10 +59,11 @@
 .nbt-mode-card:hover { border-color: var(--nbt-accent); background: var(--nbt-card); color: var(--nbt-ink); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(22,24,29,.08); }
 .nbt-mode-card strong { font-size: 21px; line-height: 1.2; }
 .nbt-mode-card__text { color: var(--nbt-muted); }
-.nbt-mode-card__media { display: block; width: 100%; aspect-ratio: 16 / 9; margin-bottom: 8px; border-radius: 12px; overflow: hidden; background: var(--nbt-soft); }
-.nbt-mode-card__media img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.nbt-mode-card.has-image { padding: 12px 12px 20px; }
-.nbt-mode-card.has-image strong, .nbt-mode-card.has-image .nbt-mode-card__text { padding: 0 8px; }
+.nbt-mode-banner { display: grid; gap: 16px; margin: 18px 0 0; }
+.nbt-mode-banner img { display: block; width: 100%; height: auto; border-radius: 18px; }
+.nbt-mode-banner figcaption { display: grid; gap: 8px; max-width: 760px; }
+.nbt-mode-banner h2 { font-size: clamp(22px, 3vw, 30px); line-height: 1.2; }
+.nbt-mode-banner p { color: var(--nbt-muted); }
 .nbt-mode-card__icon { width: 56px; height: 56px; color: var(--nbt-accent); }
 .nbt-mode-card__icon svg { width: 100%; height: 100%; }
 .nbt-draft { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--nbt-soft); }
