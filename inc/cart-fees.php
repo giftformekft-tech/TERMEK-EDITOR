@@ -74,13 +74,16 @@ add_action('woocommerce_cart_calculate_fees', function($cart){
   $total_fee = 0; $has=false;
   $discount_groups = [];
   foreach ($cart->get_cart() as $item){
-    if (!empty($item['nb_design_id'])){
+    $line_fee = 0;
+    // A csapattervező tételeinél a nyomat ára már a darabárban van.
+    if (!empty($item['nb_design_id']) && empty($item['nb_team'])){
       $has=true;
       $override = [];
       if (!empty($item['nb_price_ctx_override']) && is_array($item['nb_price_ctx_override'])){
         $override = $item['nb_price_ctx_override'];
       }
-      $total_fee += nb_calc_fee_for_design($item['nb_design_id'], $override);
+      $line_fee = nb_calc_fee_for_design($item['nb_design_id'], $override);
+      $total_fee += $line_fee;
     }
     if (!empty($item['nb_bulk_group_id'])){
       $group_id = (string)$item['nb_bulk_group_id'];
@@ -104,7 +107,8 @@ add_action('woocommerce_cart_calculate_fees', function($cart){
             $line_total = floatval($item['data']->get_price()) * $quantity;
           }
         }
-        $discount_groups[$group_id]['base'] += max(0, $line_total);
+        // A kedvezmény a teljes árra jár: termék + a tételhez tartozó nyomat.
+        $discount_groups[$group_id]['base'] += max(0, $line_total) + max(0, $line_fee);
       }
     }
   }
