@@ -986,7 +986,24 @@
         if (index === state.activePlayer) displayPlayer();
         scheduleRefresh();
       });
-      name.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); number.focus(); } });
+      // „Kaci 5” egyben is beírható: a végén álló számot a szám mezőbe tesszük.
+      const splitNameNumber = () => {
+        const m = name.value.match(/^(.*\S)\s+#?(\d{1,3})$/);
+        if (!m || player.number) return false;
+        name.value = player.name = m[1];
+        number.value = player.number = m[2];
+        if (index === state.activePlayer) displayPlayer();
+        scheduleRefresh();
+        return true;
+      };
+      name.addEventListener('blur', splitNameNumber);
+      name.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        if (!splitNameNumber()) { number.focus(); return; }
+        const next = el.roster.querySelectorAll('.nbt-player__name')[index + 1];
+        if (next) next.focus(); else addPlayer();
+      });
       number.addEventListener('keydown', e => {
         if (e.key !== 'Enter') return;
         e.preventDefault();

@@ -196,6 +196,14 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await players.nth(1).locator('.nbt-player__number').press('Enter');
     assert.equal(await players.count(), 3, 'Enter in the number field adds the next player');
     assert.deepEqual(await backTexts(), ['', ''], 'a blank shirt shows no name or number');
+    // „Kaci 5” egyben: Enterre szétválik névre és számra, és jön a következő sor.
+    await players.nth(2).locator('.nbt-player__name').fill('Kaci 5');
+    await players.nth(2).locator('.nbt-player__name').press('Enter');
+    assert.equal(await players.nth(2).locator('.nbt-player__name').inputValue(), 'Kaci');
+    assert.equal(await players.nth(2).locator('.nbt-player__number').inputValue(), '5');
+    assert.equal(await players.count(), 4, 'Enter after a combined entry adds the next player');
+    await players.nth(3).locator('.nbt-player__remove').click();
+    await players.nth(2).locator('.nbt-player__name').fill('');
     await players.nth(2).locator('.nbt-player__number').fill('10');
     await page.waitForTimeout(250);
     assert.match(await page.locator('#nbt-warnings').textContent(), /10-es szám többször szerepel: KOVÁCS, \(név nélkül\)/);

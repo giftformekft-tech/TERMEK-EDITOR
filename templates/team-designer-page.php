@@ -88,7 +88,7 @@
           <label class="nbt-add-color" id="nbt-add-color-wrap"><span>+ Másik szín hozzáadása</span><select id="nbt-add-color"></select></label>
         </div>
         <div id="nbt-qty-roster" hidden>
-          <p class="nbt-help">Mezenként egy sor. A darabszámot a névsorból számoljuk; név vagy szám nélkül is felvehetsz mezt. Kattints egy játékosra, és a mezen az ő neve látszik.</p>
+          <p class="nbt-help">Mezenként egy sor: név és szám párban (a névmezőbe egyben is írhatod, pl. „Kaci 5”). A darabszámot a névsorból számoljuk; név vagy szám nélkül is felvehetsz mezt. Kattints egy játékosra, és a mezen az ő neve látszik.</p>
           <div class="nbt-roster" id="nbt-roster"></div>
           <button type="button" class="nbt-btn" id="nbt-add-player">+ Játékos</button>
           <p class="nbt-roster-sum" id="nbt-roster-sum"></p>
