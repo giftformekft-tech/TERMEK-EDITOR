@@ -15,6 +15,23 @@ A `/tervezd-meg/` oldal tervezője egyetlen, mobilra és asztali gépre egyarán
 - A böngésző automatikusan megjegyzi a befejezetlen tervet, és visszatéréskor felajánlja a folytatást. Sikeres kosárba tétel után a piszkozat törlődik.
 - A vászon belső mérete fix, csak a megjelenítés méreteződik, így ablakméret-változáskor vagy a mobilbillentyűzet megjelenésekor a tervben lévő elemek nem mozdulnak el.
 
+## Csapatruha tervező (2.3)
+
+Külön modul a `/csapatruha-tervezo/` oldalon (`[nb_team_designer]` shortcode). Az oldal automatikusan létrejön; a webhely menüjébe a Megjelenés → Menük oldalon vehető fel. Az eredeti `/tervezd-meg/` tervezőt nem érinti, a beállításait csak olvassa (termékek, színek, méretek, mockupok, kedvezménysávok).
+
+- **Típusválasztó:** munkaruha / céges ruha vagy csapatmez / sportpóló. A `?mode=work` vagy `?mode=sport` paraméterrel közvetlenül indítható, a `nb_product` és `nb_type` paraméter előválasztja a terméket.
+- **Termék és alapszín:** az előnézet a választott szín mockupján látszik, elöl és hátul.
+- **Elhelyezési segédsablonok:** egy kattintással a jó helyre és mm-ben megadott méretre kerül a logó, felirat vagy szám (pl. bal mell logó 9×9 cm, hát szám 25 cm). Utána minden elem szabadon mozgatható és méretezhető; a nyomtatási felületből nem lóghat ki.
+- **Színek × méretek:** színenként egy sor, méretenként darabszám. Bármennyi szín hozzáadható (az adminban beállított korlátig), a darabszámok összeadódnak.
+- **Ár:** darabonként a termék (variációs) ára + a nyomatok fix ára. Egy nyomat a terv egy oldalán egymáshoz közeli elemek csoportja; az árát a befoglaló méretéhez illő sáv adja (Kis / Közepes / Nagy). A mennyiségi kedvezmény a teljes darabárra jár. Az árat a szerver újraszámolja, a kosárban a darabár tartalmazza a nyomatot.
+- **Figyelmeztetések:** ha egy felirat beleolvad valamelyik rendelt színbe, vagy a logó felbontása kevés a választott mérethez.
+- **Kosárba:** egy kattintással; a nyomdai PNG oldalanként egyszer készül (300 dpi, legfeljebb 3600 px széles), az előnézet színenként. Minden szín–méret páros külön kosársor, egy kedvezménycsoportban.
+- **Piszkozat:** a böngésző megjegyzi a befejezetlen tervet, és visszatéréskor felajánlja a folytatást.
+
+Beállítások: **Terméktervező → Csapatruha tervező** (termékek, nyomatsávok ára és mérete, csoportosítási távolság, minimum darabszám, színek száma, segédsablonok). A `/csapatpolo/` oldal gombjai erre a modulra mutatnak.
+
+A mennyiségi kedvezmény az eredeti tervezőben is a termék és a hozzá tartozó egyedi nyomat együttes árára jár.
+
 ## Tervező megjelenése
 
 A Terméktervező → Megjelenés oldalon a teljes tervezői felület színvilága és lekerekítése állítható. A módosítások élő miniatűr előnézetben láthatók, az alapértékek visszaállítása pedig csak a mezőket és az előnézetet módosítja; a tartós alkalmazáshoz külön mentés szükséges. A beállítások a meglévő termék-, mockup- és árazási konfigurációtól függetlenül, az `appearance` kulcs alatt tárolódnak.

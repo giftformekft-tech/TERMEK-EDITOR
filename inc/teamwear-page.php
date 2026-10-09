@@ -132,7 +132,8 @@ function nb_teamwear_render($attributes = []){
   $attributes = wp_parse_args(is_array($attributes) ? $attributes : [], nb_teamwear_block_defaults());
   $types = function_exists('nb_home_block_types') ? nb_home_block_types() : [];
   $tiers = nb_teamwear_discount_tiers();
-  $designer_url = nb_home_block_designer_url();
+  // A csapatpóló oldal gombjai a csapatruha-tervező típusválasztójára visznek.
+  $designer_url = function_exists('nb_team_designer_url') ? nb_team_designer_url() : nb_home_block_designer_url();
   $page_style = sprintf(
     '--nbtw-ink:%s;--nbtw-paper:%s;--nbtw-accent:%s;--nbtw-blue:%s;',
     nb_home_block_color($attributes['inkColor'], '#17191c'),
@@ -229,7 +230,7 @@ function nb_teamwear_render($attributes = []){
           </header>
           <div class="nb-teamwear-type-grid">
             <?php foreach ($types as $type): ?>
-              <a class="nb-teamwear-type" href="<?php echo esc_url(nb_home_block_designer_url($type['productId'], $type['label'])); ?>">
+              <a class="nb-teamwear-type" href="<?php echo esc_url(function_exists('nb_team_designer_url') ? add_query_arg(['nb_product'=>absint($type['productId']), 'nb_type'=>$type['label']], nb_team_designer_url()) : nb_home_block_designer_url($type['productId'], $type['label'])); ?>">
                 <span class="nb-teamwear-type__image">
                   <?php if ($type['image']): ?>
                     <img src="<?php echo esc_url($type['image']); ?>" alt="<?php echo esc_attr($type['label']); ?>" loading="lazy">
