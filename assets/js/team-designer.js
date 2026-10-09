@@ -240,7 +240,11 @@
 
   function fitCanvasCss() {
     const frameWidth = el.frame.clientWidth || 360;
-    const maxHeight = Math.max(280, Math.min(window.innerHeight * (window.innerWidth < 960 ? 0.58 : 0.78), 900));
+    // Asztali gépen a vászon a mellette lévő szerkesztővel együtt elfér a képernyőn, így görgetés közben is teljesen látszik.
+    const desktop = window.innerWidth >= 960;
+    const maxHeight = desktop
+      ? Math.max(340, Math.min(window.innerHeight - 340, 820))
+      : Math.max(280, Math.min(window.innerHeight * 0.58, 640));
     ['front', 'back'].forEach(side => {
       const c = sides[side].canvas;
       const scale = Math.min(frameWidth / c.getWidth(), maxHeight / c.getHeight());
@@ -692,7 +696,7 @@
       btn.type = 'button';
       btn.className = 'nbt-type';
       btn.setAttribute('aria-pressed', state.option && state.option.key === opt.key ? 'true' : 'false');
-      btn.innerHTML = '<span class="nbt-type__img"></span><span class="nbt-type__label"></span><small></small>';
+      btn.innerHTML = '<span class="nbt-type__img"></span><span class="nbt-type__text"><span class="nbt-type__label"></span><small></small></span>';
       if (opt.image) {
         const img = document.createElement('img');
         img.src = opt.image; img.alt = ''; img.loading = 'lazy';
@@ -984,6 +988,7 @@
 
   let errorIsCheck = false;
   function showError(message, isCheck) {
+    if (isCheck && errorIsCheck && el.error.textContent !== message) el.toast.hidden = true;
     errorIsCheck = !!isCheck;
     el.error.textContent = message;
     el.error.hidden = !message;

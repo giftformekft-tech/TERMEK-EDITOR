@@ -136,7 +136,20 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await page.locator('.nbt-row').nth(2).locator('.nbt-row__remove').click();
     await page.waitForTimeout(250);
     assert.equal(await text(page, 'nbt-sum-qty'), '15db');
-    await page.screenshot({ path: 'tmp/ui-qa/team-desktop.png', fullPage: true });
+    // A tapadó tervező oszlop kijelölt elemmel is kifér a képernyőre.
+    await page.evaluate(() => { const c = window.NBTeamDesigner.sides.back.canvas; c.setActiveObject(c.getObjects().find(o => o.type === 'text')); c.fire('selection:created'); });
+    await page.waitForTimeout(100);
+    const stage = await page.locator('.nbt-stage').boundingBox();
+    assert.ok(stage.height <= 1000 - 16, 'stage fits the viewport: ' + stage.height);
+    const tileImg = await page.locator('.nbt-type__img').first().boundingBox();
+    assert.ok(tileImg.height <= 56, 'compact product tile');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: 'tmp/ui-qa/team-desktop.png' });
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(100);
+    const stuck = await page.locator('#nbt-canvas-frame').boundingBox();
+    assert.ok(stuck.y >= 0 && stuck.y < 100, 'canvas stays in view while scrolling: ' + stuck.y);
+    await page.screenshot({ path: 'tmp/ui-qa/team-desktop-scrolled.png' });
 
     // Kosárhiba: üzenet, a felület használható marad.
     await page.click('#nbt-cart');
@@ -182,8 +195,11 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
       assert.equal(await page.locator('#nbt-bar').isVisible(), true);
       const inputBox = await page.locator('.nbt-size input').first().boundingBox();
       assert.ok(inputBox.height >= 44, 'size input touch target');
+      const mobileTile = await page.locator('.nbt-type__img').first().boundingBox();
+      assert.ok(mobileTile.height <= 56, 'compact product tile on phones');
       const canvasBox = await page.locator('#nbt-canvas-frame').boundingBox();
       assert.ok(canvasBox.width <= width - 32 + 1, 'canvas fits gutters');
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: 'tmp/ui-qa/team-mobile-' + width + '.png', fullPage: true });
     }
 
