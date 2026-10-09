@@ -182,7 +182,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     await firstRow.locator('input').nth(1).fill('5');
     await page.waitForTimeout(250);
     assert.equal(await page.locator('#nbt-next-tier').textContent(), 'Még 1 db, és a darabár 7 190 Ft.', 'next band hint');
-    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-product="1|póló"][data-color="Kék"]');
+    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-dropdown__product[data-product="1|póló"]'); await page.click('.nbt-add-color__btn[data-product="1|póló"][data-color="Kék"]');
     await page.waitForFunction(() => document.querySelectorAll('.nbt-row').length === 2);
     const secondRow = page.locator('.nbt-row').nth(1);
     await secondRow.locator('input').nth(2).fill('3');
@@ -198,12 +198,23 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     assert.equal(await page.locator('.nbt-dropdown__list').isHidden(), true);
     await page.click('.nbt-dropdown__toggle');
     assert.equal(await page.locator('.nbt-dropdown__list').isVisible(), true);
-    assert.equal(await page.locator('.nbt-add-color__btn .nbt-dot').count(), 3, 'remaining colours (and the other product) are offered with a swatch');
-    assert.deepEqual(await page.locator('.nbt-dropdown__group').allTextContents(), ['Póló (Prémium póló) (a terv alapja)', 'Gyerekpóló'], 'colours grouped by product');
+    // Először a termékek látszanak, kattintásra a lista a termék színeire vált.
+    assert.deepEqual(await page.locator('.nbt-dropdown__product .nbt-dropdown__name').allTextContents(), ['Póló (Prémium póló)a terv alapja', 'Gyerekpóló'], 'the list starts with the products');
+    assert.equal(await page.locator('.nbt-dropdown__product[data-product="1|póló"] .nbt-dropdown__count').textContent(), '1 szín');
+    await page.click('.nbt-dropdown__product[data-product="2|gyerekpóló"]');
+    assert.equal(await page.locator('.nbt-dropdown__list').isVisible(), true, 'choosing a product keeps the list open');
+    assert.equal(await page.locator('.nbt-add-color__btn[data-color] .nbt-dot').count(), 2, 'the colours of the chosen product, with a swatch');
+    assert.equal(await page.locator('.nbt-dropdown__back').textContent(), '‹ Gyerekpóló', 'the chosen product is shown above its colours');
+    await page.click('.nbt-dropdown__back');
+    assert.equal(await page.locator('.nbt-dropdown__product').count(), 2, 'back returns to the products');
     await page.click('#nbt-step-qty-title');
     assert.equal(await page.locator('.nbt-dropdown__list').isHidden(), true, 'clicking outside closes the list');
     await page.focus('.nbt-dropdown__toggle'); await page.keyboard.press('ArrowDown');
-    assert.equal(await page.evaluate(() => document.activeElement.dataset.color), 'Fekete', 'keyboard opens the list on the first colour');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.product), '1|póló', 'keyboard opens the list on the first product');
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.color), 'Fekete', 'arrow right opens the product on its first colour');
+    await page.keyboard.press('ArrowLeft');
+    assert.equal(await page.locator('.nbt-dropdown__product').count(), 2, 'arrow left goes back');
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('.nbt-dropdown__list').isHidden(), true);
     assert.equal(await page.locator('.nbt-bands__table tr.is-current td').first().textContent(), '11 db-tól');
@@ -212,7 +223,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
 
     // Kontrasztfigyelmeztetés fekete feliratnál fekete ruhán.
     await page.evaluate(() => { const o = window.NBTeamDesigner.sides.back.canvas.getObjects().find(x => x.type === 'text'); o.set('fill', '#111111'); });
-    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-product="1|póló"][data-color="Fekete"]');
+    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-dropdown__product[data-product="1|póló"]'); await page.click('.nbt-add-color__btn[data-product="1|póló"][data-color="Fekete"]');
     await page.locator('.nbt-row').nth(2).locator('input').nth(0).fill('1');
     await page.waitForTimeout(250);
     assert.match(await page.locator('#nbt-warnings').textContent(), /fekete színű ruhán alig fog látszani/);
@@ -222,7 +233,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
 
     // Gyerekpóló ugyanabban a rendelésben: a terv a kisebb felületre igazodik, a darabszám összeadódik.
     const logoBefore = await logoAt();
-    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-add-color__btn[data-product="2|gyerekpóló"][data-color="Zöld"]');
+    await page.click('.nbt-dropdown__toggle'); await page.click('.nbt-dropdown__product[data-product="2|gyerekpóló"]'); await page.click('.nbt-add-color__btn[data-product="2|gyerekpóló"][data-color="Zöld"]');
     await page.evaluate(() => window.NBTeamDesigner.viewIdle());
     assert.equal(await page.locator('#nbt-view-note').isVisible(), true, 'the other product is shown as a preview');
     assert.match(await page.locator('#nbt-view-text').textContent(), /Gyerekpóló · Zöld/);

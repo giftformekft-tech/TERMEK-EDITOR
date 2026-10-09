@@ -254,3 +254,13 @@
   .nbt-mode-card, .nbt-swatch { transition: none; }
   .nbt-spinner { animation-duration: 2s; }
 }
+/* Másik szín vagy termék: előbb a termék, aztán a színei */
+.nbt-dropdown__product { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; }
+.nbt-dropdown__product::after { content: "›"; grid-column: 4; color: var(--nbt-muted); font-size: 20px; line-height: 1; }
+.nbt-dropdown__name { display: grid; min-width: 0; }
+.nbt-dropdown__name small { color: var(--nbt-muted); font-size: 12px; font-weight: 500; }
+.nbt-dropdown__dots { display: flex; }
+.nbt-dropdown__dots .nbt-dot { width: 16px; height: 16px; margin-left: -4px; box-shadow: 0 0 0 2px #fff; }
+.nbt-dropdown__count { color: var(--nbt-muted); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.nbt .nbt-dropdown__back { min-height: 40px; color: var(--nbt-muted); font-size: 14px; border-bottom: 1px solid var(--nbt-line); border-radius: 8px 8px 0 0; margin-bottom: 2px; }
+@media (max-width: 420px) { .nbt-dropdown__dots { display: none; } }

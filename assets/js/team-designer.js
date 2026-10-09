@@ -1529,30 +1529,75 @@
     list.setAttribute('role', 'listbox');
     list.setAttribute('aria-label', 'Szín hozzáadása');
     list.hidden = true;
-    groups.forEach(group => {
-      if (many) {
-        const title = document.createElement('p');
-        title.className = 'nbt-dropdown__group';
-        title.textContent = optionLabel(group.key) + (group.key === masterKey() ? ' (a terv alapja)' : '');
-        list.appendChild(title);
-      }
-      group.colors.forEach(color => {
-        const option = document.createElement('button');
-        option.type = 'button';
-        option.className = 'nbt-add-color__btn';
-        option.setAttribute('role', 'option');
-        option.dataset.color = color;
-        option.dataset.product = group.key;
-        const dot = document.createElement('span');
-        dot.className = 'nbt-dot';
-        const hex = colorHex(color);
-        if (hex) dot.style.setProperty('--swatch', hex);
-        option.appendChild(dot);
-        option.appendChild(document.createTextNode(colorLabel(color)));
-        option.addEventListener('click', () => { close(); addColorRow(color, group.key); });
-        list.appendChild(option);
+    // Több terméknél két lépés: előbb a termék, aztán annak a színei.
+    const colorButton = (color, key) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'nbt-add-color__btn';
+      option.setAttribute('role', 'option');
+      option.dataset.color = color;
+      option.dataset.product = key;
+      const dot = document.createElement('span');
+      dot.className = 'nbt-dot';
+      const hex = colorHex(color);
+      if (hex) dot.style.setProperty('--swatch', hex);
+      option.appendChild(dot);
+      option.appendChild(document.createTextNode(colorLabel(color)));
+      option.addEventListener('click', () => { close(); addColorRow(color, key); });
+      return option;
+    };
+    const showProducts = () => {
+      list.innerHTML = '';
+      groups.forEach(group => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'nbt-add-color__btn nbt-dropdown__product';
+        item.setAttribute('role', 'option');
+        item.dataset.product = group.key;
+        const name = document.createElement('span');
+        name.className = 'nbt-dropdown__name';
+        name.textContent = optionLabel(group.key);
+        if (group.key === masterKey()) {
+          const note = document.createElement('small');
+          note.textContent = 'a terv alapja';
+          name.appendChild(note);
+        }
+        const dots = document.createElement('span');
+        dots.className = 'nbt-dropdown__dots';
+        group.colors.slice(0, 6).forEach(color => {
+          const dot = document.createElement('span');
+          dot.className = 'nbt-dot';
+          const hex = colorHex(color);
+          if (hex) dot.style.setProperty('--swatch', hex);
+          dots.appendChild(dot);
+        });
+        const count = document.createElement('span');
+        count.className = 'nbt-dropdown__count';
+        count.textContent = group.colors.length + ' szín';
+        item.append(name, dots, count);
+        item.addEventListener('click', e => { e.stopPropagation(); showColors(group); });
+        list.appendChild(item);
       });
-    });
+      toggle.textContent = 'Válassz terméket…';
+    };
+    const showColors = (group, focus = true) => {
+      list.innerHTML = '';
+      if (many) {
+        const back = document.createElement('button');
+        back.type = 'button';
+        back.className = 'nbt-add-color__btn nbt-dropdown__back';
+        back.textContent = '‹ ' + optionLabel(group.key);
+        back.setAttribute('aria-label', 'Vissza a termékekhez');
+        back.addEventListener('click', e => { e.stopPropagation(); showProducts(); const first = options()[0]; if (first) first.focus(); });
+        list.appendChild(back);
+        toggle.textContent = 'Válassz színt…';
+      }
+      group.colors.forEach(color => list.appendChild(colorButton(color, group.key)));
+      const first = list.querySelector('.nbt-add-color__btn:not(.nbt-dropdown__back)');
+      if (focus && first) first.focus();
+    };
+    if (many) showProducts();
+    else if (groups[0]) showColors(groups[0], false);
     const options = () => Array.from(list.querySelectorAll('.nbt-add-color__btn'));
     const open = () => {
       list.hidden = false;
@@ -1563,6 +1608,7 @@
       list.hidden = true;
       toggle.setAttribute('aria-expanded', 'false');
       document.removeEventListener('click', outside, true);
+      if (many) showProducts();
     };
     const outside = e => { if (!dropdown.contains(e.target)) close(); };
     toggle.addEventListener('click', () => { if (list.hidden) open(); else close(); });
@@ -1580,6 +1626,8 @@
       if (e.key === 'Escape') { e.preventDefault(); close(); toggle.focus(); }
       else if (e.key === 'ArrowDown') { e.preventDefault(); (all[index + 1] || all[0]).focus(); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); (all[index - 1] || all[all.length - 1]).focus(); }
+      else if (e.key === 'ArrowRight' && document.activeElement.classList.contains('nbt-dropdown__product')) { e.preventDefault(); document.activeElement.click(); }
+      else if ((e.key === 'ArrowLeft' || e.key === 'Backspace') && list.querySelector('.nbt-dropdown__back')) { e.preventDefault(); list.querySelector('.nbt-dropdown__back').click(); }
     });
     dropdown.appendChild(toggle);
     dropdown.appendChild(list);
