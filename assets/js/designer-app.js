@@ -38,12 +38,18 @@
     return false;
   }
 
-  function isEditableTarget(target) {
+  // Keyboard shortcuts only step aside while the user is actually typing
+  // (text fields, selects, sliders); a focused button must not block them.
+  function isTypingTarget(target) {
     if (!target || typeof target !== 'object') return false;
     if (target.isContentEditable) return true;
-    if (target.ownerDocument && target.ownerDocument.designMode === 'on') return true;
     const tag = target.tagName ? target.tagName.toLowerCase() : '';
-    return tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button';
+    if (tag === 'textarea' || tag === 'select') return true;
+    if (tag === 'input') {
+      const type = (target.type || 'text').toLowerCase();
+      return ['checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file'].indexOf(type) === -1;
+    }
+    return false;
   }
 
   let touchDragActive = false;
@@ -111,61 +117,37 @@
   applyObjectUiDefaults(fabric.Object.prototype);
 
   const baseControlProfile = {
-    cornerSize: fabric.Object.prototype.cornerSize,
-    touchCornerSize: fabric.Object.prototype.touchCornerSize,
     borderScaleFactor: fabric.Object.prototype.borderScaleFactor,
   };
-  function getRetinaScale() {
-    if (typeof c.getRetinaScaling === 'function') {
-      const scaling = c.getRetinaScaling();
-      if (Number.isFinite(scaling) && scaling > 0) {
-        return scaling;
-      }
-    }
-    if (typeof fabric.devicePixelRatio === 'number' && fabric.devicePixelRatio > 0) {
-      return fabric.devicePixelRatio;
-    }
-    if (typeof window !== 'undefined' && typeof window.devicePixelRatio === 'number' && window.devicePixelRatio > 0) {
-      return window.devicePixelRatio;
-    }
-    return 1;
-  }
+  // The canvas keeps a fixed logical size (the mockup reference size) and is
+  // only scaled with CSS to fit the stage. Control handles are drawn in logical
+  // pixels, so they are compensated by the current CSS scale to keep a steady
+  // on-screen size on every device.
+  let canvasCssScale = 1;
   function profileForKey(key) {
-    const retina = Math.max(1, getRetinaScale());
-    const baseCorner = Number.isFinite(baseControlProfile.cornerSize) && baseControlProfile.cornerSize > 0
-      ? baseControlProfile.cornerSize
-      : 13;
-    const baseTouch = Number.isFinite(baseControlProfile.touchCornerSize) && baseControlProfile.touchCornerSize > 0
-      ? baseControlProfile.touchCornerSize
-      : Math.max(baseCorner * 2, 26);
+    const scale = canvasCssScale > 0 ? canvasCssScale : 1;
     const borderScaleFactor = Number.isFinite(baseControlProfile.borderScaleFactor) && baseControlProfile.borderScaleFactor > 0
       ? baseControlProfile.borderScaleFactor
       : 1;
-    const clampCorner = (cssPx, minCss) => {
-      const desiredCss = Math.max(minCss, cssPx);
-      const raw = desiredCss / (retina || 1);
-      return Math.max(4, Math.round(raw));
-    };
+    const toLogical = cssPx => Math.max(4, Math.round(cssPx / scale));
     if (key === 'mobile') {
-      const cornerSize = clampCorner(baseCorner * 1.75, 34);
-      const touchCornerSize = clampCorner(Math.max(baseTouch * 1.6, baseCorner * 4), 64);
+      const cornerSize = toLogical(18);
       return {
         cornerSize,
-        touchCornerSize: Math.max(touchCornerSize, cornerSize + 2),
+        touchCornerSize: Math.max(toLogical(44), cornerSize + 2),
         borderScaleFactor,
       };
     }
-    const cornerSize = clampCorner(baseCorner, baseCorner);
-    const touchCornerSize = clampCorner(baseTouch, baseTouch);
+    const cornerSize = toLogical(12);
     return {
       cornerSize,
-      touchCornerSize: Math.max(touchCornerSize, cornerSize + 2),
+      touchCornerSize: Math.max(toLogical(30), cornerSize + 2),
       borderScaleFactor,
     };
   }
   let activeControlSignature = '';
   const controlMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
-    ? window.matchMedia('(max-width: 720px)')
+    ? window.matchMedia('(max-width: 768px), (pointer: coarse)')
     : null;
 
   function applyControlProfile(profile) {
@@ -289,15 +271,19 @@
   const colorSel = document.getElementById('nb-color');
   const sizeSel = document.getElementById('nb-size');
   if (!typeSel || !productSel || !colorSel || !sizeSel) return;
-  const productModal = document.getElementById('nb-product-modal');
-  const productModalTrigger = document.getElementById('nb-product-modal-trigger');
+  const appEl = document.getElementById('nb-designer');
   const modalTypeList = document.getElementById('nb-modal-type-list');
   const modalProductList = document.getElementById('nb-modal-product-list');
-  const colorModal = document.getElementById('nb-color-modal');
-  const colorModalTrigger = document.getElementById('nb-color-modal-trigger');
+  const productGroupEl = document.getElementById('nb-product-group');
+  const typeGroupEl = document.getElementById('nb-type-group');
   const modalColorList = document.getElementById('nb-modal-color-list');
   const colorModalLabel = document.getElementById('nb-color-modal-label');
   const sizeButtonsWrap = document.getElementById('nb-size-buttons');
+  const sizeValueEl = document.getElementById('nb-size-value');
+  const sizeGroupEl = document.getElementById('nb-size-group');
+  const productChipTitle = document.getElementById('nb-product-chip-title');
+  const productChipMeta = document.getElementById('nb-product-chip-meta');
+  const productChipSwatch = document.getElementById('nb-product-chip-swatch');
   const bulkModal = document.getElementById('nb-bulk-modal');
   const bulkModalTrigger = document.getElementById('nb-bulk-modal-trigger');
   const bulkModalList = document.getElementById('nb-bulk-size-list');
@@ -305,16 +291,14 @@
   const bulkDiscountSection = document.getElementById('nb-bulk-discount-section');
   const bulkDiscountTable = document.getElementById('nb-bulk-discount-table');
   const bulkDiscountHint = document.getElementById('nb-bulk-discount-hint');
-  const selectionSummaryEl = document.getElementById('nb-selection-summary');
+  const orderChecklistEl = document.getElementById('nb-order-checklist');
   const productTitleEl = document.getElementById('nb-product-title');
   const priceDisplayEl = document.getElementById('nb-price-display');
   const priceBaseEl = document.getElementById('nb-price-base');
   const priceSurchargeRow = document.getElementById('nb-price-surcharge-row');
   const priceSurchargeValueEl = document.getElementById('nb-price-surcharge');
   const priceTotalEl = document.getElementById('nb-price-total');
-  const priceTotalMobileEl = document.getElementById('nb-price-total-mobile');
   const studioTotalEl = document.getElementById('nb-studio-total');
-  const studioCheckout = document.getElementById('nb-studio-checkout');
   const studioOrderBtn = document.getElementById('nb-studio-order');
   const studioDesignStatus = document.getElementById('nb-studio-design-status');
   const studioSelectionHint = document.getElementById('nb-studio-selection-hint');
@@ -388,93 +372,72 @@
   const zoomResetBtn = document.getElementById('nb-zoom-reset');
   const zoomLevelEl = document.getElementById('nb-zoom-level');
   const doubleSidedToggle = document.getElementById('nb-double-sided-toggle');
+  const doubleSidedNote = document.getElementById('nb-double-sided-note');
   const sideStatusEl = document.getElementById('nb-side-status');
+  const sideBackFeeEl = document.getElementById('nb-side-back-fee');
   const printSummaryEl = document.getElementById('nb-print-summary');
   const canvasEmptyHintEl = document.getElementById('nb-canvas-empty-hint');
-  const sideButtons = Array.from(document.querySelectorAll('[data-nb-side]'));
-  const sideFabButton = document.getElementById('nb-side-toggle-mobile');
+  const sideButtons = Array.from(document.querySelectorAll('button[data-nb-side]'));
   const undoBtn = document.getElementById('nb-undo-btn');
   const redoBtn = document.getElementById('nb-redo-btn');
+  const textInputEl = document.getElementById('nb-text-input');
+  const textContentEl = document.getElementById('nb-text-content');
+  const previewToggleBtn = document.getElementById('nb-preview-toggle');
+  const stageCanvasEl = document.getElementById('nb-stage-canvas');
+  const canvasFrameEl = document.getElementById('nb-canvas-frame');
+  const quickbarEl = document.getElementById('nb-quickbar');
+  const quickButtons = {};
+  Array.from(document.querySelectorAll('[data-nb-quick]')).forEach(btn => {
+    const key = btn.dataset.nbQuick;
+    if (key) quickButtons[key] = btn;
+  });
+  const layerCountBadges = Array.from(document.querySelectorAll('[data-nb-layer-count]'));
+  const toastsEl = document.getElementById('nb-toasts');
+  const dialogEl = document.getElementById('nb-dialog');
+  const propertiesEmptyEl = document.getElementById('nb-properties-empty');
+  const templatesList = document.getElementById('nb-templates-list');
+  const templatesCats = document.getElementById('nb-template-categories');
+  const templateSearch = document.getElementById('nb-template-search-input');
+
+  // Panels: the same markup is a docked column on desktop and a bottom sheet on phones.
   const mobileMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
     ? window.matchMedia('(max-width: 768px)')
     : null;
-  const mobileToolbar = document.getElementById('nb-mobile-toolbar');
-  const mobileStatusBar = document.getElementById('nb-mobile-status');
-  const mobileSelectionLabel = document.getElementById('nb-mobile-selection-label');
-  const mobileCompleteBtn = document.getElementById('nb-mobile-complete');
-  const mobileBulkBtn = document.getElementById('nb-mobile-bulk');
-  const mobileSheet = document.getElementById('nb-mobile-sheet');
-  const mobileSheetContent = document.getElementById('nb-mobile-sheet-content');
-  const mobileSheetTitle = document.getElementById('nb-mobile-sheet-title');
-  const mobileSheetClose = document.getElementById('nb-mobile-sheet-close');
-  const mobileSheetOverlay = document.getElementById('nb-mobile-sheet-overlay');
-  const mobileSheetHandle = document.getElementById('nb-mobile-sheet-handle');
-  const mobileQuickButtons = {};
-  Array.from(document.querySelectorAll('[data-nb-mobile-action]')).forEach(btn => {
-    const key = btn.dataset.nbMobileAction;
-    if (!key) return;
-    mobileQuickButtons[key] = btn;
+  const tabletMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
+    ? window.matchMedia('(min-width: 769px) and (max-width: 1199px)')
+    : null;
+  const sheets = {};
+  Array.from(document.querySelectorAll('[data-nb-sheet]')).forEach(el => {
+    sheets[el.dataset.nbSheet] = el;
   });
-  const mobileToolbarButtons = new Map();
-  if (mobileToolbar) {
-    Array.from(mobileToolbar.querySelectorAll('[data-nb-sheet-target]')).forEach(btn => {
-      const key = btn.dataset.nbSheetTarget;
-      if (!key) return;
-      mobileToolbarButtons.set(key, btn);
-    });
-  }
-  const rail = document.getElementById('nb-rail');
-  const railButtons = new Map();
-  if (rail) {
-    Array.from(rail.querySelectorAll('[data-nb-rail-target]')).forEach(btn => {
-      const key = btn.dataset.nbRailTarget;
-      if (!key) return;
-      railButtons.set(key, btn);
-    });
-  }
-  const flyout = document.getElementById('nb-flyout');
-  const flyoutContent = document.getElementById('nb-flyout-content');
-  const flyoutTitle = document.getElementById('nb-flyout-title');
-  const flyoutClose = document.getElementById('nb-flyout-close');
-  const propertiesEmptyEl = document.getElementById('nb-properties-empty');
-  const designerShell = document.querySelector('.nb-designer-shell');
-  const flyoutState = { activeKey: '' };
-
-  const sheetSources = new Map();
-  Array.from(document.querySelectorAll('[data-nb-sheet-source]')).forEach(node => {
-    const key = node.dataset.nbSheetSource;
-    if (!key || sheetSources.has(key)) return;
-    const title = (node.dataset.nbSheetTitle || (node.getAttribute('aria-label') || '')).trim() || (function () {
-      const heading = node.querySelector('h2,h3');
-      return heading && heading.textContent ? heading.textContent.trim() : '';
-    })();
-    sheetSources.set(key, {
-      key,
-      node,
-      parent: node.parentNode,
-      nextSibling: node.nextSibling,
-      title
-    });
+  const toolPanels = new Map();
+  Array.from(document.querySelectorAll('[data-nb-panel]')).forEach(el => {
+    toolPanels.set(el.dataset.nbPanel, el);
   });
-  const sectionBundles = {
-    sides: ['sides', 'double'],
-    elements: ['elements'],
-    shapes: ['shapes'],
-    upload: ['upload'],
-    templates: ['templates'],
-    addtext: ['addtext'],
-    product: ['product', 'color', 'size', 'double'],
-    layers: ['layers'],
-    properties: ['text', 'image', 'align', 'appearance', 'properties-empty'],
-    cart: ['cart']
-  };
-  const sheetState = {
-    activeKey: '',
+  const toolButtons = Array.from(document.querySelectorAll('[data-nb-tool]'));
+  const inspectorTabs = Array.from(document.querySelectorAll('[data-nb-inspector-tab]'));
+  const inspectorPanes = new Map();
+  Array.from(document.querySelectorAll('[data-nb-inspector-pane]')).forEach(el => {
+    inspectorPanes.set(el.dataset.nbInspectorPane, el);
+  });
+  const propertySections = new Map();
+  Array.from(document.querySelectorAll('[data-nb-section]')).forEach(el => {
+    propertySections.set(el.dataset.nbSection, el);
+  });
+  const uiState = {
+    tool: 'product',
+    inspectorTab: 'properties',
+    sheet: '',
     expanded: false,
     historyDepth: 0,
-    pendingClose: false
+    pendingClose: false,
+    preview: false
   };
   let sheetDragState = null;
+  const DRAFT_STORAGE_KEY = 'nb_designer_draft_v1';
+  const draftState = { savedAt: 0, timer: null, suppressed: false };
+  let guideToast = null;
+  let layerSelectInProgress = false;
 
   const loadedFontUrls = new Set();
   const designState = { savedDesignId: null, dirty: true };
@@ -618,26 +581,112 @@
     return hasSizeValue();
   }
 
+  function missingSelectionKeys() {
+    const sel = currentSelection();
+    const missing = [];
+    if (!sel || !sel.pid) missing.push('product');
+    if (!colorSel.value) missing.push('color');
+    if (!hasSizeValue()) missing.push('size');
+    return missing;
+  }
+
+  function updateDesignStatus() {
+    if (!studioDesignStatus) return;
+    let state = 'idle';
+    let text = 'Még nincs mentve';
+    if (saving) {
+      state = 'saving';
+      text = 'Terv mentése…';
+    } else if (!designState.dirty && designState.savedDesignId) {
+      state = 'saved';
+      text = 'Terv elmentve';
+    } else if (draftState.savedAt) {
+      state = 'draft';
+      text = 'Piszkozat mentve';
+    }
+    studioDesignStatus.dataset.state = state;
+    studioDesignStatus.textContent = text;
+  }
+
+  function checklistIcon(done) {
+    return '<span class="nb-check-mark" aria-hidden="true">' + (done ? '<svg class="nb-icon"><use href="#nb-i-check"/></svg>' : '') + '</span>';
+  }
+
+  function renderOrderChecklist() {
+    if (!orderChecklistEl) return;
+    const sel = currentSelection();
+    const colorLabel = getColorLabel();
+    const sizeLabel = sizeSel.value || '';
+    const frontHasContent = sideHasContent('front');
+    const backHasContent = doubleSidedEnabled && sideHasContent('back');
+    const rows = [
+      { key: 'product', label: 'Termék', value: sel && sel.pid ? (sel.cfg && sel.cfg.title ? sel.cfg.title : 'kiválasztva') : '', action: 'Választok', hideWhenDone: true },
+      { key: 'color', label: 'Szín', value: colorLabel, action: 'Választok' },
+      { key: 'size', label: 'Méret', value: sizeLabel, action: 'Választok' },
+      { key: 'design', label: 'Terv', value: (frontHasContent || backHasContent) ? (backHasContent ? (frontHasContent ? 'előlap és hátlap' : 'hátlap') : 'előlap') : '', action: 'Tervezek', optional: true }
+    ];
+    orderChecklistEl.innerHTML = '';
+    rows.forEach(row => {
+      const done = !!row.value;
+      if (done && row.hideWhenDone) return;
+      const li = document.createElement('li');
+      const inner = document.createElement(done ? 'div' : 'button');
+      inner.className = 'nb-check-item ' + (done ? 'is-done' : (row.optional ? 'is-optional' : 'is-missing'));
+      if (!done) {
+        inner.type = 'button';
+        inner.addEventListener('click', () => {
+          if (row.key === 'design') {
+            openTool('upload');
+          } else {
+            guideToSelection(row.key);
+          }
+        });
+      }
+      inner.innerHTML = checklistIcon(done);
+      const label = document.createElement('span');
+      label.className = 'nb-check-label';
+      label.appendChild(document.createTextNode(row.label + ': '));
+      const value = document.createElement('strong');
+      value.textContent = done ? row.value : (row.optional ? 'még üres' : 'nincs kiválasztva');
+      label.appendChild(value);
+      inner.appendChild(label);
+      if (!done) {
+        const action = document.createElement('span');
+        action.className = 'nb-check-action';
+        action.textContent = row.action;
+        inner.appendChild(action);
+      }
+      li.appendChild(inner);
+      orderChecklistEl.appendChild(li);
+    });
+  }
+
   function updateActionStates() {
     const ready = hasCompleteSelection();
     const busy = saving || actionSubmitting;
     if (studioOrderBtn) studioOrderBtn.disabled = busy;
-    if (studioDesignStatus) {
-      studioDesignStatus.dataset.state = saving ? 'saving' : (!designState.dirty && designState.savedDesignId ? 'saved' : 'dirty');
-      studioDesignStatus.textContent = saving ? 'Terv mentése…' : (!designState.dirty && designState.savedDesignId ? 'Terv elmentve' : 'Mentés kosárba helyezéskor');
-    }
+    updateDesignStatus();
     if (studioSelectionHint) {
-      studioSelectionHint.textContent = ready ? 'A tervet kosárba helyezéskor mentjük.' : 'Válassz terméket, színt és méretet a rendeléshez.';
+      const missing = missingSelectionKeys();
+      let hint = 'A tervet a kosárba helyezéskor mentjük.';
+      if (missing.length) {
+        const names = { product: 'terméket', color: 'színt', size: 'méretet' };
+        hint = 'A rendeléshez válassz ' + missing.map(k => names[k]).join(', ') + '.';
+      }
+      studioSelectionHint.textContent = hint;
     }
+    // The cart buttons stay clickable when something is missing: a click
+    // explains what to choose instead of silently doing nothing.
     if (addToCartBtn) {
-      addToCartBtn.disabled = !ready || busy;
+      addToCartBtn.disabled = busy;
+      addToCartBtn.dataset.ready = ready ? 'true' : 'false';
+      addToCartBtn.classList.toggle('is-busy', busy);
     }
     if (bulkModalTrigger) {
-      const sizesAvailable = hasSizeOptions();
-      bulkModalTrigger.disabled = !ready || !sizesAvailable || busy;
+      bulkModalTrigger.disabled = busy || !hasSizeOptions();
+      bulkModalTrigger.dataset.ready = ready ? 'true' : 'false';
     }
-    syncMobileCompleteState();
-    syncMobileBulkState();
+    renderOrderChecklist();
   }
 
   function parseFontEntry(entry) {
@@ -814,6 +863,28 @@
     return list.some(entry => normalizedTypeValue(entry) === normalized);
   }
 
+  // Common Hungarian colour names, so swatches show a real colour even when
+  // the admin has not set a hex code for the colour.
+  const HU_COLOR_NAMES = {
+    'fekete': '#1c1c1c', 'fehér': '#ffffff', 'natúr': '#efe6d2', 'krém': '#f3ead6', 'ekrü': '#efe6d2',
+    'piros': '#d32f2f', 'vörös': '#c62828', 'bordó': '#7b1f2b', 'meggy': '#8e1b32',
+    'kék': '#1e5bd8', 'királykék': '#1f4fbf', 'sötétkék': '#1b2a4a', 'tengerészkék': '#1b2a4a', 'navy': '#1b2a4a',
+    'világoskék': '#8ec5ff', 'égkék': '#8ec5ff', 'babakék': '#bcdcff', 'türkiz': '#1fb5b0', 'petrol': '#1d5c63',
+    'zöld': '#2e7d32', 'sötétzöld': '#1b4d2b', 'világoszöld': '#8bd17c', 'fűzöld': '#4caf50', 'menta': '#a8e6cf',
+    'khaki': '#8a8456', 'oliva': '#6b6b2f', 'olíva': '#6b6b2f', 'keki': '#8a8456',
+    'sárga': '#f6d32d', 'mustár': '#d4a017', 'narancs': '#f57c00', 'narancssárga': '#f57c00', 'barack': '#ffcba4', 'korall': '#ff7f6e',
+    'lila': '#7b3fa6', 'padlizsán': '#4b2a4f', 'levendula': '#b9a3e3', 'rózsaszín': '#f48fb1', 'pink': '#ec407a', 'magenta': '#c2185b',
+    'szürke': '#9e9e9e', 'világosszürke': '#d0d0d0', 'sötétszürke': '#4a4a4a', 'melírszürke': '#b5b5b5', 'melír': '#b5b5b5',
+    'antracit': '#3b3d40', 'grafit': '#41434a', 'ezüst': '#c0c0c0', 'arany': '#c9a227',
+    'barna': '#6d4c41', 'csokoládé': '#4e342e', 'bézs': '#d8c3a5', 'homok': '#d9c7a3', 'teve': '#b38b59'
+  };
+
+  function hungarianColorCode(cleaned) {
+    if (!cleaned) return '';
+    const compact = cleaned.replace(/[\s_-]+/g, '');
+    return HU_COLOR_NAMES[cleaned] || HU_COLOR_NAMES[compact] || '';
+  }
+
   function colorCodeFromText(str) {
     if (typeof str !== 'string') return '';
     const configured = settings.color_meta && typeof settings.color_meta === 'object'
@@ -825,7 +896,7 @@
     const cleaned = str.replace(/\([^)]*\)/g, '').trim().toLowerCase();
     const canCheck = typeof CSS !== 'undefined' && typeof CSS.supports === 'function';
     if (cleaned && canCheck && CSS.supports('color', cleaned)) return cleaned;
-    return '';
+    return hungarianColorCode(cleaned);
   }
 
   function variantHasActiveMockup(cfg, typeValue, colorValue, list) {
@@ -901,6 +972,24 @@
     }
   }
 
+  function colorMetaFor(rawColor) {
+    if (!settings.color_meta || typeof settings.color_meta !== 'object') return null;
+    return settings.color_meta[normalizedColorValue(rawColor)] || null;
+  }
+
+  function applySwatchStyle(el, rawColor) {
+    if (!el) return;
+    el.style.removeProperty('--swatch-color');
+    el.style.backgroundImage = '';
+    const colorCode = colorCodeFromText(rawColor || '');
+    if (colorCode) el.style.setProperty('--swatch-color', colorCode);
+    const meta = colorMetaFor(rawColor || '');
+    if (meta && meta.texture_url) {
+      el.style.backgroundImage = `url("${String(meta.texture_url).replace(/["\\]/g, '\\$&')}")`;
+      el.style.backgroundSize = 'cover';
+    }
+  }
+
   function renderColorChoices() {
     if (!modalColorList) {
       updateColorTriggerLabel();
@@ -908,39 +997,27 @@
     }
     modalColorList.innerHTML = '';
     const options = Array.from(colorSel.options);
-    const hasOptions = options.length > 0;
-    if (colorModalTrigger) {
-      if (hasOptions) {
-        colorModalTrigger.removeAttribute('disabled');
-      } else {
-        colorModalTrigger.setAttribute('disabled', 'disabled');
-      }
-    }
-    if (!hasOptions) {
+    if (!options.length) {
       const empty = document.createElement('div');
       empty.className = 'nb-modal-empty';
       empty.textContent = 'Ehhez a termékhez nincs szín beállítva.';
       modalColorList.appendChild(empty);
-      closeColorModal();
       updateColorTriggerLabel();
       return;
     }
     options.forEach(opt => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'nb-modal-swatch' + (opt.value === colorSel.value ? ' is-active' : '');
-      const colorCode = colorCodeFromText(opt.dataset.rawColor || opt.dataset.original || opt.textContent);
-      if (colorCode) {
-        btn.style.setProperty('--swatch-color', colorCode);
-      }
+      const isActive = opt.value === colorSel.value;
+      btn.className = 'nb-swatch' + (isActive ? ' is-active' : '');
       const label = opt.dataset.display || opt.textContent;
-      btn.innerHTML = `<span class="nb-modal-swatch-color"></span><span class="nb-modal-swatch-label">${label}</span>`;
-      const colorMeta = settings.color_meta && settings.color_meta[normalizedColorValue(opt.dataset.rawColor || opt.dataset.original || opt.textContent)];
-      if (colorMeta && colorMeta.texture_url) {
-        const swatch = btn.querySelector('.nb-modal-swatch-color');
-        swatch.style.backgroundImage = `url("${String(colorMeta.texture_url).replace(/["\\]/g, '\\$&')}")`;
-        swatch.style.backgroundSize = 'cover';
-      }
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      const swatch = document.createElement('span');
+      swatch.className = 'nb-swatch-color';
+      applySwatchStyle(swatch, opt.dataset.rawColor || opt.dataset.original || opt.textContent);
+      btn.appendChild(swatch);
       btn.onclick = () => {
         const previous = colorSel.value;
         colorSel.value = opt.value;
@@ -950,7 +1027,6 @@
           renderColorChoices();
           updateColorTriggerLabel();
         }
-        closeColorModal();
       };
       modalColorList.appendChild(btn);
     });
@@ -961,23 +1037,28 @@
     if (!sizeButtonsWrap) return;
     sizeButtonsWrap.innerHTML = '';
     const options = Array.from(sizeSel.options);
+    if (sizeValueEl) sizeValueEl.textContent = sizeSel.value || '';
     if (!options.length) {
       const empty = document.createElement('div');
       empty.className = 'nb-empty';
-      empty.textContent = 'Nincs méret megadva.';
+      empty.textContent = 'Ehhez a termékhez nincs méret megadva.';
       sizeButtonsWrap.appendChild(empty);
       updateActionStates();
       return;
     }
     options.forEach(opt => {
+      if (!opt.value) return;
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'nb-pill' + (opt.value === sizeSel.value ? ' is-active' : '');
+      const isActive = opt.value === sizeSel.value;
+      btn.className = 'nb-pill' + (isActive ? ' is-active' : '');
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
       btn.textContent = opt.textContent;
       btn.onclick = () => {
         sizeSel.value = opt.value;
         renderSizeButtons();
         updateSelectionSummary();
+        scheduleDraftSave();
       };
       sizeButtonsWrap.appendChild(btn);
     });
@@ -1177,8 +1258,10 @@
           bulkSizeState[value] = parsed;
           input.value = String(parsed);
         }
+        row.classList.toggle('has-qty', Number.isFinite(parsed) && parsed > 0);
         updateBulkDiscountHint();
       });
+      row.classList.toggle('has-qty', Number.isFinite(current) && current > 0);
 
       inputWrap.appendChild(qtyLabel);
       inputWrap.appendChild(input);
@@ -1235,21 +1318,17 @@
   function renderModalTypes() {
     if (!modalTypeList) return;
     modalTypeList.innerHTML = '';
-    const typeOptions = types();
-    if (!typeOptions.length) {
-      const empty = document.createElement('div');
-      empty.className = 'nb-modal-empty';
-      empty.textContent = 'Nincs típus konfigurálva.';
-      modalTypeList.appendChild(empty);
-      return;
-    }
+    const typeOptions = types().filter(label => normalizedTypeValue(label));
+    if (typeGroupEl) typeGroupEl.hidden = typeOptions.length <= 1;
+    if (!typeOptions.length) return;
     const currentValue = normalizedTypeValue(typeSel.value);
     typeOptions.forEach(label => {
       const normalized = normalizedTypeValue(label);
-      if (!normalized) return;
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'nb-modal-type' + (normalized === currentValue ? ' is-active' : '');
+      const isActive = normalized === currentValue;
+      btn.className = 'nb-chip' + (isActive ? ' is-active' : '');
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
       btn.textContent = label;
       btn.onclick = () => {
         const currentNormalized = normalizedTypeValue(typeSel.value);
@@ -1258,7 +1337,6 @@
           typeSel.value = match ? match.value : normalized;
           dispatchChangeEvent(typeSel);
         }
-        closeProductModal();
       };
       modalTypeList.appendChild(btn);
     });
@@ -1271,38 +1349,52 @@
     const options = Array.from(productSel.options);
     const products = productList();
     if (!products.length) {
+      if (productGroupEl) productGroupEl.hidden = false;
       const empty = document.createElement('div');
       empty.className = 'nb-modal-empty';
       empty.textContent = 'Nincs elérhető termék. Ellenőrizd az admin Termékek beállításait.';
       modalProductList.appendChild(empty);
       return;
     }
+    const currentType = typeSel.value;
+    let visible = products.filter(pid => productSupportsType(cat[pid] || cat[String(pid)] || {}, currentType));
+    if (!visible.length) visible = products.slice();
     const currentValue = String(productSel.value || '');
-    products.forEach(pid => {
+    if (productGroupEl) {
+      productGroupEl.hidden = visible.length <= 1 && visible.some(pid => String(pid) === currentValue);
+    }
+    visible.forEach(pid => {
       const key = String(pid);
       const cfg = cat[pid] || cat[key] || {};
       const option = options.find(opt => String(opt.value) === key);
       const title = (cfg.title || option?.textContent || `Termék #${key}`).toString().trim();
-      const typeLabels = Array.isArray(cfg.types) ? cfg.types.filter(Boolean).join(' · ') : '';
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'nb-modal-product' + (key === currentValue ? ' is-active' : '');
-      btn.setAttribute('aria-pressed', key === currentValue ? 'true' : 'false');
+      const isActive = key === currentValue;
+      btn.className = 'nb-product-option nb-modal-product' + (isActive ? ' is-active' : '');
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      const textWrap = document.createElement('span');
       const titleEl = document.createElement('strong');
       titleEl.textContent = title;
-      btn.appendChild(titleEl);
-      if (typeLabels) {
-        const metaEl = document.createElement('span');
+      textWrap.appendChild(titleEl);
+      const priceText = typeof cfg.price_text === 'string' ? cfg.price_text.trim() : '';
+      const priceValue = Number(cfg.price_value);
+      const metaText = Number.isFinite(priceValue) && cfg.price_value !== '' && cfg.price_value != null
+        ? formatPrice(priceValue)
+        : priceText;
+      if (metaText) {
+        const metaEl = document.createElement('small');
         metaEl.className = 'nb-modal-product-meta';
-        metaEl.textContent = typeLabels;
-        btn.appendChild(metaEl);
+        metaEl.textContent = metaText;
+        textWrap.appendChild(metaEl);
       }
+      btn.appendChild(textWrap);
+      btn.insertAdjacentHTML('beforeend', '<svg class="nb-icon" aria-hidden="true"><use href="#nb-i-check"/></svg>');
       btn.addEventListener('click', () => {
         if (productSel.value !== key) {
           productSel.value = key;
           dispatchChangeEvent(productSel);
         }
-        closeProductModal();
       });
       modalProductList.appendChild(btn);
     });
@@ -1359,40 +1451,8 @@
   }
 
   function updateModalBodyState() {
-    const anyOpen = (productModal && !productModal.hidden) || (colorModal && !colorModal.hidden) || (bulkModal && !bulkModal.hidden);
-    if (anyOpen) {
-      document.body.classList.add('nb-modal-open');
-    } else {
-      document.body.classList.remove('nb-modal-open');
-    }
-  }
-
-  function openProductModal() {
-    if (!productModal) return;
-    renderModalTypes();
-    renderModalProducts();
-    productModal.hidden = false;
-    updateModalBodyState();
-  }
-
-  function closeProductModal() {
-    if (!productModal) return;
-    productModal.hidden = true;
-    updateModalBodyState();
-  }
-
-  function openColorModal() {
-    if (!colorModal) return;
-    renderColorChoices();
-    if (colorModalTrigger && colorModalTrigger.hasAttribute('disabled')) return;
-    colorModal.hidden = false;
-    updateModalBodyState();
-  }
-
-  function closeColorModal() {
-    if (!colorModal) return;
-    colorModal.hidden = true;
-    updateModalBodyState();
+    const anyOpen = (bulkModal && !bulkModal.hidden) || (dialogEl && !dialogEl.hidden);
+    document.body.classList.toggle('nb-modal-open', !!anyOpen);
   }
 
   function getColorLabel() {
@@ -1400,41 +1460,38 @@
     return opt ? (opt.dataset.display || opt.dataset.original || opt.textContent) : '';
   }
 
+  function currentColorRaw() {
+    const opt = Array.from(colorSel.options).find(o => o.value === colorSel.value);
+    return opt ? (opt.dataset.rawColor || opt.dataset.original || opt.textContent) : '';
+  }
+
   function updateColorTriggerLabel() {
-    if (!colorModalLabel) return;
-    const label = getColorLabel();
-    colorModalLabel.textContent = label ? `Szín: ${label}` : 'Válassz színt';
+    if (colorModalLabel) colorModalLabel.textContent = getColorLabel();
+    applySwatchStyle(productChipSwatch, currentColorRaw());
   }
 
   function updateSelectionSummary() {
     const sel = currentSelection();
-    const typeLabel = typeSel.selectedOptions[0]?.dataset?.label || typeSel.selectedOptions[0]?.textContent || '';
     const colorLabel = getColorLabel();
     const sizeLabel = sizeSel.value || '';
-    if (productTitleEl) {
-      productTitleEl.textContent = sel.cfg?.title || 'Termék';
+    const title = sel.cfg?.title || 'Termék';
+    if (productTitleEl) productTitleEl.textContent = title;
+    if (productChipTitle) productChipTitle.textContent = title;
+    if (productChipMeta) {
+      const parts = [];
+      if (colorLabel) parts.push(colorLabel);
+      parts.push(sizeLabel ? `${sizeLabel} méret` : (hasSizeOptions() ? 'Válassz méretet!' : ''));
+      productChipMeta.textContent = parts.filter(Boolean).join(' · ');
+      productChipMeta.classList.toggle('is-missing', !sizeLabel && hasSizeOptions());
     }
-    if (selectionSummaryEl) {
-      selectionSummaryEl.innerHTML = '';
-      if (typeLabel) {
-        const chip = document.createElement('span');
-        chip.textContent = `Típus: ${typeLabel}`;
-        selectionSummaryEl.appendChild(chip);
-      }
-      if (colorLabel) {
-        const chip = document.createElement('span');
-        chip.textContent = `Szín: ${colorLabel}`;
-        selectionSummaryEl.appendChild(chip);
-      }
-      if (sizeLabel) {
-        const chip = document.createElement('span');
-        chip.textContent = `Méret: ${sizeLabel}`;
-        selectionSummaryEl.appendChild(chip);
-      }
-    }
+    if (sizeValueEl) sizeValueEl.textContent = sizeLabel;
     updateColorTriggerLabel();
     updatePriceDisplay();
     updateActionStates();
+    if (guideToast && hasCompleteSelection()) {
+      guideToast.dismiss();
+      guideToast = null;
+    }
   }
 
   function currentProductPriceMarkup() {
@@ -1518,11 +1575,15 @@
   function formatPrice(amount) {
     if (!Number.isFinite(amount)) return '';
     const rounded = Math.round(amount);
-    try {
-      return new Intl.NumberFormat('hu-HU', { style: 'currency', currency: 'HUF', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(rounded);
-    } catch (e) {
-      return rounded.toLocaleString('hu-HU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Ft';
-    }
+    const sign = rounded < 0 ? '-' : '';
+    // Always group thousands (the hu-HU locale skips 4-digit grouping, which
+    // made "6990 Ft" differ from WooCommerce's "6 990 Ft").
+    const digits = String(Math.abs(rounded)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return sign + digits + ' Ft';
+  }
+
+  function priceMarkupHasSale(markup) {
+    return typeof markup === 'string' && /<(del|ins)\b/i.test(markup);
   }
 
   function updatePriceDisplay() {
@@ -1531,60 +1592,66 @@
     const baseAmount = currentProductPriceValue();
     const surcharge = shouldApplyDoubleSidedSurcharge() ? doubleSidedFeeValue() : 0;
     const hasBase = Number.isFinite(baseAmount) || (markup && markup.trim()) || (priceText && priceText.trim());
-    const totalTargets = [priceTotalEl, priceTotalMobileEl, studioTotalEl].filter(Boolean);
-    const surchargeTargets = [];
-    if (priceSurchargeRow && priceSurchargeValueEl) {
-      surchargeTargets.push({ row: priceSurchargeRow, value: priceSurchargeValueEl });
-    }
+    const totalTargets = [priceTotalEl, studioTotalEl].filter(Boolean);
+    updateDoubleSidedHints();
     if (!hasBase) {
       if (priceDisplayEl) priceDisplayEl.classList.add('nb-price-display--pending');
       if (priceBaseEl) priceBaseEl.textContent = '—';
-      surchargeTargets.forEach(target => {
-        target.row.hidden = true;
-        target.value.textContent = formatPrice(0);
-      });
-      totalTargets.forEach(el => {
-        el.textContent = 'Ár nem elérhető.';
-      });
+      if (priceSurchargeRow) priceSurchargeRow.hidden = true;
+      if (priceSurchargeValueEl) priceSurchargeValueEl.textContent = formatPrice(0);
+      totalTargets.forEach(el => { el.textContent = 'Ár nem elérhető'; });
       return;
     }
 
     if (priceDisplayEl) priceDisplayEl.classList.remove('nb-price-display--pending');
 
     if (priceBaseEl) {
-      if (markup && markup !== priceText) {
+      if (priceMarkupHasSale(markup)) {
+        priceBaseEl.innerHTML = markup;
+      } else if (Number.isFinite(baseAmount)) {
+        priceBaseEl.textContent = formatPrice(baseAmount);
+      } else if (markup && markup !== priceText) {
         priceBaseEl.innerHTML = markup;
       } else {
-        priceBaseEl.textContent = priceText || formatPrice(baseAmount);
+        priceBaseEl.textContent = priceText || '—';
       }
-    } else if (markup && priceDisplayEl) {
-      priceDisplayEl.innerHTML = markup;
     }
 
-    surchargeTargets.forEach(target => {
-      if (surcharge > 0) {
-        target.row.hidden = false;
-        target.value.textContent = `+${formatPrice(surcharge)}`;
-      } else {
-        target.row.hidden = true;
-        target.value.textContent = formatPrice(0);
-      }
-    });
+    if (priceSurchargeRow && priceSurchargeValueEl) {
+      priceSurchargeRow.hidden = !(surcharge > 0);
+      priceSurchargeValueEl.textContent = surcharge > 0 ? `+${formatPrice(surcharge)}` : formatPrice(0);
+    }
+    // The base price line only adds information next to a surcharge or a sale price.
+    const baseLine = priceBaseEl ? priceBaseEl.closest('.nb-price-line') : null;
+    if (baseLine) baseLine.hidden = !(surcharge > 0) && !priceMarkupHasSale(markup);
+    if (priceDisplayEl) priceDisplayEl.classList.toggle('is-simple', !(surcharge > 0) && !priceMarkupHasSale(markup));
 
-    if (totalTargets.length) {
-      if (Number.isFinite(baseAmount)) {
-        const total = baseAmount + (Number.isFinite(surcharge) ? surcharge : 0);
-        totalTargets.forEach(el => {
-          el.textContent = formatPrice(total);
-        });
-      } else if (markup && markup !== priceText) {
-        totalTargets.forEach(el => {
-          el.innerHTML = markup;
-        });
+    if (Number.isFinite(baseAmount)) {
+      const total = baseAmount + (Number.isFinite(surcharge) ? surcharge : 0);
+      totalTargets.forEach(el => { el.textContent = formatPrice(total); });
+    } else if (markup && markup !== priceText) {
+      totalTargets.forEach(el => { el.innerHTML = markup; });
+    } else {
+      totalTargets.forEach(el => { el.textContent = priceText || '—'; });
+    }
+  }
+
+  function updateDoubleSidedHints() {
+    const fee = doubleSidedFeeValue();
+    const feeText = fee > 0 ? `+${formatPrice(fee)}` : '';
+    if (sideBackFeeEl) {
+      sideBackFeeEl.textContent = feeText;
+      sideBackFeeEl.hidden = !feeText || doubleSidedEnabled;
+    }
+    if (doubleSidedNote) {
+      if (doubleSidedEnabled) {
+        doubleSidedNote.textContent = fee > 0
+          ? `Bekapcsolva. A ${feeText} felár csak akkor kerül az árba, ha a hátlapra is teszel mintát.`
+          : 'Bekapcsolva. A hátlapot a vászon feletti „Hátlap” gombbal szerkesztheted.';
       } else {
-        totalTargets.forEach(el => {
-          el.textContent = priceText || '—';
-        });
+        doubleSidedNote.textContent = fee > 0
+          ? `Ha a hátlapra is terveznél (${feeText}).`
+          : 'Kapcsold be, ha a hátlapra is terveznél.';
       }
     }
   }
@@ -1731,56 +1798,79 @@
   }
 
   function preferredCanvasBounds() {
-    // Measure the stable stage, never the previously sized canvas wrapper.
-    // Reading the wrapper here creates a shrink feedback loop after layout changes.
-    const stage = canvasEl.closest('.nb-product-stage');
-    const style = stage ? getComputedStyle(stage) : null;
-    const horizontalPadding = style ? (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0) : 0;
-    const availableWidth = stage ? stage.clientWidth - horizontalPadding - 2 : window.innerWidth - 32;
-    const reservedHeight = mobileUiEnabled() ? 290 : 230;
+    // Measure the stable stage frame (its size depends only on the layout),
+    // never the canvas wrapper itself, to avoid a resize feedback loop.
+    const frame = canvasFrameEl || canvasEl.closest('.nb-canvas-frame');
+    const width = frame ? frame.clientWidth : 0;
+    const height = frame ? frame.clientHeight : 0;
     return {
-      w: Math.max(1, availableWidth || defaultCanvasSize.w),
-      h: Math.max(220, window.innerHeight - reservedHeight)
+      w: Math.max(120, width || Math.min(window.innerWidth - 32, defaultCanvasSize.w)),
+      h: Math.max(160, height || Math.max(220, window.innerHeight - 260))
     };
   }
 
-  function applyCanvasSize(size) {
-    const canvasElement = c.getElement();
-    const targetW = positiveNumberOr(size?.w, defaultCanvasSize.w);
-    const targetH = positiveNumberOr(size?.h, defaultCanvasSize.h);
+  // Logical canvas size = mockup reference size. Object coordinates therefore
+  // stay identical on every device and never drift when the window, the phone
+  // keyboard or a panel changes the available space: only the CSS size follows.
+  function fitCanvasToStage() {
+    const logicalW = c.getWidth();
+    const logicalH = c.getHeight();
+    if (!logicalW || !logicalH) return;
     const bounds = preferredCanvasBounds();
-    const scale = Math.min(bounds.w / targetW, bounds.h / targetH);
-    const appliedW = Math.max(1, Math.floor(targetW * scale));
-    const appliedH = Math.max(1, Math.floor(targetH * scale));
-
-    const dims = { width: appliedW, height: appliedH };
-    const cssDims = { cssOnly: true };
-    c.setDimensions(dims);
-    c.setDimensions(dims, cssDims);
-
-    const canvasWrapper = canvasElement.parentElement;
-    if (canvasWrapper) {
-      canvasWrapper.style.maxWidth = '100%';
-      canvasWrapper.style.width = appliedW + 'px';
-      canvasWrapper.style.height = appliedH + 'px';
+    const scale = Math.min(bounds.w / logicalW, bounds.h / logicalH);
+    const cssW = Math.max(1, Math.floor(logicalW * scale));
+    const cssH = Math.max(1, Math.floor(logicalH * scale));
+    const devicePixelRatio = (typeof window !== 'undefined' && window.devicePixelRatio > 0) ? window.devicePixelRatio : 1;
+    const ratio = Math.min(4, Math.max(1, devicePixelRatio * Math.max(1, cssW / logicalW)));
+    if (Math.abs((fabric.devicePixelRatio || 1) - ratio) > 0.01) {
+      fabric.devicePixelRatio = ratio;
+      c.setDimensions({ width: logicalW, height: logicalH }, { backstoreOnly: true });
     }
-
-    canvasElement.style.maxWidth = '100%';
-    canvasElement.style.width = appliedW + 'px';
-    canvasElement.style.height = appliedH + 'px';
-
-    if (c.calcOffset) {
-      c.calcOffset();
+    c.setDimensions({ width: cssW + 'px', height: cssH + 'px' }, { cssOnly: true });
+    if (c.wrapperEl) {
+      c.wrapperEl.style.width = cssW + 'px';
+      c.wrapperEl.style.height = cssH + 'px';
     }
+    canvasCssScale = cssW / logicalW;
+    if (c.calcOffset) c.calcOffset();
+    refreshControlProfile();
     designObjects().forEach(obj => {
-      if (obj && typeof obj.setCoords === 'function') {
-        obj.setCoords();
-      }
+      if (obj && typeof obj.setCoords === 'function') obj.setCoords();
     });
-    if (typeof c.requestRenderAll === 'function') {
-      c.requestRenderAll();
+    c.requestRenderAll();
+    syncStageInset();
+  }
+
+  function applyCanvasSize(size) {
+    const targetW = Math.max(1, Math.round(positiveNumberOr(size?.w, defaultCanvasSize.w)));
+    const targetH = Math.max(1, Math.round(positiveNumberOr(size?.h, defaultCanvasSize.h)));
+    if (c.getWidth() !== targetW || c.getHeight() !== targetH) {
+      c.setDimensions({ width: targetW, height: targetH }, { backstoreOnly: true });
     }
-    return { w: appliedW, h: appliedH };
+    fitCanvasToStage();
+    return { w: targetW, h: targetH };
+  }
+
+  // Objects loaded from JSON saved at another logical size are scaled into the
+  // current one. JSON without a stored size (older designs) is left untouched.
+  let objectSpace = null;
+  function rescaleObjectsToCanvas() {
+    const space = objectSpace;
+    objectSpace = { w: c.getWidth(), h: c.getHeight() };
+    if (!space || !space.w || !space.h) return;
+    if (space.w === objectSpace.w && space.h === objectSpace.h) return;
+    const fx = objectSpace.w / space.w;
+    const fy = objectSpace.h / space.h;
+    const f = Math.min(fx, fy);
+    designObjects().forEach(obj => {
+      obj.set({
+        left: (obj.left || 0) * fx,
+        top: (obj.top || 0) * fy,
+        scaleX: (obj.scaleX || 1) * f,
+        scaleY: (obj.scaleY || 1) * f
+      });
+      obj.setCoords();
+    });
   }
 
   function isDesignObject(obj) {
@@ -1863,6 +1953,7 @@
       c.setActiveObject(new fabric.ActiveSelection(selectedObjects, { canvas: c }));
     }
     const clean = Object.assign({}, raw);
+    clean.__nb_canvas = { w: c.getWidth(), h: c.getHeight() };
     clean.background = 'rgba(0,0,0,0)';
     clean.backgroundImage = null;
     if (Array.isArray(clean.objects)) {
@@ -1970,27 +2061,22 @@
       const key = btn.dataset.nbSide === 'back' ? 'back' : 'front';
       const isActive = key === activeSideKey;
       btn.classList.toggle('is-active', isActive);
+      btn.classList.toggle('has-content', sideHasContent(key) && (key === 'front' || doubleSidedEnabled));
       btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
       if (key === 'back') {
-        btn.disabled = !doubleSidedEnabled;
+        btn.classList.toggle('is-offer', !doubleSidedEnabled);
+        btn.title = doubleSidedEnabled ? 'Hátlap szerkesztése' : 'Kétoldalas nyomtatás bekapcsolása és a hátlap szerkesztése';
       }
     });
-    if (sideFabButton) {
-      if (doubleSidedEnabled) {
-        sideFabButton.removeAttribute('hidden');
-      } else {
-        sideFabButton.setAttribute('hidden', '');
-      }
-      const nextSide = activeSideKey === 'front' ? 'back' : 'front';
-      sideFabButton.setAttribute('aria-label', `Váltás: ${sideLabel(nextSide)}`);
-    }
+    updateDoubleSidedHints();
   }
 
   function updateSideStatus() {
+    updateSideUiState();
     if (!sideStatusEl) return;
-    const badges = Array.from(sideStatusEl.querySelectorAll('[data-nb-side]'));
+    const badges = Array.from(sideStatusEl.querySelectorAll('[data-nb-side-status]'));
     badges.forEach(el => {
-      const key = el.dataset.nbSide === 'back' ? 'back' : 'front';
+      const key = el.dataset.nbSideStatus === 'back' ? 'back' : 'front';
       const hasContent = sideHasContent(key);
       let statusText = hasContent ? 'van terv' : 'üres';
       if (key === 'back' && !doubleSidedEnabled) {
@@ -1998,6 +2084,24 @@
       }
       el.textContent = `${sideLabel(key)}: ${statusText}`;
     });
+  }
+
+  function setDoubleSided(enabled) {
+    if (!doubleSidedToggle) return;
+    if (doubleSidedToggle.checked === !!enabled) return;
+    doubleSidedToggle.checked = !!enabled;
+    dispatchChangeEvent(doubleSidedToggle);
+  }
+
+  function requestSide(target) {
+    if (target === 'back' && !doubleSidedEnabled) {
+      setDoubleSided(true);
+      const fee = doubleSidedFeeValue();
+      toast(fee > 0
+        ? `Kétoldalas nyomtatás bekapcsolva. A ${formatPrice(fee)} felár csak akkor kerül az árba, ha a hátlapra is teszel mintát.`
+        : 'Kétoldalas nyomtatás bekapcsolva.', 'info');
+    }
+    return setActiveSide(target);
   }
 
   function totalSideCount() {
@@ -2017,408 +2121,177 @@
     printSummaryEl.textContent = `Nyomtatási oldalak: ${used} / ${total}`;
   }
 
-  function toolPanelTitle(key) {
-    return ({ product: 'Termék beállításai', sides: 'Előlap és hátlap', upload: 'Saját képek', addtext: 'Szöveg hozzáadása', shapes: 'Elemek és QR-kód', templates: 'Sablonok', layers: 'Rétegek', properties: 'Tulajdonságok', cart: 'Rendelés' })[key] || '';
-  }
-
-  function sheetKeysForTarget(key) {
-    if (!key) return [];
-    const bundle = sectionBundles[key];
-    if (Array.isArray(bundle) && bundle.length) {
-      return bundle.filter(entry => sheetSources.has(entry));
-    }
-    return sheetSources.has(key) ? [key] : [];
-  }
-
-  function restoreSheetSources(keys) {
-    if (!Array.isArray(keys)) return;
-    keys.forEach(sheetKey => {
-      const source = sheetSources.get(sheetKey);
-      if (!source || !source.node || !source.parent) return;
-      const parent = source.parent;
-      const sibling = source.nextSibling;
-      if (source.node.parentNode === parent) return;
-      if (sibling && sibling.parentNode === parent) {
-        parent.insertBefore(source.node, sibling);
-      } else {
-        parent.appendChild(source.node);
-      }
-      if (source._unhiddenForSheet) {
-        source.node.setAttribute('hidden', '');
-        source._unhiddenForSheet = false;
-      }
-    });
-  }
-
-  function restoreAllSheetSources() {
-    sheetSources.forEach(source => {
-      if (!source || !source.node || !source.parent) return;
-      if (source.node.parentNode === source.parent) return;
-      const sibling = source.nextSibling;
-      if (sibling && sibling.parentNode === source.parent) {
-        source.parent.insertBefore(source.node, sibling);
-      } else {
-        source.parent.appendChild(source.node);
-      }
-    });
-  }
-
-  function updateToolbarActiveState() {
-    mobileToolbarButtons.forEach((btn, key) => {
-      if (!btn) return;
-      const isActive = sheetState.activeKey === key;
-      btn.setAttribute('aria-expanded', String(isActive));
-      btn.setAttribute('aria-controls', 'nb-mobile-sheet');
-      if (isActive) {
-        btn.classList.add('is-active');
-      } else {
-        btn.classList.remove('is-active');
-      }
-    });
-  }
-
-  function mobileUiEnabled() {
+  function isMobileUi() {
     return !!(mobileMedia && typeof mobileMedia.matches === 'boolean' && mobileMedia.matches);
   }
 
-  function syncMobileCompleteState() {
-    if (!mobileCompleteBtn) return;
-    if (!mobileUiEnabled()) {
-      mobileCompleteBtn.setAttribute('hidden', '');
-      return;
-    }
-    mobileCompleteBtn.removeAttribute('hidden');
-    if (addToCartBtn) {
-      mobileCompleteBtn.disabled = !!addToCartBtn.disabled;
-    } else {
-      mobileCompleteBtn.disabled = true;
-    }
+  function isTabletUi() {
+    return !!(tabletMedia && typeof tabletMedia.matches === 'boolean' && tabletMedia.matches);
   }
 
-  function syncMobileBulkState() {
-    if (!mobileBulkBtn) return;
-    if (!mobileUiEnabled()) {
-      mobileBulkBtn.setAttribute('hidden', '');
-      return;
-    }
-    mobileBulkBtn.removeAttribute('hidden');
-    const ready = hasCompleteSelection();
-    const sizesAvailable = hasSizeOptions();
-    const busy = saving || actionSubmitting;
-    mobileBulkBtn.disabled = !ready || !sizesAvailable || busy;
+  function dockIsVisible() {
+    if (isMobileUi()) return uiState.sheet === 'dock';
+    if (isTabletUi()) return !!(sheets.dock && sheets.dock.classList.contains('is-open'));
+    return true;
   }
 
-  function updateLayerBadges() {
-    const count = designObjects().length;
-    const hasSelection = !!activeDesignObject();
-    [mobileToolbarButtons.get('layers'), railButtons.get('layers')].forEach(btn => {
-      if (!btn) return;
-      const badge = btn.querySelector('.nb-mobile-icon-badge');
-      if (badge) {
-        if (count > 0) {
-          badge.textContent = count > 99 ? '99+' : String(count);
-          badge.removeAttribute('hidden');
-        } else {
-          badge.setAttribute('hidden', '');
-        }
-      }
-      if (hasSelection) {
-        btn.classList.add('has-selection');
-      } else {
-        btn.classList.remove('has-selection');
-      }
+  function syncToolButtons() {
+    const visible = dockIsVisible();
+    toolButtons.forEach(btn => {
+      const active = visible && btn.dataset.nbTool === uiState.tool;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-expanded', active ? 'true' : 'false');
     });
   }
 
-  function mobileSelectionLabelText() {
-    const obj = activeDesignObject();
-    if (!obj) return 'Nincs kiválasztott elem';
-    const label = layerLabel(obj) || '';
-    return label || 'Kijelölt elem';
-  }
-
-  function syncMobileSelectionUi() {
-    if (!mobileUiEnabled()) return;
-    if (mobileSelectionLabel) {
-      mobileSelectionLabel.textContent = mobileSelectionLabelText();
-    }
-    const obj = activeDesignObject();
-    const hasSelection = !!obj;
-    const order = designObjects();
-    const index = hasSelection ? designObjectIndex(obj) : -1;
-    Object.keys(mobileQuickButtons).forEach(key => {
-      const btn = mobileQuickButtons[key];
-      if (!btn) return;
-      let disabled = !hasSelection;
-      if (hasSelection) {
-        if (key === 'forward') {
-          disabled = index === order.length - 1;
-        } else if (key === 'backward') {
-          disabled = index <= 0;
-        }
-        if (key === 'visibility') {
-          btn.textContent = obj.visible === false ? 'Mutat' : 'Elrejt';
-        }
-      }
-      btn.disabled = !!disabled;
+  function showToolPanel(key) {
+    const target = toolPanels.has(key) ? key : 'product';
+    uiState.tool = target;
+    toolPanels.forEach((panel, panelKey) => {
+      panel.hidden = panelKey !== target;
     });
-    updateLayerBadges();
+    syncToolButtons();
+    if (target === 'templates') ensureTemplatesLoaded();
   }
 
-  function closeMobileSheet(options) {
+  function focusFirstIn(container) {
+    if (!container) return;
+    const target = container.querySelector('textarea, input:not([type="hidden"]):not([type="file"]), select, button:not([data-nb-sheet-close]):not(:disabled)');
+    if (target && typeof target.focus === 'function') {
+      try { target.focus({ preventScroll: true }); } catch (e) { target.focus(); }
+    }
+  }
+
+  // After something was added the floating panel steps aside so the design is visible.
+  function closeTransientPanel() {
+    if (isMobileUi()) closeSheet();
+    else if (isTabletUi()) setTabletDock(false);
+  }
+
+  function setTabletDock(open) {
+    if (!sheets.dock) return;
+    sheets.dock.classList.toggle('is-open', !!open);
+    syncToolButtons();
+  }
+
+  function openTool(key, options) {
     const opts = options || {};
-    if (!mobileSheet || !sheetState.activeKey) return;
-    if (!opts.fromPopState && sheetState.historyDepth > 0 && typeof history !== 'undefined' && history.back) {
-      sheetState.pendingClose = true;
+    showToolPanel(key);
+    if (isMobileUi()) {
+      openSheet('dock', opts);
+    } else if (isTabletUi()) {
+      setTabletDock(true);
+    }
+    syncToolButtons();
+    if (opts.focus) focusFirstIn(toolPanels.get(uiState.tool));
+  }
+
+  function toggleTool(key) {
+    if (isMobileUi() && uiState.sheet === 'dock' && uiState.tool === key) {
+      closeSheet();
+      return;
+    }
+    if (isTabletUi() && dockIsVisible() && uiState.tool === key) {
+      setTabletDock(false);
+      return;
+    }
+    openTool(key);
+  }
+
+  function setInspectorTab(tab) {
+    const target = inspectorPanes.has(tab) ? tab : 'properties';
+    uiState.inspectorTab = target;
+    inspectorTabs.forEach(btn => {
+      const active = btn.dataset.nbInspectorTab === target;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      btn.tabIndex = active ? 0 : -1;
+    });
+    inspectorPanes.forEach((pane, key) => {
+      pane.hidden = key !== target;
+    });
+  }
+
+  function openInspector(tab) {
+    setInspectorTab(tab || uiState.inspectorTab);
+    if (isMobileUi()) openSheet('inspector');
+  }
+
+  function openOrder() {
+    if (isMobileUi()) {
+      openSheet('order');
+      return;
+    }
+    if (sheets.order && typeof sheets.order.scrollIntoView === 'function') {
+      sheets.order.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  function openSheet(name, options) {
+    const opts = options || {};
+    const sheet = sheets[name];
+    if (!sheet || !isMobileUi()) return;
+    const wasOpen = !!uiState.sheet;
+    Object.keys(sheets).forEach(key => {
+      const el = sheets[key];
+      const open = key === name;
+      el.classList.toggle('is-open', open);
+      el.classList.toggle('is-expanded', open && !!opts.expanded);
+      el.classList.remove('is-dragging');
+      el.style.removeProperty('--nb-sheet-drag');
+    });
+    uiState.sheet = name;
+    uiState.expanded = !!opts.expanded;
+    if (appEl) appEl.classList.add('has-sheet');
+    if (!wasOpen && typeof history !== 'undefined' && history.pushState && uiState.historyDepth === 0) {
+      try {
+        history.pushState({ __nb_sheet: true }, document.title, location.href);
+        uiState.historyDepth = 1;
+      } catch (e) { /* ignore */ }
+    }
+    syncToolButtons();
+    scheduleStageInset();
+  }
+
+  function closeSheet(options) {
+    const opts = options || {};
+    if (!uiState.sheet) return;
+    if (!opts.fromPopState && uiState.historyDepth > 0 && typeof history !== 'undefined' && history.back) {
+      uiState.pendingClose = true;
       history.back();
       return;
     }
-    const keys = sheetKeysForTarget(sheetState.activeKey);
-    restoreSheetSources(keys);
-    if (mobileSheetContent) {
-      while (mobileSheetContent.firstChild) {
-        const child = mobileSheetContent.firstChild;
-        mobileSheetContent.removeChild(child);
-      }
-    }
-    sheetState.activeKey = '';
-    sheetState.expanded = false;
-    sheetState.pendingClose = false;
-    if (opts.fromPopState && sheetState.historyDepth > 0) {
-      sheetState.historyDepth = Math.max(0, sheetState.historyDepth - 1);
-    }
-    if (mobileSheetOverlay) {
-      mobileSheetOverlay.setAttribute('hidden', '');
-    }
-    mobileSheet.classList.remove('is-open', 'is-expanded', 'is-dragging');
-    mobileSheet.setAttribute('hidden', '');
-    mobileSheet.setAttribute('aria-hidden', 'true');
-    mobileSheet.style.transform = '';
-    updateToolbarActiveState();
-  }
-
-  function openMobileSheet(key) {
-    if (!mobileUiEnabled() || !mobileSheet || !mobileSheetContent) return;
-    if (!key) return;
-    if (sheetState.activeKey === key) {
-      closeMobileSheet();
-      return;
-    }
-    if (flyout && flyoutState.activeKey) {
-      closeFlyout({ skipFocus: true });
-    }
-    const wasActive = !!sheetState.activeKey;
-    if (sheetState.activeKey) {
-      const previousKeys = sheetKeysForTarget(sheetState.activeKey);
-      restoreSheetSources(previousKeys);
-      while (mobileSheetContent.firstChild) {
-        mobileSheetContent.removeChild(mobileSheetContent.firstChild);
-      }
-    }
-    const keys = sheetKeysForTarget(key);
-    if (!keys.length) {
-      sheetState.activeKey = '';
-      updateToolbarActiveState();
-      return;
-    }
-    const titles = [];
-    keys.forEach(sheetKey => {
-      const source = sheetSources.get(sheetKey);
-      if (!source || !source.node) return;
-      source.parent = source.node.parentNode;
-      source.nextSibling = source.node.nextSibling;
-      if (source.title) {
-        titles.push(source.title);
-      }
-      mobileSheetContent.appendChild(source.node);
-      if (source.node.hasAttribute('data-nb-sheet-unhide') && source.node.hasAttribute('hidden')) {
-        source.node.removeAttribute('hidden');
-        source._unhiddenForSheet = true;
-      }
+    Object.keys(sheets).forEach(key => {
+      const el = sheets[key];
+      el.classList.remove('is-open', 'is-expanded', 'is-dragging');
+      el.style.removeProperty('--nb-sheet-drag');
     });
-    if (mobileSheetTitle) {
-      const label = toolPanelTitle(key) || (titles.length ? titles.join(' • ') : '');
-      if (label) {
-        mobileSheetTitle.textContent = label;
-      } else {
-        const btn = mobileToolbarButtons.get(key);
-        mobileSheetTitle.textContent = btn ? (btn.getAttribute('aria-label') || btn.textContent || '') : '';
-      }
+    uiState.sheet = '';
+    uiState.expanded = false;
+    uiState.pendingClose = false;
+    if (opts.fromPopState && uiState.historyDepth > 0) {
+      uiState.historyDepth = Math.max(0, uiState.historyDepth - 1);
     }
-    if (!wasActive) {
-      if (mobileSheetOverlay) {
-        mobileSheetOverlay.removeAttribute('hidden');
-      }
-      mobileSheet.removeAttribute('hidden');
-      mobileSheet.setAttribute('aria-hidden', 'false');
-      mobileSheet.classList.add('is-open');
-      if (typeof history !== 'undefined' && history.pushState && sheetState.historyDepth === 0) {
-        try {
-          history.pushState({ __nb_sheet: true }, document.title, location.href);
-          sheetState.historyDepth = 1;
-        } catch (e) { /* ignore */ }
-      }
-    }
-    mobileSheet.classList.remove('is-expanded');
-    sheetState.expanded = false;
-    sheetState.pendingClose = false;
-    sheetState.activeKey = key;
-    updateToolbarActiveState();
+    if (appEl) appEl.classList.remove('has-sheet');
+    syncToolButtons();
+    scheduleStageInset();
   }
 
-  function updateRailActiveState() {
-    railButtons.forEach((btn, key) => {
-      if (!btn) return;
-      btn.setAttribute('aria-expanded', String(flyoutState.activeKey === key));
-      btn.setAttribute('aria-controls', 'nb-flyout');
-      if (flyoutState.activeKey === key) {
-        btn.classList.add('is-active');
-      } else {
-        btn.classList.remove('is-active');
-      }
-    });
+  function setSheetExpanded(expanded) {
+    const sheet = uiState.sheet ? sheets[uiState.sheet] : null;
+    if (!sheet) return;
+    uiState.expanded = !!expanded;
+    sheet.classList.toggle('is-expanded', uiState.expanded);
+    scheduleStageInset();
   }
 
-  function closeFlyout(options) {
-    const opts = options || {};
-    if (!flyout || !flyoutState.activeKey) return;
-    const previousKey = flyoutState.activeKey;
-    const keys = sheetKeysForTarget(previousKey);
-    restoreSheetSources(keys);
-    if (flyoutContent) {
-      while (flyoutContent.firstChild) {
-        flyoutContent.removeChild(flyoutContent.firstChild);
-      }
-    }
-    flyoutState.activeKey = '';
-    flyout.classList.remove('is-open');
-    flyout.setAttribute('hidden', '');
-    if (designerShell) {
-      designerShell.classList.remove('nb-flyout-open');
-    }
-    updateRailActiveState();
-    if (!opts.skipFocus) {
-      const btn = railButtons.get(previousKey);
-      if (btn && typeof btn.focus === 'function') {
-        btn.focus();
-      }
-    }
-  }
-
-  function openFlyout(key, options) {
-    if (!flyout || !flyoutContent || !key) return;
-    if (flyoutState.activeKey === key) {
-      closeFlyout();
-      return;
-    }
-    if (mobileSheet && sheetState.activeKey) {
-      closeMobileSheet();
-    }
-    const wasActive = !!flyoutState.activeKey;
-    if (flyoutState.activeKey) {
-      const previousKeys = sheetKeysForTarget(flyoutState.activeKey);
-      restoreSheetSources(previousKeys);
-      while (flyoutContent.firstChild) {
-        flyoutContent.removeChild(flyoutContent.firstChild);
-      }
-    }
-    const keys = sheetKeysForTarget(key);
-    if (!keys.length) {
-      flyoutState.activeKey = '';
-      updateRailActiveState();
-      return;
-    }
-    const titles = [];
-    keys.forEach(sheetKey => {
-      const source = sheetSources.get(sheetKey);
-      if (!source || !source.node) return;
-      source.parent = source.node.parentNode;
-      source.nextSibling = source.node.nextSibling;
-      if (source.title) {
-        titles.push(source.title);
-      }
-      flyoutContent.appendChild(source.node);
-      if (source.node.hasAttribute('data-nb-sheet-unhide') && source.node.hasAttribute('hidden')) {
-        source.node.removeAttribute('hidden');
-        source._unhiddenForSheet = true;
-      }
-    });
-    if (flyoutTitle) {
-      const label = toolPanelTitle(key) || (titles.length ? titles.join(' • ') : '');
-      if (label) {
-        flyoutTitle.textContent = label;
-      } else {
-        const btn = railButtons.get(key);
-        flyoutTitle.textContent = btn ? (btn.getAttribute('aria-label') || btn.textContent || '') : '';
-      }
-    }
-    if (!wasActive && designerShell) {
-      designerShell.classList.add('nb-flyout-open');
-    }
-    flyout.removeAttribute('hidden');
-    flyout.classList.add('is-open');
-    flyoutState.activeKey = key;
-    updateRailActiveState();
-    if (options && options.skipFocus) return;
-    const focusTarget = flyoutContent.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    if (focusTarget && typeof focusTarget.focus === 'function') {
-      focusTarget.focus();
-    } else if (flyoutClose && typeof flyoutClose.focus === 'function') {
-      flyoutClose.focus();
-    }
-  }
-
-  function updateMobileScrollHint() {
-    const row = mobileToolbar && mobileToolbar.querySelector('.nb-mobile-toolbar-row');
-    const hint = document.getElementById('nb-mobile-scroll-hint');
-    if (hint && row) hint.hidden = !mobileUiEnabled() || row.scrollWidth <= row.clientWidth + 1;
-  }
-
-  function refreshMobileUi() {
-    const enabled = mobileUiEnabled();
-    if (studioCheckout) studioCheckout.hidden = !enabled;
-    updatePriceDisplay();
-    requestAnimationFrame(updateMobileScrollHint);
-    if (enabled && flyoutState.activeKey) closeFlyout({ skipFocus: true });
-    if (mobileToolbar) {
-      if (enabled) {
-        mobileToolbar.removeAttribute('hidden');
-      } else {
-        mobileToolbar.setAttribute('hidden', '');
-      }
-    }
-    if (!enabled) {
-      const previousDepth = sheetState.historyDepth;
-      closeMobileSheet({ fromPopState: true });
-      if (previousDepth > 0 && typeof history !== 'undefined' && history.back) {
-        sheetState.pendingClose = true;
-        history.back();
-      }
-    }
-    syncMobileSelectionUi();
-    syncMobileCompleteState();
-    syncMobileBulkState();
-  }
-
-  function toggleSheetExpansion() {
-    if (!mobileSheet || !sheetState.activeKey) return;
-    sheetState.expanded = !sheetState.expanded;
-    mobileSheet.classList.toggle('is-expanded', sheetState.expanded);
-  }
-
-  function beginSheetDrag(evt) {
-    if (!mobileSheet || !mobileSheetHandle || !sheetState.activeKey) return;
-    if (!evt || typeof evt.clientY !== 'number') {
-      return toggleSheetExpansion();
-    }
-    sheetDragState = {
-      startY: evt.clientY,
-      lastY: evt.clientY,
-      moved: false
-    };
-    mobileSheet.classList.add('is-dragging');
-    if (typeof mobileSheetHandle.setPointerCapture === 'function' && evt.pointerId !== undefined) {
-      try { mobileSheetHandle.setPointerCapture(evt.pointerId); } catch (e) { /* ignore */ }
+  function beginSheetDrag(evt, grip) {
+    const sheet = uiState.sheet ? sheets[uiState.sheet] : null;
+    if (!sheet || !evt || typeof evt.clientY !== 'number') return;
+    sheetDragState = { sheet, grip, startY: evt.clientY, lastY: evt.clientY, moved: false };
+    sheet.classList.add('is-dragging');
+    if (grip && typeof grip.setPointerCapture === 'function' && evt.pointerId !== undefined) {
+      try { grip.setPointerCapture(evt.pointerId); } catch (e) { /* ignore */ }
     }
     window.addEventListener('pointermove', onSheetDragMove);
     window.addEventListener('pointerup', endSheetDrag);
@@ -2426,50 +2299,133 @@
   }
 
   function onSheetDragMove(evt) {
-    if (!sheetDragState || !mobileSheet) return;
-    if (typeof evt.clientY !== 'number') return;
+    if (!sheetDragState || typeof evt.clientY !== 'number') return;
     sheetDragState.lastY = evt.clientY;
     const delta = sheetDragState.lastY - sheetDragState.startY;
-    if (Math.abs(delta) > 6) {
-      sheetDragState.moved = true;
-    }
-    if (delta > 0) {
-      mobileSheet.style.transform = `translateY(${delta}px)`;
-    } else {
-      mobileSheet.style.transform = 'translateY(0)';
-    }
+    if (Math.abs(delta) > 6) sheetDragState.moved = true;
+    sheetDragState.sheet.style.setProperty('--nb-sheet-drag', Math.max(0, delta) + 'px');
   }
 
   function endSheetDrag(evt) {
-    if (!sheetDragState || !mobileSheet) return;
-    if (typeof evt.clientY === 'number') {
-      sheetDragState.lastY = evt.clientY;
-    }
+    if (!sheetDragState) return;
+    const { sheet, grip, moved } = sheetDragState;
+    if (evt && typeof evt.clientY === 'number') sheetDragState.lastY = evt.clientY;
     const delta = sheetDragState.lastY - sheetDragState.startY;
-    const moved = sheetDragState.moved;
     sheetDragState = null;
-    mobileSheet.classList.remove('is-dragging');
-    mobileSheet.style.transform = '';
-    if (mobileSheetHandle && typeof mobileSheetHandle.releasePointerCapture === 'function' && evt.pointerId !== undefined) {
-      try { mobileSheetHandle.releasePointerCapture(evt.pointerId); } catch (e) { /* ignore */ }
+    sheet.classList.remove('is-dragging');
+    sheet.style.removeProperty('--nb-sheet-drag');
+    if (grip && typeof grip.releasePointerCapture === 'function' && evt && evt.pointerId !== undefined) {
+      try { grip.releasePointerCapture(evt.pointerId); } catch (e) { /* ignore */ }
     }
     window.removeEventListener('pointermove', onSheetDragMove);
     window.removeEventListener('pointerup', endSheetDrag);
     window.removeEventListener('pointercancel', endSheetDrag);
     if (!moved) {
-      toggleSheetExpansion();
+      setSheetExpanded(!uiState.expanded);
       return;
     }
-    if (delta > 120) {
-      closeMobileSheet();
+    if (delta > 90) {
+      if (uiState.expanded) setSheetExpanded(false);
+      else closeSheet();
       return;
     }
-    if (delta < -80) {
-      sheetState.expanded = true;
-      mobileSheet.classList.add('is-expanded');
+    if (delta < -50) setSheetExpanded(true);
+  }
+
+  // When a bottom sheet covers part of the stage on phones, the canvas is
+  // visually scaled into the remaining space (CSS transform only, so the
+  // logical canvas and every object position stay untouched).
+  let stageInsetRaf = null;
+  function scheduleStageInset() {
+    if (stageInsetRaf) cancelAnimationFrame(stageInsetRaf);
+    stageInsetRaf = requestAnimationFrame(() => {
+      stageInsetRaf = null;
+      syncStageInset();
+    });
+  }
+
+  function clearStageInset() {
+    if (!canvasFrameEl) return;
+    canvasFrameEl.style.removeProperty('--nb-frame-scale');
+    canvasFrameEl.style.removeProperty('--nb-frame-shift');
+  }
+
+  function syncStageInset() {
+    if (!canvasFrameEl || !stageCanvasEl) return;
+    const sheet = uiState.sheet ? sheets[uiState.sheet] : null;
+    const tabbar = document.getElementById('nb-tabbar');
+    const wrapper = c.wrapperEl;
+    if (!isMobileUi() || !sheet || !tabbar || !wrapper) {
+      clearStageInset();
       return;
     }
-    mobileSheet.classList.toggle('is-expanded', sheetState.expanded);
+    const stageRect = stageCanvasEl.getBoundingClientRect();
+    const sheetTop = tabbar.getBoundingClientRect().top - sheet.offsetHeight;
+    const visibleTop = stageRect.top + 54;
+    const visibleBottom = Math.min(stageRect.bottom, sheetTop) - 8;
+    const canvasH = wrapper.offsetHeight;
+    const frameTop = stageRect.top + canvasFrameEl.offsetTop;
+    const canvasTopInFrame = Math.max(0, (canvasFrameEl.clientHeight - canvasH) / 2);
+    if (!canvasH || frameTop + canvasTopInFrame + canvasH <= visibleBottom) {
+      clearStageInset();
+      return;
+    }
+    const available = visibleBottom - visibleTop;
+    if (available < 60) {
+      clearStageInset();
+      return;
+    }
+    const scale = Math.min(1, available / canvasH);
+    const shift = visibleTop - frameTop - canvasTopInFrame * scale;
+    canvasFrameEl.style.setProperty('--nb-frame-scale', scale.toFixed(4));
+    canvasFrameEl.style.setProperty('--nb-frame-shift', Math.round(shift) + 'px');
+  }
+
+  function applyLayoutMode() {
+    const mobile = isMobileUi();
+    if (!mobile && uiState.sheet) {
+      const depth = uiState.historyDepth;
+      closeSheet({ fromPopState: true });
+      if (depth > 0 && typeof history !== 'undefined' && history.back) {
+        uiState.pendingClose = true;
+        history.back();
+      }
+    }
+    if (!isTabletUi() && sheets.dock) sheets.dock.classList.remove('is-open');
+    showToolPanel(uiState.tool);
+    syncQuickbar();
+    scheduleStageInset();
+  }
+
+  function updateLayerBadges() {
+    const count = designObjects().length;
+    layerCountBadges.forEach(badge => {
+      if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.hidden = false;
+      } else {
+        badge.hidden = true;
+      }
+    });
+  }
+
+  function syncQuickbar() {
+    if (!quickbarEl) return;
+    const obj = activeDesignObject();
+    const show = !!obj && !cropSession && !uiState.preview;
+    quickbarEl.hidden = !show;
+    if (!show) return;
+    const isMulti = obj.type === 'activeSelection';
+    const order = designObjects();
+    const index = isMulti ? -1 : designObjectIndex(obj);
+    if (quickButtons.forward) quickButtons.forward.disabled = isMulti || index === -1 || index === order.length - 1;
+    if (quickButtons.backward) quickButtons.backward.disabled = isMulti || index <= 0;
+    if (quickButtons.duplicate) quickButtons.duplicate.disabled = isMulti;
+  }
+
+  function syncMobileSelectionUi() {
+    updateLayerBadges();
+    syncQuickbar();
   }
 
   function cloneSideJson(state) {
@@ -2510,6 +2466,10 @@
         c.discardActiveObject();
       }
       c.loadFromJSON(json, () => {
+        const storedSpace = json && json.__nb_canvas;
+        objectSpace = (storedSpace && Number(storedSpace.w) > 0 && Number(storedSpace.h) > 0)
+          ? { w: Number(storedSpace.w), h: Number(storedSpace.h) }
+          : null;
         setMockupBgAndArea();
         designObjects().forEach(obj => {
           applyObjectUiDefaults(obj);
@@ -2642,30 +2602,43 @@
   function removeActiveObject(target) {
     const obj = target && isDesignObject(target) ? target : activeDesignObject();
     if (!obj) return;
-    const wasActive = c.getActiveObject() === obj;
-    c.remove(obj);
-    if (wasActive) {
-      c.discardActiveObject();
+    const active = c.getActiveObject();
+    let items = [obj];
+    if (obj.type === 'activeSelection' && typeof obj.getObjects === 'function') {
+      items = obj.getObjects().slice();
     }
+    const wasActive = active === obj || items.indexOf(active) !== -1 || (active && active.type === 'activeSelection');
+    if (wasActive) c.discardActiveObject();
+    suspendHistory = true;
+    items.forEach(item => c.remove(item));
+    suspendHistory = false;
     c.requestRenderAll();
     markDesignDirty();
+    commitHistory();
     syncLayerList();
+    syncTextControls();
+    syncImageControls();
+    syncPropertiesEmptyState();
     syncMobileSelectionUi();
+    toast(items.length > 1 ? `${items.length} elem törölve` : 'Elem törölve', 'info', {
+      action: { label: 'Visszavonás', onClick: undoHistory }
+    });
   }
 
-  function toggleActiveVisibility() {
-    const obj = activeDesignObject();
-    if (!obj) return;
-    const next = obj.visible === false ? true : false;
-    obj.visible = next;
-    if (!next) {
-      c.discardActiveObject();
+  function centerActiveObject() {
+    const active = c.getActiveObject();
+    if (!active || !isDesignObject(active)) return;
+    const area = c.__nb_area || fallbackArea;
+    const box = { left: area.x, top: area.y, width: area.w, height: area.h };
+    applyAlign(active, 'center-h', box);
+    applyAlign(active, 'center-v', box);
+    if (active.type === 'activeSelection' && typeof active.getObjects === 'function') {
+      active.getObjects().forEach(item => item.setCoords());
     }
     c.requestRenderAll();
     markDesignDirty();
     commitHistory();
     syncLayerList();
-    syncMobileSelectionUi();
   }
 
   function moveLayer(obj, delta) {
@@ -2844,8 +2817,8 @@
   function syncAlignButtons() {
     const active = c.getActiveObject();
     const hasSelection = !!active && isDesignObject(active);
-    const alignSection = sheetSources.get('align');
-    if (alignSection && alignSection.node) alignSection.node.hidden = !hasSelection;
+    const alignSection = propertySections.get('align');
+    if (alignSection) alignSection.hidden = !hasSelection;
     objectAlignButtons.forEach(btn => {
       btn.disabled = !hasSelection;
     });
@@ -2869,8 +2842,8 @@
   function syncObjectAppearance() {
     const targets = activeAppearanceTargets();
     const hasTarget = targets.length > 0;
-    const appearanceSection = sheetSources.get('appearance');
-    if (appearanceSection && appearanceSection.node) appearanceSection.node.hidden = !hasTarget;
+    const appearanceSection = propertySections.get('appearance');
+    if (appearanceSection) appearanceSection.hidden = !hasTarget;
     if (opacityInput) opacityInput.disabled = !hasTarget;
     if (flipHBtn) flipHBtn.disabled = !hasTarget;
     if (flipVBtn) flipVBtn.disabled = !hasTarget;
@@ -2919,10 +2892,22 @@
   function syncPropertiesEmptyState() {
     if (!propertiesEmptyEl) return;
     const allHidden = ['text', 'image', 'align', 'appearance'].every(key => {
-      const source = sheetSources.get(key);
-      return !source || !source.node || source.node.hidden;
+      const section = propertySections.get(key);
+      return !section || section.hidden;
     });
     propertiesEmptyEl.hidden = !allHidden;
+  }
+
+  function iconMarkup(name, extraClass) {
+    return `<svg class="nb-icon${extraClass ? ' ' + extraClass : ''}" aria-hidden="true" focusable="false"><use href="#nb-i-${name}"/></svg>`;
+  }
+
+  function layerIconName(obj) {
+    if (!obj) return 'shapes';
+    if (obj.type === 'textbox') return 'text';
+    if (obj.type === 'image') return 'image';
+    if (obj.type === 'group') return obj.__nb_layer_name === 'QR kód' ? 'qr' : 'layers';
+    return 'shapes';
   }
 
   function syncLayerList() {
@@ -2930,80 +2915,86 @@
     syncAlignButtons();
     syncObjectAppearance();
     updateLayerBadges();
+    updateSideUiState();
     if (!layerListEl) return;
     const objects = designObjects();
     layerListEl.innerHTML = '';
     if (!objects.length) {
       const empty = document.createElement('div');
       empty.className = 'nb-layer-empty';
-      empty.textContent = 'Nincs feltöltött elem';
+      empty.textContent = 'Ezen az oldalon még nincs elem.';
       layerListEl.appendChild(empty);
       syncMobileSelectionUi();
       return;
     }
     const active = c.getActiveObject();
+    const selected = active && active.type === 'activeSelection' && typeof active.getObjects === 'function'
+      ? active.getObjects()
+      : (active ? [active] : []);
     const topFirst = objects.slice().reverse();
     topFirst.forEach((obj, idx) => {
       ensureLayerId(obj);
       const item = document.createElement('div');
       item.className = 'nb-layer-item';
-      if (active === obj) {
-        item.classList.add('is-active');
-      }
+      if (selected.indexOf(obj) !== -1) item.classList.add('is-active');
+      if (obj.visible === false) item.classList.add('is-hidden');
       item.dataset.layerId = obj.__nb_layer_id;
 
       const info = document.createElement('div');
       info.className = 'nb-layer-info';
       const selectBtn = document.createElement('button');
       selectBtn.type = 'button';
-      selectBtn.textContent = layerLabel(obj);
+      selectBtn.innerHTML = iconMarkup(layerIconName(obj), 'nb-icon--sm');
+      const nameEl = document.createElement('span');
+      nameEl.textContent = layerLabel(obj);
+      selectBtn.appendChild(nameEl);
       selectBtn.addEventListener('click', () => {
-        c.setActiveObject(obj);
+        if (obj.visible === false) {
+          obj.visible = true;
+          markDesignDirty();
+          commitHistory();
+        }
+        layerSelectInProgress = true;
+        try {
+          c.setActiveObject(obj);
+        } finally {
+          layerSelectInProgress = false;
+        }
         c.requestRenderAll();
         syncTextControls();
+        syncImageControls();
         syncLayerList();
+        syncPropertiesEmptyState();
       });
       info.appendChild(selectBtn);
       item.appendChild(info);
 
       const controls = document.createElement('div');
       controls.className = 'nb-layer-controls';
-      const upBtn = document.createElement('button');
-      upBtn.type = 'button';
-      upBtn.setAttribute('aria-label', 'Feljebb');
-      upBtn.innerHTML = '▲';
-      if (idx === 0) {
-        upBtn.disabled = true;
-      }
-      upBtn.addEventListener('click', () => {
-        moveLayer(obj, 1);
+      const makeControl = (icon, label, handler, disabled, extraClass) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('aria-label', label);
+        btn.title = label;
+        btn.innerHTML = iconMarkup(icon, 'nb-icon--sm');
+        if (extraClass) btn.className = extraClass;
+        btn.disabled = !!disabled;
+        btn.addEventListener('click', handler);
+        controls.appendChild(btn);
+        return btn;
+      };
+      makeControl(obj.visible === false ? 'eye-off' : 'eye', obj.visible === false ? 'Megjelenítés' : 'Elrejtés', () => {
+        obj.visible = obj.visible === false;
+        if (obj.visible === false && c.getActiveObject() === obj) c.discardActiveObject();
+        c.requestRenderAll();
+        markDesignDirty();
+        commitHistory();
+        syncLayerList();
       });
-
-      const downBtn = document.createElement('button');
-      downBtn.type = 'button';
-      downBtn.setAttribute('aria-label', 'Lejjebb');
-      downBtn.innerHTML = '▼';
-      if (idx === topFirst.length - 1) {
-        downBtn.disabled = true;
-      }
-      downBtn.addEventListener('click', () => {
-        moveLayer(obj, -1);
-      });
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.type = 'button';
-      deleteBtn.className = 'nb-layer-delete';
-      deleteBtn.setAttribute('aria-label', 'Törlés');
-      deleteBtn.innerHTML = '✕';
-      deleteBtn.addEventListener('click', () => {
-        removeActiveObject(obj);
-      });
-
-      controls.appendChild(upBtn);
-      controls.appendChild(downBtn);
-      controls.appendChild(deleteBtn);
+      makeControl('arrow-up', 'Feljebb', () => moveLayer(obj, 1), idx === 0);
+      makeControl('arrow-down', 'Lejjebb', () => moveLayer(obj, -1), idx === topFirst.length - 1);
+      makeControl('trash', 'Törlés', () => removeActiveObject(obj), false, 'nb-layer-delete');
       item.appendChild(controls);
-
       layerListEl.appendChild(item);
     });
     syncMobileSelectionUi();
@@ -3222,7 +3213,7 @@
 
   function resetZoom() {
     isPanning = false;
-    c.selection = true;
+    c.selection = !uiState.preview;
     c.setViewportTransform([1, 0, 0, 1, 0, 0]);
     c.requestRenderAll();
     syncZoomUi();
@@ -3276,15 +3267,16 @@
   c.on('mouse:up', () => {
     if (!isPanning) return;
     isPanning = false;
-    c.selection = true;
+    c.selection = !uiState.preview;
   });
 
   const touchGesture = { active: false, pointers: new Map(), lastDist: 0, lastMidX: 0, lastMidY: 0 };
 
   function touchPointToCanvas(t) {
     const bounds = c.upperCanvasEl.getBoundingClientRect();
-    const scaleX = bounds.width ? c.upperCanvasEl.width / bounds.width : 1;
-    const scaleY = bounds.height ? c.upperCanvasEl.height / bounds.height : 1;
+    // Logical canvas units (not retina backstore pixels) so pinch zoom centres correctly.
+    const scaleX = bounds.width ? c.getWidth() / bounds.width : 1;
+    const scaleY = bounds.height ? c.getHeight() / bounds.height : 1;
     return { x: (t.clientX - bounds.left) * scaleX, y: (t.clientY - bounds.top) * scaleY };
   }
 
@@ -3380,6 +3372,7 @@
     updateActionStates();
     syncMobileSelectionUi();
     scheduleImagePregen();
+    scheduleDraftSave();
   }
 
   function setMockupBgAndArea() {
@@ -3401,6 +3394,7 @@
       : (firstArea ? Object.assign({}, firstArea) : (mk && mk.area ? Object.assign({}, mk.area) : Object.assign({}, fallbackArea)));
     const refSize = referenceSizeForMockup(mk, areaRaw);
     const appliedSize = applyCanvasSize(refSize);
+    rescaleObjectsToCanvas();
 
     const baseArea = {
       x: numberOr(areaRaw.x, fallbackArea.x),
@@ -3433,6 +3427,7 @@
       excludeFromExport: true
     });
     printArea.__nb_area = true;
+    if (uiState.preview) printArea.visible = false;
     c.add(printArea);
     c.__nb_area = area;
     c.__nb_area_physical = {
@@ -3516,8 +3511,15 @@
     scheduleHistoryCommit();
   }
 
+  function isVectorImage(img) {
+    const src = img && typeof img.getSrc === 'function' ? (img.getSrc() || '') : '';
+    return /^data:image\/svg\+xml/i.test(src) || /\.svg(?:[?#]|$)/i.test(src);
+  }
+
   function imageEffectiveDpi(img) {
     if (!img || img.type !== 'image') return null;
+    // Vector images stay sharp at any print size.
+    if (isVectorImage(img)) return Infinity;
     const area = c.__nb_area || fallbackArea;
     if (!area || !area.w || !area.h) return null;
     const nativeW = img.width || 0;
@@ -3545,9 +3547,11 @@
     updateLowResWarning();
     const img = activeImage();
     const hasImage = !!img;
-    const imageSection = sheetSources.get('image');
-    if (imageSection && imageSection.node) imageSection.node.hidden = !hasImage;
     const cropping = !!cropSession;
+    const imageSection = propertySections.get('image');
+    // While cropping, the crop frame is the active object; keep the image tools
+    // (and the Apply / Cancel buttons) visible.
+    if (imageSection) imageSection.hidden = !hasImage && !cropping;
     if (replaceImageBtn) replaceImageBtn.disabled = !hasImage || cropping;
     if (cropImageBtn) cropImageBtn.disabled = !hasImage || cropping;
     [filterGrayscaleToggle, filterSepiaToggle, filterBrightnessInput, filterContrastInput].forEach(ctrl => {
@@ -3702,6 +3706,9 @@
     c.requestRenderAll();
     updateCropToolbarVisibility();
     syncImageControls();
+    syncPropertiesEmptyState();
+    syncQuickbar();
+    if (isMobileUi()) openInspector('properties');
   }
 
   function endImageCrop(apply) {
@@ -4659,8 +4666,16 @@
   function syncTextControls() {
     const textbox = activeTextbox();
     const hasTextbox = !!textbox;
-    const textSection = sheetSources.get('text');
-    if (textSection && textSection.node) textSection.node.hidden = !hasTextbox;
+    const textSection = propertySections.get('text');
+    if (textSection) textSection.hidden = !hasTextbox;
+    if (textContentEl) {
+      textContentEl.disabled = !hasTextbox;
+      if (!hasTextbox) {
+        textContentEl.value = '';
+      } else if (document.activeElement !== textContentEl) {
+        textContentEl.value = textbox.text || '';
+      }
+    }
     if (textbox) initializeTextboxCurve(textbox);
     const controls = [
       fontFamilySel,
@@ -4865,6 +4880,8 @@
     const { entries: filteredColors, restricted, typeConfigured } = availableColorsForType(cfg, typeSel ? typeSel.value : '');
     const fallbackColors = typeConfigured ? [] : colorStringsForType(cfg, '').map(colorEntryFromString).filter(Boolean);
     const colorsToRender = filteredColors.length ? filteredColors : fallbackColors;
+    const previousColor = colorSel.value;
+    const previousSize = sizeSel.value;
     colorSel.innerHTML = '';
     colorsToRender.forEach(entry => {
       const opt = document.createElement('option');
@@ -4875,6 +4892,9 @@
       opt.dataset.rawColor = entry.original;
       colorSel.appendChild(opt);
     });
+    if (previousColor && Array.from(colorSel.options).some(o => o.value === previousColor)) {
+      colorSel.value = previousColor;
+    }
     ensureSelectValue(colorSel);
     renderColorChoices();
 
@@ -4883,15 +4903,26 @@
       closeBulkModal();
     }
     sizeSel.innerHTML = '';
-    (cfg.sizes || []).forEach(size => {
-      const val = (size || '').toString().trim();
-      if (!val) return;
+    const sizeValues = (cfg.sizes || []).map(size => (size || '').toString().trim()).filter(Boolean);
+    // With several sizes the customer has to pick one explicitly, so nobody
+    // ends up with the first size by accident. A single size is preselected.
+    if (sizeValues.length > 1) {
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Válassz méretet';
+      sizeSel.appendChild(placeholder);
+    }
+    sizeValues.forEach(val => {
       const opt = document.createElement('option');
       opt.value = val;
       opt.textContent = val;
       sizeSel.appendChild(opt);
     });
-    ensureSelectValue(sizeSel);
+    if (previousSize && sizeValues.indexOf(previousSize) !== -1) {
+      sizeSel.value = previousSize;
+    } else {
+      sizeSel.value = sizeValues.length === 1 ? sizeValues[0] : '';
+    }
     renderSizeButtons();
     renderBulkSizeList();
   }
@@ -4960,29 +4991,506 @@
   updateSideUiState();
   updateSideStatus();
   updatePrintSummary();
-  refreshMobileUi();
-  updateToolbarActiveState();
-  updateRailActiveState();
-  if (!mobileUiEnabled()) openFlyout('product', { skipFocus: true });
+  setInspectorTab('properties');
+  applyLayoutMode();
+  syncPropertiesEmptyState();
 
-  const studioHelpToggle = document.getElementById('nb-studio-help-toggle');
-  const studioHelp = document.getElementById('nb-studio-help');
-  if (studioHelpToggle && studioHelp) {
-    studioHelpToggle.addEventListener('click', () => {
-      studioHelp.hidden = !studioHelp.hidden;
-      studioHelpToggle.setAttribute('aria-expanded', String(!studioHelp.hidden));
+  // --- Értesítések ---------------------------------------------------------
+  const TOAST_ICONS = { info: 'info', success: 'check', error: 'alert', warning: 'alert' };
+  function toast(message, type, options) {
+    if (!toastsEl || !message) return null;
+    const opts = options || {};
+    const kind = TOAST_ICONS[type] ? type : 'info';
+    Array.from(toastsEl.children).forEach(existing => {
+      const text = existing.querySelector('.nb-toast-text');
+      if (text && text.textContent === message && existing.parentNode) existing.parentNode.removeChild(existing);
+    });
+    const el = document.createElement('div');
+    el.className = `nb-toast nb-toast--${kind}`;
+    el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    el.innerHTML = iconMarkup(TOAST_ICONS[kind]);
+    const text = document.createElement('div');
+    text.className = 'nb-toast-text';
+    text.textContent = message;
+    el.appendChild(text);
+    let timer = null;
+    const dismiss = () => {
+      if (!el.isConnected) return;
+      clearTimeout(timer);
+      el.classList.add('is-leaving');
+      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+    };
+    if (opts.action && opts.action.label && typeof opts.action.onClick === 'function') {
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = 'nb-toast-action';
+      actionBtn.textContent = opts.action.label;
+      actionBtn.addEventListener('click', () => {
+        dismiss();
+        opts.action.onClick();
+      });
+      el.appendChild(actionBtn);
+    }
+    toastsEl.appendChild(el);
+    while (toastsEl.children.length > 3) toastsEl.removeChild(toastsEl.firstElementChild);
+    timer = setTimeout(dismiss, opts.duration || (kind === 'error' ? 6500 : 4000));
+    return { dismiss };
+  }
+
+  // --- Megerősítő ablak ----------------------------------------------------
+  function confirmDialog(options) {
+    const opts = options || {};
+    return new Promise(resolve => {
+      const titleEl = document.getElementById('nb-dialog-title');
+      const textEl = document.getElementById('nb-dialog-text');
+      const okBtn = document.getElementById('nb-dialog-ok');
+      const cancelBtn = document.getElementById('nb-dialog-cancel');
+      if (!dialogEl || !okBtn || !cancelBtn) {
+        resolve(window.confirm(opts.message || opts.title || ''));
+        return;
+      }
+      if (titleEl) titleEl.textContent = opts.title || 'Biztos vagy benne?';
+      if (textEl) textEl.textContent = opts.message || '';
+      okBtn.textContent = opts.confirmLabel || 'Rendben';
+      cancelBtn.textContent = opts.cancelLabel || 'Mégse';
+      const previousFocus = document.activeElement;
+      const cancelEls = Array.from(dialogEl.querySelectorAll('[data-nb-dialog-cancel]'));
+      let settled = false;
+      const finish = result => {
+        if (settled) return;
+        settled = true;
+        dialogEl.hidden = true;
+        updateModalBodyState();
+        okBtn.removeEventListener('click', onOk);
+        cancelEls.forEach(el => el.removeEventListener('click', onCancel));
+        document.removeEventListener('keydown', onKey, true);
+        if (previousFocus && typeof previousFocus.focus === 'function') {
+          try { previousFocus.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+        }
+        resolve(result);
+      };
+      const onOk = () => finish(true);
+      const onCancel = () => finish(false);
+      const onKey = evt => {
+        if (evt.key === 'Escape') {
+          evt.preventDefault();
+          evt.stopPropagation();
+          onCancel();
+        } else if (evt.key === 'Tab') {
+          // Keep keyboard focus inside the dialog.
+          const focusables = [cancelBtn, okBtn];
+          const index = focusables.indexOf(document.activeElement);
+          evt.preventDefault();
+          const next = evt.shiftKey ? (index <= 0 ? focusables.length - 1 : index - 1) : (index + 1) % focusables.length;
+          focusables[next].focus();
+        }
+      };
+      okBtn.addEventListener('click', onOk);
+      cancelEls.forEach(el => el.addEventListener('click', onCancel));
+      document.addEventListener('keydown', onKey, true);
+      dialogEl.hidden = false;
+      updateModalBodyState();
+      setTimeout(() => okBtn.focus(), 0);
     });
   }
-  document.querySelectorAll('[data-nb-open-tool]').forEach(button => {
-    button.addEventListener('click', () => {
-      const key = button.dataset.nbOpenTool;
-      if (mobileUiEnabled()) openMobileSheet(key);
-      else openFlyout(key);
+
+  // --- Hiányzó választás jelzése ------------------------------------------
+  function guideToSelection(preferredKey) {
+    const missing = missingSelectionKeys();
+    const key = preferredKey || missing[0] || 'size';
+    const names = { product: 'terméket', color: 'színt', size: 'méretet' };
+    openTool('product');
+    const groups = {
+      product: productGroupEl && !productGroupEl.hidden ? productGroupEl : typeGroupEl,
+      color: document.getElementById('nb-color-group'),
+      size: sizeGroupEl
+    };
+    const group = groups[key];
+    if (group) {
+      group.classList.remove('is-attention');
+      void group.offsetWidth;
+      group.classList.add('is-attention');
+      setTimeout(() => group.classList.remove('is-attention'), 1400);
+      if (typeof group.scrollIntoView === 'function') {
+        setTimeout(() => group.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
+      }
+    }
+    if (missing.length) {
+      if (guideToast) guideToast.dismiss();
+      guideToast = toast(`A rendeléshez válassz ${names[key] || 'méretet'}.`, 'warning');
+    }
+  }
+
+  // --- Piszkozat automatikus mentése ---------------------------------------
+  function sideObjectCount(json) {
+    return json && Array.isArray(json.objects) ? json.objects.length : 0;
+  }
+
+  function serializeDraft() {
+    captureActiveSideState();
+    const front = cloneSideJson(ensureSideState('front'));
+    const back = cloneSideJson(ensureSideState('back'));
+    if (!sideObjectCount(front) && !sideObjectCount(back)) return null;
+    return {
+      v: 1,
+      savedAt: Date.now(),
+      product: productSel.value || '',
+      type: typeSel.value || '',
+      color: colorSel.value || '',
+      size: sizeSel.value || '',
+      doubleSided: !!doubleSidedEnabled,
+      layers: { front, back }
+    };
+  }
+
+  function draftStorage() {
+    try {
+      return window.localStorage || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function scheduleDraftSave() {
+    if (draftState.suppressed) return;
+    if (draftState.timer) clearTimeout(draftState.timer);
+    draftState.timer = setTimeout(saveDraftNow, 900);
+  }
+
+  function saveDraftNow() {
+    draftState.timer = null;
+    if (draftState.suppressed) return;
+    if (sideLoading || saving || historyOpInProgress || cropSession) {
+      scheduleDraftSave();
+      return;
+    }
+    const storage = draftStorage();
+    if (!storage) return;
+    const draft = serializeDraft();
+    try {
+      if (!draft) {
+        storage.removeItem(DRAFT_STORAGE_KEY);
+        draftState.savedAt = 0;
+      } else {
+        storage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        draftState.savedAt = draft.savedAt;
+      }
+    } catch (e) {
+      // Large photos can exceed the browser quota; the editor keeps working.
+      draftState.savedAt = 0;
+    }
+    updateDesignStatus();
+  }
+
+  function readDraft() {
+    const storage = draftStorage();
+    if (!storage) return null;
+    try {
+      const raw = storage.getItem(DRAFT_STORAGE_KEY);
+      if (!raw) return null;
+      const draft = JSON.parse(raw);
+      if (!draft || draft.v !== 1 || !draft.layers) return null;
+      if (!draft.savedAt || Date.now() - draft.savedAt > 30 * 24 * 3600 * 1000) {
+        storage.removeItem(DRAFT_STORAGE_KEY);
+        return null;
+      }
+      if (!sideObjectCount(draft.layers.front) && !sideObjectCount(draft.layers.back)) return null;
+      return draft;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function clearDraft() {
+    if (draftState.timer) {
+      clearTimeout(draftState.timer);
+      draftState.timer = null;
+    }
+    const storage = draftStorage();
+    try {
+      if (storage) storage.removeItem(DRAFT_STORAGE_KEY);
+    } catch (e) { /* ignore */ }
+    draftState.savedAt = 0;
+    updateDesignStatus();
+  }
+
+  function selectOptionValue(selectEl, value) {
+    if (!selectEl || !value) return false;
+    const match = Array.from(selectEl.options).find(o => o.value === value);
+    if (!match || selectEl.value === value) return !!match;
+    selectEl.value = value;
+    dispatchChangeEvent(selectEl);
+    return true;
+  }
+
+  async function restoreDraft(draft) {
+    draftState.suppressed = true;
+    try {
+      selectOptionValue(typeSel, draft.type);
+      selectOptionValue(productSel, draft.product);
+      selectOptionValue(colorSel, draft.color);
+      selectOptionValue(sizeSel, draft.size);
+      await loadDesign({ layers: draft.layers }, { doubleSided: !!draft.doubleSided });
+      updateSelectionSummary();
+    } finally {
+      draftState.suppressed = false;
+    }
+    draftState.savedAt = draft.savedAt;
+    updateDesignStatus();
+    toast('Visszatöltöttük a korábbi tervedet.', 'success');
+  }
+
+  function formatDraftTime(timestamp) {
+    try {
+      return new Date(timestamp).toLocaleString('hu-HU', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return '';
+    }
+  }
+
+  // --- Képek: feltöltés, behúzás, beillesztés ------------------------------
+  const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+  const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+  function validateImageFile(file) {
+    if (!file) return 'Nem sikerült beolvasni a fájlt.';
+    const type = (file.type || '').toLowerCase();
+    const typeOk = ACCEPTED_IMAGE_TYPES.indexOf(type) !== -1 || /\.(png|jpe?g|svg|webp)$/i.test(file.name || '');
+    if (!typeOk) return 'Ez a fájltípus nem támogatott. PNG, JPG, SVG vagy WEBP képet tölts fel.';
+    if (file.size > MAX_UPLOAD_BYTES) return 'A kép túl nagy, legfeljebb 25 MB lehet.';
+    return '';
+  }
+
+  function addImageFromFile(file) {
+    const error = validateImageFile(file);
+    if (error) {
+      toast(error, 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = evt => {
+      const dataUrl = evt && evt.target && typeof evt.target.result === 'string' ? evt.target.result : '';
+      if (!dataUrl) {
+        toast('Nem sikerült beolvasni a képet.', 'error');
+        return;
+      }
+      fabric.Image.fromURL(dataUrl, (img, isError) => {
+        if (isError || !img || !img.width || !img.height) {
+          toast('Nem sikerült megnyitni a képet.', 'error');
+          return;
+        }
+        if (uiState.preview) setPreviewMode(false);
+        const a = c.__nb_area || fallbackArea;
+        const maxW = a.w * 0.95;
+        const maxH = a.h * 0.95;
+        const scale = Math.min(1, maxW / img.width, maxH / img.height);
+        img.scale(scale);
+        img.set({
+          left: a.x + (a.w - img.getScaledWidth()) / 2,
+          top: a.y + (a.h - img.getScaledHeight()) / 2,
+          selectable: true,
+          cornerStyle: 'circle',
+          transparentCorners: false,
+          lockScalingFlip: true
+        });
+        applyObjectUiDefaults(img);
+        if (typeof file.name === 'string' && file.name) {
+          const baseName = file.name.split(/[/\\]/).pop() || file.name;
+          img.__nb_layer_name = baseName.replace(/\.[^.]+$/, '') || 'Kép';
+        }
+        c.add(img);
+        c.setActiveObject(img);
+        keepObjectInside(img);
+        syncImageControls();
+        closeTransientPanel();
+        const dpi = imageEffectiveDpi(img);
+        if (Number.isFinite(dpi) && dpi < MIN_PRINT_DPI) {
+          toast('A kép felbontása alacsony, nyomtatásban pixeles lehet. Kicsinyítsd, vagy tölts fel nagyobb képet.', 'warning', { duration: 7000 });
+        } else {
+          toast('Kép hozzáadva.', 'success');
+        }
+      });
+    };
+    reader.onerror = () => toast('Nem sikerült beolvasni a képet.', 'error');
+    reader.readAsDataURL(file);
+  }
+
+  function firstImageFile(fileList) {
+    const files = Array.from(fileList || []);
+    return files.find(f => /^image\//i.test(f.type || '') || /\.(png|jpe?g|svg|webp)$/i.test(f.name || '')) || files[0] || null;
+  }
+
+  function enableFileDrop(zone) {
+    if (!zone) return;
+    let depth = 0;
+    const hasFiles = evt => !!(evt.dataTransfer && Array.from(evt.dataTransfer.types || []).indexOf('Files') !== -1);
+    zone.addEventListener('dragenter', evt => {
+      if (!hasFiles(evt)) return;
+      evt.preventDefault();
+      depth += 1;
+      zone.classList.add('is-dragover');
+    });
+    zone.addEventListener('dragover', evt => {
+      if (!hasFiles(evt)) return;
+      evt.preventDefault();
+      evt.dataTransfer.dropEffect = 'copy';
+    });
+    zone.addEventListener('dragleave', evt => {
+      if (!hasFiles(evt)) return;
+      depth = Math.max(0, depth - 1);
+      if (!depth) zone.classList.remove('is-dragover');
+    });
+    zone.addEventListener('drop', evt => {
+      if (!hasFiles(evt)) return;
+      evt.preventDefault();
+      depth = 0;
+      zone.classList.remove('is-dragover');
+      const file = firstImageFile(evt.dataTransfer.files);
+      if (file) addImageFromFile(file);
+    });
+  }
+
+  enableFileDrop(stageCanvasEl);
+  enableFileDrop(document.querySelector('#nb-designer .nb-dropzone'));
+
+  document.addEventListener('paste', evt => {
+    if (isTypingTarget(evt.target)) return;
+    if (!appEl || !document.body.contains(appEl)) return;
+    const items = Array.from((evt.clipboardData && evt.clipboardData.items) || []);
+    const item = items.find(i => i.kind === 'file' && /^image\//i.test(i.type || ''));
+    if (!item) return;
+    const file = item.getAsFile();
+    if (!file) return;
+    evt.preventDefault();
+    addImageFromFile(file);
+  });
+
+  // --- Előnézet mód --------------------------------------------------------
+  function setPreviewMode(on) {
+    uiState.preview = !!on;
+    if (appEl) appEl.classList.toggle('is-preview', uiState.preview);
+    if (previewToggleBtn) {
+      previewToggleBtn.setAttribute('aria-pressed', uiState.preview ? 'true' : 'false');
+      previewToggleBtn.setAttribute('aria-label', uiState.preview ? 'Előnézet bezárása' : 'Előnézet');
+      previewToggleBtn.title = uiState.preview ? 'Vissza a szerkesztéshez' : 'Előnézet segédvonalak nélkül';
+      const use = previewToggleBtn.querySelector('use');
+      if (use) use.setAttribute('href', uiState.preview ? '#nb-i-eye-off' : '#nb-i-eye');
+    }
+    if (uiState.preview) {
+      maybeAutoApplyCrop(null);
+      c.discardActiveObject();
+      resetZoom();
+    }
+    if (c.__nb_area_rect) c.__nb_area_rect.visible = !uiState.preview;
+    c.skipTargetFind = uiState.preview;
+    c.selection = !uiState.preview;
+    c.requestRenderAll();
+    syncQuickbar();
+  }
+
+  if (previewToggleBtn) {
+    previewToggleBtn.addEventListener('click', () => setPreviewMode(!uiState.preview));
+  }
+
+  // --- Súgó ----------------------------------------------------------------
+  const studioHelp = document.getElementById('nb-studio-help');
+  const helpToggles = Array.from(document.querySelectorAll('[data-nb-help-toggle]'));
+  function setHelpOpen(open) {
+    if (!studioHelp) return;
+    studioHelp.hidden = !open;
+    helpToggles.forEach(btn => {
+      if (btn.hasAttribute('aria-expanded')) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
+  helpToggles.forEach(btn => {
+    btn.addEventListener('click', () => setHelpOpen(!!(studioHelp && studioHelp.hidden)));
+  });
+
+  // --- Panelek és eszközök -------------------------------------------------
+  toolButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (uiState.preview) setPreviewMode(false);
+      const key = btn.dataset.nbTool;
+      toggleTool(key);
+      if (key === 'text' && !isMobileUi() && dockIsVisible()) focusFirstIn(toolPanels.get('text'));
     });
   });
-  if (studioOrderBtn) studioOrderBtn.addEventListener('click', () => {
-    if (!mobileUiEnabled()) return;
-    openMobileSheet(hasCompleteSelection() ? 'cart' : 'product');
+
+  document.querySelectorAll('[data-nb-tool-open]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (uiState.preview) setPreviewMode(false);
+      const key = btn.dataset.nbToolOpen;
+      openTool(key, { focus: key === 'text' && !isMobileUi() });
+    });
+  });
+
+  inspectorTabs.forEach((btn, index) => {
+    btn.addEventListener('click', () => setInspectorTab(btn.dataset.nbInspectorTab));
+    btn.addEventListener('keydown', evt => {
+      if (evt.key !== 'ArrowRight' && evt.key !== 'ArrowLeft') return;
+      evt.preventDefault();
+      const next = inspectorTabs[(index + (evt.key === 'ArrowRight' ? 1 : inspectorTabs.length - 1)) % inspectorTabs.length];
+      setInspectorTab(next.dataset.nbInspectorTab);
+      next.focus();
+    });
+  });
+
+  document.querySelectorAll('[data-nb-inspector-open]').forEach(btn => {
+    btn.addEventListener('click', () => openInspector(btn.dataset.nbInspectorOpen));
+  });
+
+  document.querySelectorAll('[data-nb-sheet-close]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (isMobileUi()) closeSheet();
+      else if (isTabletUi()) setTabletDock(false);
+    });
+  });
+
+  document.querySelectorAll('[data-nb-sheet-grip]').forEach(grip => {
+    grip.addEventListener('pointerdown', evt => beginSheetDrag(evt, grip));
+  });
+
+  if (typeof ResizeObserver === 'function') {
+    const sheetResizeObserver = new ResizeObserver(() => scheduleStageInset());
+    Object.keys(sheets).forEach(key => sheetResizeObserver.observe(sheets[key]));
+  }
+
+  if (studioOrderBtn) {
+    studioOrderBtn.addEventListener('click', () => {
+      if (!hasCompleteSelection()) {
+        guideToSelection();
+        return;
+      }
+      openOrder();
+    });
+  }
+
+  Object.keys(quickButtons).forEach(key => {
+    const btn = quickButtons[key];
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      const obj = activeDesignObject();
+      switch (key) {
+        case 'edit':
+          openInspector('properties');
+          break;
+        case 'duplicate':
+          duplicateActiveObject();
+          break;
+        case 'forward':
+          if (obj) moveLayer(obj, 1);
+          break;
+        case 'backward':
+          if (obj) moveLayer(obj, -1);
+          break;
+        case 'center':
+          centerActiveObject();
+          break;
+        case 'delete':
+          removeActiveObject();
+          break;
+      }
+    });
   });
 
   // Auto-load saved design from URL ?nb_design_id=ID (set by "Saját Terveim" edit button)
@@ -5020,109 +5528,23 @@
 
   sideButtons.forEach(btn => {
     btn.addEventListener('click', () => {
-      const target = btn.dataset.nbSide === 'back' ? 'back' : 'front';
-      setActiveSide(target);
+      requestSide(btn.dataset.nbSide === 'back' ? 'back' : 'front');
     });
   });
 
-  if (sideFabButton) {
-    sideFabButton.addEventListener('click', () => {
-      if (!doubleSidedEnabled) return;
-      const next = activeSideKey === 'front' ? 'back' : 'front';
-      setActiveSide(next);
-    });
-  }
-
-  window.addEventListener('resize', updateMobileScrollHint);
-  if (mobileMedia) {
-    const mobileListener = () => { refreshMobileUi(); };
-    if (typeof mobileMedia.addEventListener === 'function') {
-      mobileMedia.addEventListener('change', mobileListener);
-    } else if (typeof mobileMedia.addListener === 'function') {
-      mobileMedia.addListener(mobileListener);
+  const onLayoutChange = () => {
+    applyLayoutMode();
+    refreshControlProfile();
+    fitCanvasToStage();
+  };
+  [mobileMedia, tabletMedia].forEach(media => {
+    if (!media) return;
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onLayoutChange);
+    } else if (typeof media.addListener === 'function') {
+      media.addListener(onLayoutChange);
     }
-  }
-
-  if (mobileToolbarButtons.size) {
-    mobileToolbarButtons.forEach((btn, key) => {
-      if (!btn) return;
-      btn.addEventListener('click', () => {
-        if (!mobileUiEnabled()) return;
-        openMobileSheet(key);
-      });
-    });
-  }
-
-  if (mobileSheetClose) {
-    mobileSheetClose.addEventListener('click', () => {
-      closeMobileSheet();
-    });
-  }
-
-  if (railButtons.size) {
-    railButtons.forEach((btn, key) => {
-      if (!btn) return;
-      btn.addEventListener('click', () => {
-        openFlyout(key);
-      });
-    });
-  }
-
-  if (flyoutClose) {
-    flyoutClose.addEventListener('click', () => {
-      closeFlyout();
-    });
-  }
-
-  if (mobileSheetHandle) {
-    mobileSheetHandle.addEventListener('pointerdown', beginSheetDrag);
-  }
-
-  Object.keys(mobileQuickButtons).forEach(key => {
-    const btn = mobileQuickButtons[key];
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-      if (btn.disabled) return;
-      switch (key) {
-        case 'duplicate':
-          duplicateActiveObject();
-          break;
-        case 'delete':
-          removeActiveObject();
-          break;
-        case 'visibility':
-          toggleActiveVisibility();
-          break;
-        case 'forward': {
-          const obj = activeDesignObject();
-          if (obj) moveLayer(obj, 1);
-          break;
-        }
-        case 'backward': {
-          const obj = activeDesignObject();
-          if (obj) moveLayer(obj, -1);
-          break;
-        }
-      }
-    });
   });
-
-  if (mobileCompleteBtn) {
-    mobileCompleteBtn.addEventListener('click', () => {
-      if (!mobileUiEnabled()) return;
-      if (addToCartBtn && !addToCartBtn.disabled) {
-        addToCartBtn.click();
-      }
-    });
-  }
-
-  if (mobileBulkBtn) {
-    mobileBulkBtn.addEventListener('click', () => {
-      if (!mobileUiEnabled()) return;
-      if (mobileBulkBtn.disabled) return;
-      openBulkModal();
-    });
-  }
 
   if (doubleSidedToggle) {
     doubleSidedToggle.onchange = () => {
@@ -5198,58 +5620,25 @@
   c.on('mouse:up', () => clearSnapGuides());
   c.on('object:removed', e => { if (isDesignObject(e.target)) { markDesignDirty(); commitHistory(); syncLayerList(); } });
 
-  // Gear control: appears on the top-right corner of any selected design object.
-  // Clicking/tapping opens Tulajdonságok (flyout on desktop, sheet on mobile).
-  (function () {
-    const SZ = 22;
-    function renderGear(ctx, left, top, styleOverride, fabricObject) {
-      if (!isDesignObject(fabricObject)) return;
-      ctx.save();
-      ctx.translate(left, top);
-      ctx.beginPath();
-      ctx.arc(0, 0, SZ / 2, 0, 2 * Math.PI);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      ctx.strokeStyle = '#bbbbbb';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.font = Math.round(SZ * 0.62) + 'px sans-serif';
-      ctx.fillStyle = '#555555';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('⚙', 0, 1);
-      ctx.restore();
-    }
-    const gearControl = new fabric.Control({
-      x: 0.5,
-      y: -0.5,
-      offsetX: 28,
-      offsetY: 0,
-      sizeX: SZ,
-      sizeY: SZ,
-      cursorStyle: 'pointer',
-      mouseUpHandler: (eventData, transform) => {
-        if (!isDesignObject(transform.target)) return false;
-        if (mobileUiEnabled()) {
-          openMobileSheet('properties');
-        } else {
-          openFlyout('properties');
-        }
-        return true;
-      },
-      render: renderGear
-    });
-    fabric.Object.prototype.controls.nb_gear = gearControl;
-    // fabric.Textbox defines its own `controls` object (does not inherit
-    // Object.prototype.controls by reference), so the gear must be added there too.
-    if (fabric.Textbox && fabric.Textbox.prototype.controls) {
-      fabric.Textbox.prototype.controls.nb_gear = gearControl;
-    }
-  }());
-
-  c.on('selection:created', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); if (!mobileUiEnabled() && activeDesignObject()) openFlyout('properties'); });
-  c.on('selection:updated', () => { maybeAutoApplyCrop(c.getActiveObject()); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); if (!mobileUiEnabled() && activeDesignObject()) openFlyout('properties'); });
-  c.on('selection:cleared', () => { maybeAutoApplyCrop(null); syncTextControls(); syncImageControls(); syncLayerList(); syncMobileSelectionUi(); syncPropertiesEmptyState(); });
+  function onSelectionChanged() {
+    maybeAutoApplyCrop(c.getActiveObject());
+    syncTextControls();
+    syncImageControls();
+    syncLayerList();
+    syncMobileSelectionUi();
+    syncPropertiesEmptyState();
+    if (!isMobileUi() && !layerSelectInProgress && activeDesignObject()) setInspectorTab('properties');
+  }
+  c.on('selection:created', onSelectionChanged);
+  c.on('selection:updated', onSelectionChanged);
+  c.on('selection:cleared', () => {
+    maybeAutoApplyCrop(null);
+    syncTextControls();
+    syncImageControls();
+    syncLayerList();
+    syncMobileSelectionUi();
+    syncPropertiesEmptyState();
+  });
   c.on('text:changed', e => {
     if (!isDesignObject(e.target)) return;
     initializeTextboxCurve(e.target);
@@ -5261,6 +5650,20 @@
     syncLayerList();
     syncTextControls();
   });
+
+  if (textContentEl) {
+    textContentEl.addEventListener('input', () => {
+      const textbox = activeTextbox();
+      if (!textbox) return;
+      const value = textContentEl.value;
+      applyToActiveText(obj => { obj.set('text', value); });
+      initializeTextboxCurve(textbox);
+      applyTextboxCurve(textbox);
+      c.requestRenderAll();
+      syncLayerList();
+      syncTextControls();
+    });
+  }
 
   if (fontFamilySel) {
     fontFamilySel.onchange = () => {
@@ -5401,40 +5804,16 @@
     });
   }
 
-  if (productModalTrigger) {
-    productModalTrigger.addEventListener('click', openProductModal);
-  }
-
-  if (productModal) {
-    const closeButtons = Array.from(productModal.querySelectorAll('[data-nb-close="product-modal"]'));
-    closeButtons.forEach(btn => btn.addEventListener('click', closeProductModal));
-    productModal.addEventListener('click', evt => {
-      if (evt.target && evt.target.dataset && evt.target.dataset.nbClose === 'product-modal') {
-        closeProductModal();
-      }
-    });
-  }
-
-  if (colorModalTrigger) {
-    colorModalTrigger.addEventListener('click', openColorModal);
-  }
-
-  if (colorModal) {
-    const closeButtons = Array.from(colorModal.querySelectorAll('[data-nb-close="color-modal"]'));
-    closeButtons.forEach(btn => btn.addEventListener('click', closeColorModal));
-    colorModal.addEventListener('click', evt => {
-      if (evt.target && evt.target.dataset && evt.target.dataset.nbClose === 'color-modal') {
-        closeColorModal();
-      }
-    });
-  }
-
   renderBulkDiscountTable();
   updateBulkDiscountHint();
 
   if (bulkModalTrigger) {
     bulkModalTrigger.addEventListener('click', () => {
       if (bulkModalTrigger.disabled) return;
+      if (!hasCompleteSelection() && missingSelectionKeys().some(key => key !== 'size')) {
+        guideToSelection();
+        return;
+      }
       openBulkModal();
     });
   }
@@ -5456,35 +5835,47 @@
         cancelImageCrop();
         return;
       }
-      if (mobileSheet && sheetState.activeKey) {
-        closeMobileSheet();
-        return;
-      }
-      if (flyout && flyoutState.activeKey) {
-        closeFlyout();
-        return;
-      }
       if (bulkModal && !bulkModal.hidden) {
         closeBulkModal();
         return;
       }
-      if (colorModal && !colorModal.hidden) {
-        closeColorModal();
+      if (studioHelp && !studioHelp.hidden) {
+        setHelpOpen(false);
         return;
       }
-      if (productModal && !productModal.hidden) {
-        closeProductModal();
+      if (uiState.sheet) {
+        closeSheet();
+        return;
+      }
+      if (isTabletUi() && dockIsVisible()) {
+        setTabletDock(false);
+        return;
+      }
+      if (uiState.preview) {
+        setPreviewMode(false);
+        return;
+      }
+      if (activeDesignObject() && !isTypingTarget(evt.target)) {
+        c.discardActiveObject();
+        c.requestRenderAll();
       }
       return;
     }
-    if ((key === 'Delete' || key === 'Backspace') && !isEditableTarget(evt.target)) {
+    if ((key === 'd' || key === 'D') && (evt.ctrlKey || evt.metaKey) && !isTypingTarget(evt.target)) {
+      if (activeDesignObject()) {
+        evt.preventDefault();
+        duplicateActiveObject();
+      }
+      return;
+    }
+    if ((key === 'Delete' || key === 'Backspace') && !isTypingTarget(evt.target)) {
       const active = activeDesignObject();
       if (active) {
         evt.preventDefault();
         removeActiveObject(active);
       }
     }
-    if ((key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') && !isEditableTarget(evt.target)) {
+    if ((key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') && !isTypingTarget(evt.target)) {
       const step = evt.shiftKey ? 10 : 1;
       let dx = 0, dy = 0;
       if (key === 'ArrowUp') dy = -step;
@@ -5496,7 +5887,7 @@
         return;
       }
     }
-    if ((key === 'z' || key === 'Z') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+    if ((key === 'z' || key === 'Z') && (evt.ctrlKey || evt.metaKey) && !isTypingTarget(evt.target)) {
       evt.preventDefault();
       if (evt.shiftKey) {
         redoHistory();
@@ -5505,22 +5896,22 @@
       }
       return;
     }
-    if ((key === 'y' || key === 'Y') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+    if ((key === 'y' || key === 'Y') && (evt.ctrlKey || evt.metaKey) && !isTypingTarget(evt.target)) {
       evt.preventDefault();
       redoHistory();
       return;
     }
-    if ((key === '+' || key === '=') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+    if ((key === '+' || key === '=') && (evt.ctrlKey || evt.metaKey) && !isTypingTarget(evt.target)) {
       evt.preventDefault();
       setZoomLevel(c.getZoom() + ZOOM_STEP);
       return;
     }
-    if ((key === '-' || key === '_') && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+    if ((key === '-' || key === '_') && (evt.ctrlKey || evt.metaKey) && !isTypingTarget(evt.target)) {
       evt.preventDefault();
       setZoomLevel(c.getZoom() - ZOOM_STEP);
       return;
     }
-    if (key === '0' && (evt.ctrlKey || evt.metaKey) && !isEditableTarget(evt.target)) {
+    if (key === '0' && (evt.ctrlKey || evt.metaKey) && !isTypingTarget(evt.target)) {
       evt.preventDefault();
       resetZoom();
       return;
@@ -5703,7 +6094,11 @@
   if (cropCancelBtn) cropCancelBtn.addEventListener('click', () => cancelImageCrop());
 
   shapeButtons.forEach(btn => {
-    btn.addEventListener('click', () => addShapeToCanvas(btn.dataset.nbShape));
+    btn.addEventListener('click', () => {
+      if (uiState.preview) setPreviewMode(false);
+      addShapeToCanvas(btn.dataset.nbShape);
+      closeTransientPanel();
+    });
   });
 
   if (qrInput && qrAddBtn) {
@@ -5715,8 +6110,13 @@
       syncQrAddState();
     });
     qrAddBtn.addEventListener('click', () => {
+      if (uiState.preview) setPreviewMode(false);
+      const before = designObjects().length;
       addQrToCanvas(qrInput.value);
-      qrInput.value = '';
+      if (designObjects().length > before) {
+        qrInput.value = '';
+        closeTransientPanel();
+      }
       syncQrAddState();
     });
     syncQrAddState();
@@ -5731,24 +6131,22 @@
   function scheduleStageResize() {
     if (resizeRaf) cancelAnimationFrame(resizeRaf);
     resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = null;
       refreshControlProfile();
-      setMockupBgAndArea();
+      fitCanvasToStage();
     });
   }
   window.addEventListener('resize', scheduleStageResize);
 
-  if (typeof ResizeObserver === 'function') {
-    const stageColumnEl = document.querySelector('.nb-column--stage');
-    if (stageColumnEl) {
-      const stageResizeObserver = new ResizeObserver(() => {
-        scheduleStageResize();
-      });
-      stageResizeObserver.observe(stageColumnEl);
-    }
+  if (typeof ResizeObserver === 'function' && canvasFrameEl) {
+    const stageResizeObserver = new ResizeObserver(() => {
+      scheduleStageResize();
+    });
+    stageResizeObserver.observe(canvasFrameEl);
   }
 
   window.addEventListener('load', () => {
-    setMockupBgAndArea();
+    fitCanvasToStage();
   });
 
   if (typeof history !== 'undefined' && history.replaceState) {
@@ -5757,17 +6155,18 @@
     } catch (e) { /* ignore */ }
   }
 
-  window.addEventListener('popstate', evt => {
-    if (sheetState.historyDepth > 0 && sheetState.activeKey) {
-      closeMobileSheet({ fromPopState: true });
+  window.addEventListener('popstate', () => {
+    if (uiState.historyDepth > 0 && uiState.sheet) {
+      closeSheet({ fromPopState: true });
       return;
     }
-    if (sheetState.pendingClose) {
-      sheetState.pendingClose = false;
+    if (uiState.pendingClose) {
+      uiState.pendingClose = false;
       return;
     }
-    if (mobileUiEnabled()) {
-      if (designState.dirty) {
+    if (isMobileUi()) {
+      const hasContent = sideHasContent('front') || sideHasContent('back');
+      if (hasContent && designState.dirty && !draftState.savedAt) {
         const leave = window.confirm('Kilépsz a tervezőből? A jelenlegi terv még nincs elmentve.');
         if (!leave && typeof history !== 'undefined' && history.pushState) {
           history.pushState({ __nb_root: true }, document.title, location.href);
@@ -5779,101 +6178,98 @@
   syncLayerList();
   syncPropertiesEmptyState();
 
+  function addTextFromInput() {
+    if (uiState.preview) setPreviewMode(false);
+    const raw = textInputEl ? textInputEl.value : '';
+    const typed = raw.trim().length > 0;
+    const content = typed ? raw.replace(/\s+$/, '') : 'Írd ide a feliratot';
+    const a = c.__nb_area || fallbackArea;
+    const textboxWidth = Math.max(80, a.w - 40);
+    const t = new fabric.Textbox(content, {
+      fill: currentFontColor(),
+      stroke: currentFontStrokeColor(),
+      strokeWidth: currentFontStrokeWidth(),
+      strokeUniform: true,
+      paintFirst: 'stroke',
+      fontSize: currentFontSize(),
+      width: textboxWidth,
+      left: a.x + (a.w - textboxWidth) / 2,
+      top: a.y + 20,
+      fontFamily: currentFontFamily(),
+      fontWeight: currentFontWeight(),
+      fontStyle: currentFontStyle(),
+      textAlign: currentTextAlign(),
+      charSpacing: currentLetterSpacing(),
+      lineHeight: currentLineHeight(),
+      shadow: currentTextShadow(),
+      cornerStyle: 'circle',
+      transparentCorners: false,
+      lockScalingFlip: true
+    });
+    applyObjectUiDefaults(t);
+    initializeTextboxCurve(t);
+    c.add(t).setActiveObject(t);
+    keepObjectInside(t);
+    syncTextControls();
+    if (textInputEl) textInputEl.value = '';
+    setInspectorTab('properties');
+    if (isMobileUi()) openInspector('properties');
+    else if (isTabletUi()) setTabletDock(false);
+    if (!typed && textContentEl) {
+      // The placeholder text is selected, so typing replaces it right away.
+      setTimeout(() => {
+        try { textContentEl.focus({ preventScroll: true }); } catch (e) { textContentEl.focus(); }
+        textContentEl.select();
+      }, 60);
+    }
+  }
+
   if (addTextBtn) {
-    addTextBtn.onclick = () => {
-      const a = c.__nb_area || fallbackArea;
-      const textboxWidth = Math.max(80, a.w - 40);
-      const t = new fabric.Textbox('Írd ide a feliratot', {
-        fill: currentFontColor(),
-        stroke: currentFontStrokeColor(),
-        strokeWidth: currentFontStrokeWidth(),
-        strokeUniform: true,
-        paintFirst: 'stroke',
-        fontSize: currentFontSize(),
-        width: textboxWidth,
-        left: a.x + (a.w - textboxWidth) / 2,
-        top: a.y + 20,
-        fontFamily: currentFontFamily(),
-        fontWeight: currentFontWeight(),
-        fontStyle: currentFontStyle(),
-        textAlign: currentTextAlign(),
-        charSpacing: currentLetterSpacing(),
-        lineHeight: currentLineHeight(),
-        shadow: currentTextShadow(),
-        cornerStyle: 'circle',
-        transparentCorners: false,
-        lockScalingFlip: true
-      });
-      applyObjectUiDefaults(t);
-      initializeTextboxCurve(t);
-      c.add(t).setActiveObject(t);
-      keepObjectInside(t);
-      syncTextControls();
-    };
+    addTextBtn.onclick = addTextFromInput;
+  }
+
+  if (textInputEl) {
+    textInputEl.addEventListener('keydown', evt => {
+      if (evt.key === 'Enter' && (evt.ctrlKey || evt.metaKey)) {
+        evt.preventDefault();
+        addTextFromInput();
+      }
+    });
   }
 
   if (uploadInput) {
     uploadInput.addEventListener('change', e => {
       const file = e.target.files && e.target.files[0];
-      if (!file) {
-        e.target.value = '';
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = evt => {
-        const dataUrl = evt && evt.target && typeof evt.target.result === 'string'
-          ? evt.target.result
-          : '';
-        if (!dataUrl) {
-          e.target.value = '';
-          return;
-        }
-        fabric.Image.fromURL(dataUrl, img => {
-          const a = c.__nb_area || fallbackArea;
-          const maxW = a.w * 0.95;
-          const maxH = a.h * 0.95;
-          const scale = Math.min(1, maxW / img.width, maxH / img.height);
-          img.scale(scale);
-          img.set({
-            left: a.x + (a.w - img.getScaledWidth()) / 2,
-            top: a.y + (a.h - img.getScaledHeight()) / 2,
-            selectable: true,
-            cornerStyle: 'circle',
-            transparentCorners: false,
-            lockScalingFlip: true
-          });
-          applyObjectUiDefaults(img);
-          if (file && typeof file.name === 'string' && file.name) {
-            const baseName = file.name.split(/[/\\]/).pop() || file.name;
-            img.__nb_layer_name = baseName.replace(/\.[^.]+$/, '') || 'Kép';
-          }
-          c.add(img);
-          c.setActiveObject(img);
-          keepObjectInside(img);
-          syncImageControls();
-        });
-        e.target.value = '';
-      };
-      reader.onerror = () => {
-        console.error('Nem sikerült beolvasni a képfájlt.');
-        e.target.value = '';
-      };
-      reader.readAsDataURL(file);
+      e.target.value = '';
+      if (file) addImageFromFile(file);
     });
   }
 
   if (clearButton) {
-    clearButton.onclick = () => {
+    clearButton.onclick = async () => {
+      if (!designObjects().length) {
+        toast('Ezen az oldalon nincs mit törölni.', 'info');
+        return;
+      }
+      const ok = await confirmDialog({
+        title: `${sideLabel(activeSideKey)} ürítése`,
+        message: `Minden elem törlődik a(z) ${sideLabel(activeSideKey).toLowerCase()} oldalról. A Visszavonás gombbal még visszahozhatod.`,
+        confirmLabel: 'Ürítés',
+        cancelLabel: 'Mégse'
+      });
+      if (!ok) return;
+      c.discardActiveObject();
       suspendHistory = true;
       designObjects().forEach(obj => c.remove(obj));
       suspendHistory = false;
-      c.discardActiveObject();
       c.requestRenderAll();
       markDesignDirty();
       commitHistory();
       syncTextControls();
+      syncImageControls();
       syncLayerList();
+      syncPropertiesEmptyState();
+      toast('Az oldal kiürítve.', 'info', { action: { label: 'Visszavonás', onClick: undoHistory } });
     };
   }
 
@@ -6070,7 +6466,7 @@
         });
       } catch (networkError) {
         const err = new Error('network');
-        err.userMessage = 'Hálózati hiba';
+        err.userMessage = 'Hálózati hiba. Ellenőrizd az internetkapcsolatot, majd próbáld újra.';
         throw err;
       }
       const j = await res.json().catch(() => ({}));
@@ -6105,12 +6501,14 @@
     bulkConfirmBtn.onclick = async () => {
       const entries = collectBulkSizeEntries();
       if (!entries.length) {
-        alert('Adj meg legalább egy mennyiséget!');
+        toast('Adj meg legalább egy darabszámot.', 'warning');
         return;
       }
       bulkConfirmBtn.disabled = true;
       actionSubmitting = true;
       updateActionStates();
+      showProcessingOverlay();
+      await new Promise(r => requestAnimationFrame(r));
       try {
         const designId = await ensureDesignSaved();
         let res;
@@ -6122,24 +6520,26 @@
           });
         } catch (networkError) {
           const err = new Error('network');
-          err.userMessage = 'Hálózati hiba';
+          err.userMessage = 'Hálózati hiba. Ellenőrizd az internetkapcsolatot, majd próbáld újra.';
           throw err;
         }
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
-          alert((j && j.message) ? j.message : 'Kosár hiba');
+          hideProcessingOverlay();
+          toast((j && j.message) ? j.message : 'Nem sikerült a kosárba tenni. Próbáld újra.', 'error');
           return;
         }
         closeBulkModal();
+        clearDraft();
         if (j.redirect) {
           window.location = j.redirect;
+        } else {
+          hideProcessingOverlay();
+          toast('A termékek a kosárba kerültek.', 'success');
         }
       } catch (e) {
-        if (e && e.userMessage) {
-          alert(e.userMessage);
-        } else {
-          alert('Hálózati hiba');
-        }
+        hideProcessingOverlay();
+        toast(e && e.userMessage ? e.userMessage : 'Hálózati hiba. Próbáld újra.', 'error');
       } finally {
         bulkConfirmBtn.disabled = false;
         actionSubmitting = false;
@@ -6152,7 +6552,7 @@
   processingOverlay.id = 'nb-processing-overlay';
   processingOverlay.setAttribute('role', 'status');
   processingOverlay.style.display = 'none';
-  processingOverlay.innerHTML = '<div class="nb-processing-box"><div class="nb-processing-spinner"></div><p class="nb-processing-text">Kis türelmet, terv feldolgozása…</p></div>';
+  processingOverlay.innerHTML = '<div class="nb-processing-box"><div class="nb-processing-spinner"></div><p class="nb-processing-text">Kis türelmet, a terv feldolgozása folyamatban…</p></div>';
   document.body.appendChild(processingOverlay);
 
   function showProcessingOverlay() {
@@ -6165,6 +6565,10 @@
   if (addToCartBtn) {
     addToCartBtn.onclick = async () => {
       if (addToCartBtn.disabled) return;
+      if (!hasCompleteSelection()) {
+        guideToSelection();
+        return;
+      }
       actionSubmitting = true;
       updateActionStates();
       showProcessingOverlay();
@@ -6180,26 +6584,26 @@
           });
         } catch (networkError) {
           const err = new Error('network');
-          err.userMessage = 'Hálózati hiba';
+          err.userMessage = 'Hálózati hiba. Ellenőrizd az internetkapcsolatot, majd próbáld újra.';
           throw err;
         }
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
-          alert((j && j.message) ? j.message : 'Kosár hiba');
+          hideProcessingOverlay();
+          toast((j && j.message) ? j.message : 'Nem sikerült a kosárba tenni. Próbáld újra.', 'error');
           return;
         }
+        clearDraft();
         if (j.redirect) {
           window.location = j.redirect;
+        } else {
+          hideProcessingOverlay();
+          toast('A termék a kosárba került.', 'success');
         }
       } catch (e) {
         hideProcessingOverlay();
-        if (e && e.userMessage) {
-          alert(e.userMessage);
-        } else {
-          alert('Hálózati hiba');
-        }
+        toast(e && e.userMessage ? e.userMessage : 'Hálózati hiba. Próbáld újra.', 'error');
       } finally {
-        hideProcessingOverlay();
         actionSubmitting = false;
         updateActionStates();
       }
@@ -6212,164 +6616,242 @@
     if (!closeTrigger) return;
     const key = closeTrigger.dataset.nbClose;
     if (!key) return;
-    const modalId = 'nb-' + key;
-    const modal = document.getElementById(modalId);
+    const modal = document.getElementById('nb-' + key);
     if (modal) {
       modal.setAttribute('hidden', '');
+      updateModalBodyState();
       e.preventDefault();
     }
   });
 
-  // --- Template System ---
-  const templatesModal = document.getElementById('nb-templates-modal');
-  const templatesTrigger = document.getElementById('nb-templates-trigger');
-  const templatesList = document.getElementById('nb-templates-list');
-  const templatesCats = document.getElementById('nb-template-categories');
-  const templateSearch = document.getElementById('nb-template-search-input');
-  let currentCat = 0;
-  let searchTimer = null;
+  // --- Sablonok a panelben ---
+  const templateState = { loaded: false, loading: false, category: 0, search: '', requestId: 0, categories: [] };
+  let templateSearchTimer = null;
 
-  if (templatesTrigger) {
-    templatesTrigger.onclick = function () {
-      openTemplatesModal();
-    };
+  function setTemplateStatus(message) {
+    if (!templatesList) return;
+    templatesList.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'nb-template-status';
+    p.textContent = message;
+    templatesList.appendChild(p);
   }
 
-  if (templateSearch) {
-    templateSearch.oninput = function () {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => {
-        fetchTemplates(currentCat, this.value);
-      }, 500);
-    };
-  }
-
-  async function openTemplatesModal() {
-    if (!templatesModal) return;
-    templatesModal.removeAttribute('hidden');
-    templatesList.innerHTML = '<p>Betöltés...</p>';
-
-    // Reset filters
-    currentCat = 0;
-    if (templateSearch) templateSearch.value = '';
-
-    try {
-      const res = await fetch(NB_DESIGNER.rest + 'templates', {
-        headers: { 'X-WP-Nonce': NB_DESIGNER.nonce }
-      });
-      const data = await res.json();
-
-      renderCategories(data.categories || []);
-      renderTemplates(data.templates || []);
-    } catch (e) {
-      templatesList.innerHTML = '<p>Hiba a sablonok betöltésekor.</p>';
+  function renderTemplateSkeleton() {
+    if (!templatesList) return;
+    templatesList.innerHTML = '';
+    for (let i = 0; i < 6; i++) {
+      const sk = document.createElement('div');
+      sk.className = 'nb-skeleton';
+      templatesList.appendChild(sk);
     }
   }
 
+  function ensureTemplatesLoaded() {
+    if (templateState.loaded || templateState.loading) return;
+    fetchTemplates(0, '');
+  }
+
   async function fetchTemplates(catId, searchVal) {
-    templatesList.innerHTML = '<p>Keresés...</p>';
-    currentCat = catId;
-
-    // Update active state in sidebar
-    const links = templatesCats.querySelectorAll('li');
-    links.forEach(li => li.classList.remove('active'));
-    const activeLi = templatesCats.querySelector(`li[data-id="${catId}"]`);
-    if (activeLi) activeLi.classList.add('active');
-
-    const url = new URL(NB_DESIGNER.rest + 'templates');
-    if (catId) url.searchParams.append('category', catId);
-    if (searchVal) url.searchParams.append('search', searchVal);
-
+    if (!templatesList || typeof NB_DESIGNER === 'undefined') return;
+    templateState.category = catId || 0;
+    templateState.search = searchVal || '';
+    templateState.loading = true;
+    const requestId = ++templateState.requestId;
+    renderCategories(templateState.categories);
+    renderTemplateSkeleton();
     try {
-      const res = await fetch(url.toString(), {
-        headers: { 'X-WP-Nonce': NB_DESIGNER.nonce }
-      });
+      const url = new URL(NB_DESIGNER.rest + 'templates', window.location.href);
+      if (templateState.category) url.searchParams.append('category', templateState.category);
+      if (templateState.search) url.searchParams.append('search', templateState.search);
+      const res = await fetch(url.toString(), { headers: { 'X-WP-Nonce': NB_DESIGNER.nonce } });
       const data = await res.json();
-      renderTemplates(data.templates || []);
+      if (requestId !== templateState.requestId) return;
+      if (Array.isArray(data.categories) && (!templateState.loaded || !templateState.categories.length)) {
+        templateState.categories = data.categories;
+      }
+      templateState.loaded = true;
+      renderCategories(templateState.categories);
+      renderTemplates(Array.isArray(data.templates) ? data.templates : []);
     } catch (e) {
-      templatesList.innerHTML = '<p>Hiba a keresés során.</p>';
+      if (requestId !== templateState.requestId) return;
+      setTemplateStatus('Nem sikerült betölteni a sablonokat. Próbáld újra később.');
+    } finally {
+      if (requestId === templateState.requestId) templateState.loading = false;
     }
   }
 
   function renderCategories(cats) {
     if (!templatesCats) return;
-    let html = `<li data-id="0" class="active">Összes</li>`;
-    cats.forEach(c => {
-      html += `<li data-id="${c.id}">${c.name} <small>(${c.count})</small></li>`;
-    });
-    templatesCats.innerHTML = html;
-
-    templatesCats.querySelectorAll('li').forEach(li => {
-      li.onclick = () => {
-        const id = parseInt(li.dataset.id);
-        fetchTemplates(id, templateSearch ? templateSearch.value : '');
-      };
+    templatesCats.innerHTML = '';
+    const list = Array.isArray(cats) ? cats : [];
+    if (!list.length) {
+      templatesCats.hidden = true;
+      return;
+    }
+    templatesCats.hidden = false;
+    const entries = [{ id: 0, name: 'Összes' }].concat(list);
+    entries.forEach(cat => {
+      const id = parseInt(cat.id, 10) || 0;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const isActive = id === templateState.category;
+      btn.className = 'nb-chip' + (isActive ? ' is-active' : '');
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      btn.textContent = (cat.name || '').toString();
+      if (id && Number.isFinite(Number(cat.count))) {
+        const count = document.createElement('small');
+        count.textContent = String(cat.count);
+        btn.appendChild(count);
+      }
+      btn.addEventListener('click', () => fetchTemplates(id, templateSearch ? templateSearch.value.trim() : ''));
+      templatesCats.appendChild(btn);
     });
   }
 
   function renderTemplates(list) {
+    if (!templatesList) return;
     templatesList.innerHTML = '';
-    if (!list || !list.length) {
-      templatesList.innerHTML = '<p>Nincs találat.</p>';
+    if (!list.length) {
+      setTemplateStatus(templateState.search ? 'Nincs a keresésnek megfelelő sablon.' : 'Ebben a kategóriában még nincs sablon.');
       return;
     }
     list.forEach(tpl => {
-      const div = document.createElement('div');
-      div.className = 'nb-template-card';
-
-      const img = tpl.preview_url ? `<img src="${tpl.preview_url}" alt="${tpl.title}">` : '<div class="nb-template-placeholder"></div>';
-
-      div.innerHTML = `
-        <div class="nb-template-preview">${img}</div>
-        <div class="nb-template-title">${tpl.title}</div>
-      `;
-      div.onclick = () => loadTemplate(tpl.id);
-      templatesList.appendChild(div);
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'nb-template-card';
+      const title = (tpl.title || 'Sablon').toString();
+      card.setAttribute('aria-label', `${title} sablon betöltése`);
+      const preview = document.createElement('div');
+      preview.className = 'nb-template-preview';
+      if (tpl.preview_url) {
+        const img = document.createElement('img');
+        img.src = tpl.preview_url;
+        img.alt = '';
+        img.loading = 'lazy';
+        preview.appendChild(img);
+      } else {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'nb-template-placeholder';
+        preview.appendChild(placeholder);
+      }
+      const titleEl = document.createElement('div');
+      titleEl.className = 'nb-template-title';
+      titleEl.textContent = title;
+      card.appendChild(preview);
+      card.appendChild(titleEl);
+      card.addEventListener('click', () => loadTemplate(tpl.id, title));
+      templatesList.appendChild(card);
     });
   }
 
-  async function loadTemplate(id) {
+  if (templateSearch) {
+    templateSearch.addEventListener('input', () => {
+      clearTimeout(templateSearchTimer);
+      templateSearchTimer = setTimeout(() => {
+        fetchTemplates(templateState.category, templateSearch.value.trim());
+      }, 400);
+    });
+  }
+
+  async function loadTemplate(id, title) {
+    const hasDesign = sideHasContent('front') || (doubleSidedEnabled && sideHasContent('back')) || designObjects().length > 0;
+    if (hasDesign) {
+      const ok = await confirmDialog({
+        title: 'Lecseréled a tervet?',
+        message: 'A sablon a jelenlegi terv helyére kerül. Ezt nem lehet visszavonni.',
+        confirmLabel: 'Sablon betöltése',
+        cancelLabel: 'Mégse'
+      });
+      if (!ok) return;
+    }
     try {
-      const res = await fetch(NB_DESIGNER.rest + 'load-design?id=' + id, {
+      const res = await fetch(NB_DESIGNER.rest + 'load-design?id=' + encodeURIComponent(id), {
         headers: { 'X-WP-Nonce': NB_DESIGNER.nonce }
       });
       const data = await res.json();
-      if (data && data.layers) {
-        await loadDesign(data);
-        if (templatesModal) templatesModal.setAttribute('hidden', '');
-      }
+      if (!data || !data.layers) throw new Error('empty-template');
+      if (uiState.preview) setPreviewMode(false);
+      await loadDesign(data);
+      markDesignDirty();
+      closeTransientPanel();
+      toast(`„${title}” sablon betöltve. Most már testre szabhatod.`, 'success');
     } catch (e) {
-      alert('Hiba a sablon betöltésekor.');
+      toast('Nem sikerült betölteni a sablont.', 'error');
     }
   }
 
-  async function loadDesign(data) {
-    // Reset sides
+  function layersHaveObjects(json) {
+    if (!json) return false;
+    if (Array.isArray(json)) return json.length > 0;
+    return Array.isArray(json.objects) && json.objects.length > 0;
+  }
+
+  async function loadDesign(data, options) {
+    const opts = options || {};
     sideStates.front = emptySideSnapshot();
     sideStates.back = emptySideSnapshot();
 
-    const layers = data.layers;
-    // Check if layers has explicit front/back properties (saved designs)
-    if (layers && layers.front) {
-      sideStates.front.json = layers.front;
-      sideStates.front.hasContent = true;
-    }
-    if (layers && layers.back) {
-      sideStates.back.json = layers.back;
-      sideStates.back.hasContent = true;
-    }
-
-    // If no explicit front/back, treat the entire layers as front side (templates, legacy)
-    if (!layers.front && !layers.back && layers) {
+    const layers = data && data.layers ? data.layers : null;
+    if (layers && (layers.front || layers.back)) {
+      if (layers.front) {
+        sideStates.front.json = layers.front;
+        sideStates.front.hasContent = layersHaveObjects(layers.front);
+      }
+      if (layers.back) {
+        sideStates.back.json = layers.back;
+        sideStates.back.hasContent = layersHaveObjects(layers.back);
+      }
+    } else if (layers) {
+      // Templates and legacy designs store a single side.
       sideStates.front.json = layers;
-      sideStates.front.hasContent = true;
+      sideStates.front.hasContent = layersHaveObjects(layers);
     }
 
-    // Switch to front and load
+    // A saved two-sided design must show its back side again.
+    if (sideStates.back.hasContent || opts.doubleSided) {
+      if (doubleSidedToggle && !doubleSidedToggle.checked) {
+        doubleSidedToggle.checked = true;
+        doubleSidedEnabled = true;
+      }
+    }
+
     activeSideKey = 'front';
     await loadSideState('front');
     updateSideUiState();
+    updateSideStatus();
+    updatePrintSummary();
     updatePriceDisplay();
+    updateActionStates();
   }
 
+  // --- Korábbi piszkozat felajánlása ---
+  const hasPresetDesign = !!urlNbDesignId || !!initialDesignImageUrl;
+  if (!hasPresetDesign) {
+    const draft = readDraft();
+    if (draft) {
+      // Do not overwrite the stored draft while the customer decides.
+      draftState.suppressed = true;
+      setTimeout(async () => {
+        const when = formatDraftTime(draft.savedAt);
+        const ok = await confirmDialog({
+          title: 'Folytatod a korábbi tervedet?',
+          message: when
+            ? `Van egy befejezetlen terved (${when}). Szeretnéd onnan folytatni?`
+            : 'Van egy befejezetlen terved. Szeretnéd onnan folytatni?',
+          confirmLabel: 'Folytatom',
+          cancelLabel: 'Újat kezdek'
+        });
+        if (ok) {
+          restoreDraft(draft).catch(() => {
+            draftState.suppressed = false;
+            toast('Nem sikerült visszatölteni a tervet.', 'error');
+          });
+        } else {
+          draftState.suppressed = false;
+          clearDraft();
+        }
+      }, 300);
+    }
+  }
 })();
