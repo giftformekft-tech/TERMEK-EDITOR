@@ -42,8 +42,54 @@ function nb_team_default_presets(){
   ];
 }
 
+/** A típusválasztó (első képernyő) szövegei és képei. */
+function nb_team_default_intro(){
+  return [
+    'kicker' => 'Csapat- és munkaruha tervező',
+    'title'  => 'Mit tervezel?',
+    'lead'   => 'Tervezd meg egyszer, add meg a színeket és a méreteket, a mennyiségi kedvezményt pedig automatikusan számoljuk.',
+    'cards'  => [
+      'work'  => ['title'=>'Munkaruha, céges ruha', 'text'=>'Logó a mellen, cégnév a háton. Egységes megjelenés a kollégáknak.', 'image_id'=>0],
+      'sport' => ['title'=>'Csapatmez, sportpóló', 'text'=>'Címer elöl, csapatnév és szám a háton.', 'image_id'=>0],
+    ],
+  ];
+}
+
+function nb_team_sanitize_intro($intro){
+  $defaults = nb_team_default_intro();
+  $intro = is_array($intro) ? $intro : [];
+  $clean = [
+    'kicker' => sanitize_text_field($intro['kicker'] ?? $defaults['kicker']),
+    'title'  => sanitize_text_field($intro['title'] ?? $defaults['title']),
+    'lead'   => sanitize_textarea_field($intro['lead'] ?? $defaults['lead']),
+    'cards'  => [],
+  ];
+  foreach ($defaults['cards'] as $key => $card_defaults){
+    $card = isset($intro['cards'][$key]) && is_array($intro['cards'][$key]) ? $intro['cards'][$key] : [];
+    $title = sanitize_text_field($card['title'] ?? $card_defaults['title']);
+    $clean['cards'][$key] = [
+      'title'    => $title !== '' ? $title : $card_defaults['title'],
+      'text'     => sanitize_textarea_field($card['text'] ?? $card_defaults['text']),
+      'image_id' => absint($card['image_id'] ?? 0),
+    ];
+  }
+  return $clean;
+}
+
+/** A sablonnak: a beállított szövegek és a képek URL-je. */
+function nb_team_intro_view(){
+  $intro = nb_team_get_settings()['intro'];
+  foreach ($intro['cards'] as $key => $card){
+    $url = $card['image_id'] ? wp_get_attachment_image_url($card['image_id'], 'large') : '';
+    $intro['cards'][$key]['image_url'] = $url ?: '';
+    $intro['cards'][$key]['image_alt'] = $card['image_id'] ? (string)get_post_meta($card['image_id'], '_wp_attachment_image_alt', true) : '';
+  }
+  return $intro;
+}
+
 function nb_team_defaults(){
   return [
+    'intro'    => nb_team_default_intro(),
     'products' => [],
     'tiers'    => nb_team_default_tiers(),
     'presets'  => nb_team_default_presets(),
@@ -113,6 +159,7 @@ function nb_team_get_settings(){
   $stored = get_option('nb_team_settings', []);
   $stored = is_array($stored) ? $stored : [];
   $settings = array_merge($defaults, $stored);
+  $settings['intro'] = nb_team_sanitize_intro($settings['intro']);
   $settings['products'] = array_values(array_filter(array_map('absint', (array)$settings['products'])));
   $settings['tiers'] = nb_team_sanitize_tiers($settings['tiers']);
   if (empty($settings['tiers'])) $settings['tiers'] = nb_team_default_tiers();
@@ -557,6 +604,32 @@ add_action('admin_enqueue_scripts', function(){
   if (sanitize_key($_GET['page'] ?? '') !== 'nb-team-designer') return;
   $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '2.3.0';
   wp_enqueue_style('nb-admin', NB_DESIGNER_URL.'admin/css/admin.css', [], $version);
+  wp_enqueue_media();
+  wp_add_inline_script('media-editor', <<<'JS'
+jQuery(function($){
+  $(document).on('click', '.nb-team-image-pick', function(e){
+    e.preventDefault();
+    var box = $(this).closest('.nb-team-image');
+    var frame = wp.media({ title: 'Kép kiválasztása', button: { text: 'Kiválasztom' }, library: { type: 'image' }, multiple: false });
+    frame.on('select', function(){
+      var file = frame.state().get('selection').first().toJSON();
+      var url = (file.sizes && (file.sizes.medium || file.sizes.full) || file).url;
+      box.find('input[type=hidden]').val(file.id);
+      box.find('.nb-team-image__preview').html($('<img>').attr('src', url).css({maxWidth: '220px', height: 'auto', borderRadius: '8px', display: 'block'}));
+      box.find('.nb-team-image-remove').show();
+    });
+    frame.open();
+  });
+  $(document).on('click', '.nb-team-image-remove', function(e){
+    e.preventDefault();
+    var box = $(this).closest('.nb-team-image');
+    box.find('input[type=hidden]').val('0');
+    box.find('.nb-team-image__preview').empty();
+    $(this).hide();
+  });
+});
+JS
+  );
 });
 
 add_action('admin_post_nb_team_save', function(){
@@ -570,6 +643,7 @@ add_action('admin_post_nb_team_save', function(){
     $presets = nb_team_sanitize_presets(array_values((array)($input['presets'] ?? [])));
   }
   $settings = [
+    'intro'      => nb_team_sanitize_intro($input['intro'] ?? []),
     'products'   => array_values(array_filter(array_map('absint', (array)($input['products'] ?? [])))),
     'tiers'      => nb_team_sanitize_tiers(array_values((array)($input['tiers'] ?? []))),
     'presets'    => $presets,
@@ -588,6 +662,7 @@ add_action('admin_post_nb_team_save', function(){
 function nb_team_admin_render(){
   if (!current_user_can(nb_admin_capability())) return;
   $team = nb_team_get_settings();
+  $intro = $team['intro'];
   $designer = nb_get_settings([]);
   $catalog = isset($designer['catalog']) && is_array($designer['catalog']) ? $designer['catalog'] : [];
   $product_ids = isset($designer['products']) && is_array($designer['products']) ? array_map('absint', $designer['products']) : array_keys($catalog);
@@ -604,6 +679,29 @@ function nb_team_admin_render(){
     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
       <input type="hidden" name="action" value="nb_team_save">
       <?php wp_nonce_field('nb_team_save'); ?>
+
+      <h2><?php esc_html_e('Típusválasztó (első képernyő)', 'nb-designer'); ?></h2>
+      <p class="description"><?php esc_html_e('Ezt látja a vásárló, amikor megnyitja a tervezőt. Ha egy kártyához képet adsz, az ikon helyett az jelenik meg.', 'nb-designer'); ?></p>
+      <table class="form-table" role="presentation">
+        <tr><th scope="row"><label for="nb-team-kicker"><?php esc_html_e('Felső címke', 'nb-designer'); ?></label></th><td><input id="nb-team-kicker" class="regular-text" type="text" name="nb_team[intro][kicker]" value="<?php echo esc_attr($intro['kicker']); ?>"></td></tr>
+        <tr><th scope="row"><label for="nb-team-title"><?php esc_html_e('Cím', 'nb-designer'); ?></label></th><td><input id="nb-team-title" class="regular-text" type="text" name="nb_team[intro][title]" value="<?php echo esc_attr($intro['title']); ?>"></td></tr>
+        <tr><th scope="row"><label for="nb-team-lead"><?php esc_html_e('Bevezető szöveg', 'nb-designer'); ?></label></th><td><textarea id="nb-team-lead" class="large-text" rows="3" name="nb_team[intro][lead]"><?php echo esc_textarea($intro['lead']); ?></textarea></td></tr>
+        <?php foreach (['work'=>__('Munkaruha kártya', 'nb-designer'), 'sport'=>__('Csapatmez kártya', 'nb-designer')] as $card_key => $card_label): $card = $intro['cards'][$card_key]; $card_name = 'nb_team[intro][cards]['.$card_key.']'; $card_image = $card['image_id'] ? wp_get_attachment_image_url($card['image_id'], 'medium') : ''; ?>
+          <tr>
+            <th scope="row"><?php echo esc_html($card_label); ?></th>
+            <td>
+              <p><label><?php esc_html_e('Cím', 'nb-designer'); ?><br><input class="regular-text" type="text" name="<?php echo esc_attr($card_name); ?>[title]" value="<?php echo esc_attr($card['title']); ?>"></label></p>
+              <p><label><?php esc_html_e('Leírás', 'nb-designer'); ?><br><textarea class="large-text" rows="2" name="<?php echo esc_attr($card_name); ?>[text]"><?php echo esc_textarea($card['text']); ?></textarea></label></p>
+              <div class="nb-team-image">
+                <input type="hidden" name="<?php echo esc_attr($card_name); ?>[image_id]" value="<?php echo esc_attr($card['image_id']); ?>">
+                <div class="nb-team-image__preview" style="margin:6px 0"><?php if ($card_image): ?><img src="<?php echo esc_url($card_image); ?>" alt="" style="max-width:220px;height:auto;border-radius:8px;display:block"><?php endif; ?></div>
+                <button type="button" class="button nb-team-image-pick"><?php esc_html_e('Kép kiválasztása', 'nb-designer'); ?></button>
+                <button type="button" class="button-link nb-team-image-remove" style="margin-left:8px;<?php echo $card_image ? '' : 'display:none'; ?>"><?php esc_html_e('Kép eltávolítása', 'nb-designer'); ?></button>
+              </div>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </table>
 
       <h2><?php esc_html_e('Termékek', 'nb-designer'); ?></h2>
       <p class="description"><?php esc_html_e('Ha egyet sem jelölsz ki, a tervező összes terméke megjelenik.', 'nb-designer'); ?></p>

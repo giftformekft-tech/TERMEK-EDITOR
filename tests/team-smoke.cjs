@@ -39,7 +39,9 @@ const fixture = {
 };
 const shirt = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="640" viewBox="0 0 480 640"><rect width="480" height="640" fill="#f7f6f2"/><path d="M165 75 60 120 20 235 105 265 135 205 125 550Q240 575 355 550L345 205 375 265 460 235 420 120 315 75Q240 120 165 75Z" fill="#e9e1ce" stroke="#d4cbb8" stroke-width="2"/></svg>';
 const logoPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAQMAAACXljzdAAAABlBMVEUAAAD/AAAb/40iAAAAAXRSTlMAQObYZgAAAB9JREFUaN7twTEBAAAAwqD1T20LL6AAAAAAAAAAAP4GHMgAAX2Nc0QAAAAASUVORK5CYII=', 'base64');
-const template = fs.readFileSync('templates/team-designer-page.php', 'utf8').replace(/<\?php[\s\S]*?\?>/, '');
+// A sablont valódi PHP rendereli (tests/render-team-page.php), adminban beállított választószövegekkel és képpel.
+const teamSettings = { intro: { title: 'Mit tervezel ma?', lead: 'Első sor\nMásodik sor', cards: { sport: { title: 'Focimez', text: 'Név és szám a háton.', image_id: 12 } } } };
+const template = require('child_process').execFileSync(process.env.PHP_BINARY || 'php', ['tests/render-team-page.php', JSON.stringify(teamSettings)], { encoding: 'utf8' });
 const html = '<!doctype html><html lang="hu"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#fff;font-family:Arial}</style><link rel="stylesheet" href="/assets/css/team-designer.css">' + template + '<script>window.NB_TEAM=' + JSON.stringify(fixture) + '</script><script src="/tmp/ui-qa/fabric.min.js"></script><script src="/assets/js/team-designer.js"></script></html>';
 
 const objectsOn = (page, side) => page.evaluate(s => window.NBTeamDesigner.sides[s].canvas.getObjects().filter(o => !o.nbArea).map(o => o.type), side);
@@ -56,7 +58,7 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
     if (u.hostname !== 'nb.test') return route.abort();
     if (u.pathname === '/') return route.fulfill({ contentType: 'text/html', body: html });
     if (u.pathname === '/tmp/ui-qa/fabric.min.js') return route.fulfill({ path: fabricPath, contentType: 'application/javascript' });
-    if (u.pathname === '/shirt.svg') return route.fulfill({ contentType: 'image/svg+xml', body: shirt });
+    if (u.pathname === '/shirt.svg' || u.pathname === '/card-12.svg') return route.fulfill({ contentType: 'image/svg+xml', body: shirt });
     if (u.pathname === '/api/team/order') {
       orderBody = JSON.parse(route.request().postData());
       return route.fulfill({ status: orderStatus, contentType: 'application/json', body: JSON.stringify(orderStatus === 200 ? { ok: true, redirect: 'http://nb.test/cart-confirmed' } : { message: 'Tesztelt kosárhiba' }) });
@@ -70,6 +72,17 @@ const text = async (page, id) => (await page.locator('#' + id).textContent()).re
   try {
     await page.goto('http://nb.test/');
     assert.equal(await page.locator('#nbt-work').isHidden(), true, 'workspace hidden before choosing a mode');
+    // Az adminban megadott választószövegek és kép; ami nincs megadva, az alapértéket kapja.
+    assert.equal(await page.locator('#nbt-mode-title').textContent(), 'Mit tervezel ma?');
+    assert.equal(await page.locator('.nbt-lead br').count(), 1, 'line breaks of the lead text are kept');
+    assert.equal(await page.locator('.nbt-kicker').textContent(), 'Csapat- és munkaruha tervező');
+    assert.equal(await page.locator('.nbt-mode-card[data-mode="sport"] strong').textContent(), 'Focimez');
+    assert.equal(await page.locator('.nbt-mode-card[data-mode="sport"] img').getAttribute('alt'), 'Kép 12');
+    assert.equal(await page.locator('.nbt-mode-card[data-mode="sport"] .nbt-mode-card__icon').count(), 0, 'the image replaces the icon');
+    assert.equal(await page.locator('.nbt-mode-card[data-mode="work"] .nbt-mode-card__icon').count(), 1, 'a card without an image keeps its icon');
+    assert.equal(await page.locator('.nbt-mode-card[data-mode="work"] strong').textContent(), 'Munkaruha, céges ruha');
+    await page.waitForFunction(() => document.querySelector('.nbt-mode-card img').complete);
+    await page.screenshot({ path: 'tmp/ui-qa/team-mode.png' });
     await page.click('.nbt-mode-card[data-mode="work"]');
     await page.waitForSelector('#nbt-work:not([hidden])');
     assert.equal(await page.locator('.nbt-type[aria-pressed="true"]').count(), 1, 'first product preselected');

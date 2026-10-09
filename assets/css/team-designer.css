@@ -52,13 +52,17 @@
 .nbt-mode h1 { font-size: clamp(30px, 5vw, 48px); line-height: 1.1; }
 .nbt-mode__grid { display: grid; gap: 14px; margin-top: 10px; }
 .nbt-mode-card {
-  display: grid; gap: 6px; justify-items: start; text-align: left; padding: 22px; min-height: 0;
+  display: grid; gap: 6px; justify-items: start; align-content: start; text-align: left; padding: 22px; min-height: 0;
   border: 2px solid var(--nbt-line); border-radius: 18px; background: var(--nbt-card); color: var(--nbt-ink);
   transition: border-color .15s, transform .15s, box-shadow .15s;
 }
 .nbt-mode-card:hover { border-color: var(--nbt-accent); background: var(--nbt-card); color: var(--nbt-ink); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(22,24,29,.08); }
 .nbt-mode-card strong { font-size: 21px; line-height: 1.2; }
-.nbt-mode-card span:last-child { color: var(--nbt-muted); }
+.nbt-mode-card__text { color: var(--nbt-muted); }
+.nbt-mode-card__media { display: block; width: 100%; aspect-ratio: 16 / 9; margin-bottom: 8px; border-radius: 12px; overflow: hidden; background: var(--nbt-soft); }
+.nbt-mode-card__media img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.nbt-mode-card.has-image { padding: 12px 12px 20px; }
+.nbt-mode-card.has-image strong, .nbt-mode-card.has-image .nbt-mode-card__text { padding: 0 8px; }
 .nbt-mode-card__icon { width: 56px; height: 56px; color: var(--nbt-accent); }
 .nbt-mode-card__icon svg { width: 100%; height: 100%; }
 .nbt-draft { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--nbt-soft); }

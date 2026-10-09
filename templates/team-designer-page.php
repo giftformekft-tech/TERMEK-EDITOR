@@ -1,20 +1,28 @@
-<?php if ( ! defined('ABSPATH') ) exit; ?>
+<?php
+if ( ! defined('ABSPATH') ) exit;
+$nbt_intro = function_exists('nb_team_intro_view') ? nb_team_intro_view() : [];
+$nbt_icons = [
+  'work'  => '<svg viewBox="0 0 64 64"><path d="M22 10l-14 8 5 13 7-3v26h24V28l7 3 5-13-14-8c-2 5-6 8-10 8s-8-3-10-8z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><rect x="36" y="30" width="8" height="8" rx="1.5" fill="currentColor"/></svg>',
+  'sport' => '<svg viewBox="0 0 64 64"><path d="M22 10l-14 8 5 13 7-3v26h24V28l7 3 5-13-14-8c-2 5-6 8-10 8s-8-3-10-8z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><text x="32" y="47" text-anchor="middle" font-size="17" font-weight="700" font-family="Arial" fill="currentColor">10</text></svg>',
+];
+?>
 <div class="nbt" id="nbt-app" data-view="mode">
   <section class="nbt-mode" id="nbt-mode" aria-labelledby="nbt-mode-title">
-    <p class="nbt-kicker">Csapat- és munkaruha tervező</p>
-    <h1 id="nbt-mode-title">Mit tervezel?</h1>
-    <p class="nbt-lead">Tervezd meg egyszer, add meg a színeket és a méreteket, a mennyiségi kedvezményt pedig automatikusan számoljuk.</p>
+    <?php if (!empty($nbt_intro['kicker'])): ?><p class="nbt-kicker"><?php echo esc_html($nbt_intro['kicker']); ?></p><?php endif; ?>
+    <h1 id="nbt-mode-title"><?php echo esc_html($nbt_intro['title'] ?? 'Mit tervezel?'); ?></h1>
+    <?php if (!empty($nbt_intro['lead'])): ?><p class="nbt-lead"><?php echo nl2br(esc_html($nbt_intro['lead'])); ?></p><?php endif; ?>
     <div class="nbt-mode__grid">
-      <button type="button" class="nbt-mode-card" data-mode="work">
-        <span class="nbt-mode-card__icon" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M22 10l-14 8 5 13 7-3v26h24V28l7 3 5-13-14-8c-2 5-6 8-10 8s-8-3-10-8z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><rect x="36" y="30" width="8" height="8" rx="1.5" fill="currentColor"/></svg></span>
-        <strong>Munkaruha, céges ruha</strong>
-        <span>Logó a mellen, cégnév a háton. Egységes megjelenés a kollégáknak.</span>
-      </button>
-      <button type="button" class="nbt-mode-card" data-mode="sport">
-        <span class="nbt-mode-card__icon" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M22 10l-14 8 5 13 7-3v26h24V28l7 3 5-13-14-8c-2 5-6 8-10 8s-8-3-10-8z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><text x="32" y="47" text-anchor="middle" font-size="17" font-weight="700" font-family="Arial" fill="currentColor">10</text></svg></span>
-        <strong>Csapatmez, sportpóló</strong>
-        <span>Címer elöl, csapatnév és szám a háton.</span>
-      </button>
+      <?php foreach (['work', 'sport'] as $nbt_key): $nbt_card = $nbt_intro['cards'][$nbt_key] ?? []; ?>
+        <button type="button" class="nbt-mode-card<?php echo !empty($nbt_card['image_url']) ? ' has-image' : ''; ?>" data-mode="<?php echo esc_attr($nbt_key); ?>">
+          <?php if (!empty($nbt_card['image_url'])): ?>
+            <span class="nbt-mode-card__media"><img src="<?php echo esc_url($nbt_card['image_url']); ?>" alt="<?php echo esc_attr($nbt_card['image_alt'] ?? ''); ?>" loading="lazy"></span>
+          <?php else: ?>
+            <span class="nbt-mode-card__icon" aria-hidden="true"><?php echo $nbt_icons[$nbt_key]; // statikus SVG ?></span>
+          <?php endif; ?>
+          <strong><?php echo esc_html($nbt_card['title'] ?? ''); ?></strong>
+          <?php if (!empty($nbt_card['text'])): ?><span class="nbt-mode-card__text"><?php echo nl2br(esc_html($nbt_card['text'])); ?></span><?php endif; ?>
+        </button>
+      <?php endforeach; ?>
     </div>
     <div class="nbt-draft" id="nbt-draft" hidden>
       <span>Van egy befejezetlen terved ebben a böngészőben.</span>

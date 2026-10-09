@@ -19,7 +19,7 @@ A `/tervezd-meg/` oldal tervezője egyetlen, mobilra és asztali gépre egyarán
 
 Külön modul a `/csapatruha-tervezo/` oldalon (`[nb_team_designer]` shortcode). Az oldal automatikusan létrejön; a webhely menüjébe a Megjelenés → Menük oldalon vehető fel. Az eredeti `/tervezd-meg/` tervezőt nem érinti, a beállításait csak olvassa (termékek, színek, méretek, mockupok, kedvezménysávok).
 
-- **Típusválasztó:** munkaruha / céges ruha vagy csapatmez / sportpóló. A `?mode=work` vagy `?mode=sport` paraméterrel közvetlenül indítható, a `nb_product` és `nb_type` paraméter előválasztja a terméket.
+- **Típusválasztó:** munkaruha / céges ruha vagy csapatmez / sportpóló. A felső címke, a cím, a bevezető szöveg, valamint a két kártya címe, leírása és képe az adminból szerkeszthető; kép nélkül a kártyán ikon látszik. A `?mode=work` vagy `?mode=sport` paraméterrel közvetlenül indítható, a `nb_product` és `nb_type` paraméter előválasztja a terméket.
 - **Termék és alapszín:** az előnézet a választott szín mockupján látszik, elöl és hátul.
 - **Elhelyezési segédsablonok:** egy kattintással a jó helyre és mm-ben megadott méretre kerül a logó, felirat vagy szám (pl. bal mell logó 9×9 cm, hát szám 25 cm). Utána minden elem szabadon mozgatható és méretezhető; a nyomtatási felületből nem lóghat ki.
 - **Színek × méretek:** színenként egy sor, méretenként darabszám. Bármennyi szín hozzáadható (az adminban beállított korlátig), a darabszámok összeadódnak.
@@ -30,7 +30,7 @@ Külön modul a `/csapatruha-tervezo/` oldalon (`[nb_team_designer]` shortcode).
 - **Kosárba:** egy kattintással; a nyomdai PNG oldalanként egyszer készül (300 dpi, legfeljebb 3600 px széles), az előnézet színenként. Minden szín–méret páros külön kosársor, egy kedvezménycsoportban.
 - **Piszkozat:** a böngésző megjegyzi a befejezetlen tervet, és visszatéréskor felajánlja a folytatást.
 
-Beállítások: **Terméktervező → Csapatruha tervező** (termékek, nyomatsávok ára és mérete, csoportosítási távolság, minimum darabszám, színek és játékosok száma, név/szám felár, segédsablonok és hogy melyik a névsorból kap szöveget). A `/csapatpolo/` oldal gombjai erre a modulra mutatnak.
+Beállítások: **Terméktervező → Csapatruha tervező** (típusválasztó szövegei és képei, termékek, nyomatsávok ára és mérete, csoportosítási távolság, minimum darabszám, színek és játékosok száma, név/szám felár, segédsablonok és hogy melyik a névsorból kap szöveget). A `/csapatpolo/` oldal gombjai erre a modulra mutatnak.
 
 A mennyiségi kedvezmény az eredeti tervezőben is a termék és a hozzá tartozó egyedi nyomat együttes árára jár.
 
