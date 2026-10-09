@@ -37,6 +37,10 @@ Beállítások: **Terméktervező → Csapatruha tervező** (típusválasztó sz
 
 Az eredeti tervezőben a százalékos mennyiségi kedvezmény a termék és a hozzá tartozó egyedi nyomat együttes árára jár.
 
+**Új tervezhető termék** (Terméktervező → Termékek, „＋ Új tervezhető WooCommerce termék”): egy lépésben létrehoz egy egyszerű WooCommerce terméket (név, alapár, méretek; alapból rejtve a bolt listáiból), felveszi a tervező termékei közé, és a megadott tervezői típust hozzá köti (új típust is felvesz). Utána a megnyíló oldalon csak a mockupokat kell a színekhez rendelni. A termék színei a típus színei (Típusok és színek). Egy Csapatruha tervező termékhez a Csapatruha tervező oldalon is fel kell venni, és megadni a sávárait. A termék és típus hiányának okát a Csapatruha tervező oldal Termékek részének táblázata mutatja.
+
+Árak röviden: a fő tervezőben a WooCommerce termék ára (alapár) + a nyomtatási díj (cm² alapú, minimum, kétoldalas felár) − mennyiségi kedvezmény, plusz a termékenkénti méretfelár. A csapattervezőben a Csapatruha tervező oldalon megadott sávár számít (nyomással együtt); a WooCommerce-ár csak akkor, ha ott nincs ár.
+
 ## Tervező megjelenése
 
 A Terméktervező → Megjelenés oldalon a teljes tervezői felület színvilága és lekerekítése állítható. A módosítások élő miniatűr előnézetben láthatók, az alapértékek visszaállítása pedig csak a mezőket és az előnézetet módosítja; a tartós alkalmazáshoz külön mentés szükséges. A beállítások a meglévő termék-, mockup- és árazási konfigurációtól függetlenül, az `appearance` kulcs alatt tárolódnak.
