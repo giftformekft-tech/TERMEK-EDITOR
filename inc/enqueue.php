@@ -133,6 +133,7 @@ function nb_designer_enqueue_assets(){
     // Ha egy gyorsító bővítmény kiszedi a stíluslapot az oldalból, a script ezekből tölti be újra.
     'css_url' => add_query_arg('ver', $css_version, NB_DESIGNER_URL.'assets/css/designer.css'),
     'appearance_css' => $appearance_css,
+    'version' => defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '',
   ]);
 }
 

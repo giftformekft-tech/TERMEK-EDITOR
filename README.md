@@ -10,6 +10,8 @@ A `/tervezd-meg/` oldal tervezője egyetlen, mobilra és asztali gépre egyarán
 - A kijelölt elemhez a vászon alján gyorsmenü jelenik meg (Formázás, Másolat, Előre, Hátra, Középre, Törlés).
 - A kijelölt elem jobb felső sarkán ceruza gomb is van: megnyitja a Formázás panelt, szövegnél rögtön a felirat mezőjébe ugrik.
 - Mobilon a tervező a téma fejléce alatti helyet tölti ki, így a vászon alja a gyorsmenüvel görgetés nélkül is látszik a fülsor fölött.
+- Ha a téma egy szülőelemen `transform`, `filter`, `will-change`, `contain` stb. tulajdonságot használ (pl. csúszó menühöz), a tervező oldalán ezek kikapcsolódnak, különben az alsó fülsor és a panelek a képernyőn kívül nyílnának meg.
+- Hibakereséshez az oldal `?nb_debug=1` címmel megnyitva felül egy panelt mutat: verzió, betöltött termékek, fabric.js, stíluslap, gombok száma, a fülsor helye, a kikapcsolt szülő-tulajdonságok és a JavaScript-hibák. Telefonon képernyőképpel továbbítható.
 - A szín- és méretválasztás közvetlenül a Termék panelen történik. Több méret esetén a vásárlónak kifejezetten választania kell; a Kosárba gomb ilyenkor megmutatja, mi hiányzik.
 - A feliratot szövegmezőben lehet beírni és később szerkeszteni, ami telefonon is megbízhatóan működik.
 - A Hátlap gombbal azonnal bekapcsolható a kétoldalas nyomtatás; a felár a gomb mellett látszik, és csak akkor kerül az árba, ha a hátlapon is van minta.

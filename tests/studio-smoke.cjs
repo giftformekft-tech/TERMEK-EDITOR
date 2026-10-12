@@ -263,6 +263,19 @@ const orderTotal = async page => (await page.locator('#nb-price-total').textCont
     await page.evaluate(()=>document.getElementById('qa-theme-header').remove());
     await page.waitForTimeout(300);
 
+    // A theme wrapper with a transform (e.g. for a sliding menu) must not drag the fixed
+    // tab bar and sheets off the screen.
+    await page.evaluate(()=>{document.body.style.transform='translateZ(0)';window.dispatchEvent(new Event('resize'));});
+    await page.waitForTimeout(300);
+    await page.locator('#nb-product-chip').click();
+    await page.locator('#nb-dock.is-open').waitFor({state:'visible'});
+    await page.waitForTimeout(450);
+    const pinned=await page.evaluate(()=>({tab:document.getElementById('nb-tabbar').getBoundingClientRect().bottom,dock:document.getElementById('nb-dock').getBoundingClientRect().top,vh:innerHeight}));
+    assert.ok(Math.abs(pinned.tab-pinned.vh)<=1 && pinned.dock<pinned.vh,'tab bar and sheets stay on screen under a transformed theme wrapper');
+    await page.locator('#nb-dock .nb-panel-close:visible').first().click();
+    await page.evaluate(()=>{document.body.style.removeProperty('transform');});
+    await page.waitForTimeout(300);
+
     cartSucceeds=true;
     const successfulCartBefore=cartRequests;
     await page.locator('#nb-studio-order').click();
@@ -272,6 +285,6 @@ const orderTotal = async page => (await page.locator('#nb-price-total').textCont
     assert.equal(cartRequests,successfulCartBefore+1,'successful mobile cart redirects exactly once');
     assert.equal(await page.evaluate(()=>localStorage.getItem('nb_designer_draft_v1')),null,'draft cleared after a successful order');
     assert.deepEqual(errors,[],'JavaScript errors across all interactions');
-    console.log('PASS: panels on desktop/tablet/mobile, inline colour and size choice with explicit size, text field editing, layers, undo/redo, stable object positions, back-side offer and surcharge, preview, templates with confirmation, cart error recovery and success, theme colours, touch targets, cold-start and numeric price, draft restore, edit button on the selected object, fit below a theme header, responsive widths 1440/1024/768/390/320.');
+    console.log('PASS: panels on desktop/tablet/mobile, inline colour and size choice with explicit size, text field editing, layers, undo/redo, stable object positions, back-side offer and surcharge, preview, templates with confirmation, cart error recovery and success, theme colours, touch targets, cold-start and numeric price, draft restore, edit button on the selected object, fit below a theme header, tab bar and sheets on screen under a transformed theme wrapper, responsive widths 1440/1024/768/390/320.');
   }finally{await page.screenshot({path:'tmp/ui-qa/last-state.png',fullPage:true}).catch(()=>{});await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

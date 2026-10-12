@@ -27,6 +27,42 @@
   setTimeout(inject, 1500);
 })();
 
+// Hibakereséshez: a ?nb_debug=1 címmel megnyitott oldalon egy kis panel mutatja, mi töltődött
+// be és milyen hiba történt (telefonon is képernyőképezhető, böngészőkonzol nélkül).
+(function () {
+  if (!/[?&]nb_debug=1\b/.test(location.search)) return;
+  const errors = [];
+  window.addEventListener('error', e => errors.push((e.message || 'hiba') + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : '')));
+  window.addEventListener('unhandledrejection', e => errors.push('promise: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))));
+  const show = () => {
+    const data = typeof NB_DESIGNER !== 'undefined' ? NB_DESIGNER : null;
+    const root = document.getElementById('nb-designer');
+    const catalog = data && data.settings && data.settings.catalog ? Object.keys(data.settings.catalog) : [];
+    const rect = sel => {
+      const el = document.querySelector(sel);
+      if (!el) return 'nincs';
+      const r = el.getBoundingClientRect();
+      return Math.round(r.top) + '–' + Math.round(r.bottom) + ' px';
+    };
+    const lines = [
+      'Verzió: ' + (data && data.version ? data.version : '?'),
+      'Beállítások: ' + (data ? 'megvan' : 'HIÁNYZIK') + ', termékek: ' + catalog.length,
+      'fabric.js: ' + (typeof fabric !== 'undefined' ? fabric.version : 'HIÁNYZIK'),
+      'Stíluslap: ' + (root && getComputedStyle(root).getPropertyValue('--nb-css-ready').trim() === '1' ? 'rendben' : 'HIÁNYZIK'),
+      'Gombok: ' + document.querySelectorAll('#nb-modal-type-list button').length + ' típus, ' + document.querySelectorAll('#nb-modal-product-list button').length + ' termék, ' + document.querySelectorAll('#nb-modal-color-list button').length + ' szín',
+      'Képernyő: ' + window.innerWidth + '×' + window.innerHeight + ', fülsor: ' + rect('#nb-tabbar') + ', tervező: ' + rect('#nb-designer'),
+      'Kikapcsolt szülő-tulajdonságok: ' + ((window.__nbReleasedAncestors || []).join(', ') || 'nincs'),
+      'Hibák: ' + (errors.length ? errors.slice(0, 5).join(' | ') : 'nincs')
+    ];
+    const panel = document.createElement('pre');
+    panel.id = 'nb-debug-panel';
+    panel.textContent = lines.join('\n');
+    panel.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;margin:0;padding:8px 10px;max-height:45vh;overflow:auto;background:rgba(0,0,0,.85);color:#fff;font:11px/1.4 monospace;white-space:pre-wrap;pointer-events:none';
+    document.body.appendChild(panel);
+  };
+  window.addEventListener('load', () => setTimeout(show, 1500), { once: true });
+})();
+
 (function () {
   if (typeof fabric === 'undefined') return;
   const canvasEl = document.getElementById('nb-canvas');
@@ -6251,6 +6287,30 @@
     });
   }
   window.addEventListener('resize', scheduleStageResize);
+
+  // Ha a téma egy szülőelemen transform, filter, contain stb. tulajdonságot használ (pl. csúszó
+  // menühöz), a position: fixed fülsor, lapok és ablakok ahhoz igazodnak, nem a képernyőhöz,
+  // és a képernyőn kívül nyílnak meg. A tervező oldalán ezeket kikapcsoljuk a szülőkön.
+  function releaseFixedAncestors() {
+    if (!appEl) return;
+    const released = window.__nbReleasedAncestors || (window.__nbReleasedAncestors = []);
+    const release = (el, prop, value) => {
+      el.style.setProperty(prop, value, 'important');
+      released.push((el.id ? '#' + el.id : el.tagName.toLowerCase() + (el.classList[0] ? '.' + el.classList[0] : '')) + ' ' + prop);
+    };
+    for (let el = appEl.parentElement; el && el !== document.documentElement; el = el.parentElement) {
+      const cs = getComputedStyle(el);
+      ['transform', 'translate', 'rotate', 'scale', 'perspective', 'filter', 'backdrop-filter', '-webkit-backdrop-filter'].forEach(prop => {
+        const value = cs.getPropertyValue(prop);
+        if (value && value !== 'none') release(el, prop, 'none');
+      });
+      if (/transform|translate|rotate|scale|perspective|filter/.test(cs.getPropertyValue('will-change'))) release(el, 'will-change', 'auto');
+      if (/layout|paint|strict|content/.test(cs.getPropertyValue('contain'))) release(el, 'contain', 'none');
+      if (cs.getPropertyValue('content-visibility') === 'auto') release(el, 'content-visibility', 'visible');
+    }
+  }
+  releaseFixedAncestors();
+  window.addEventListener('resize', () => requestAnimationFrame(releaseFixedAncestors));
 
   // Mobilon a tervező a téma fejléce alatti helyet tölti ki: a magasságából levonjuk,
   // milyen messze kezdődik az oldal tetejétől, így görgetés nélkül is látszik a vászon alja.
