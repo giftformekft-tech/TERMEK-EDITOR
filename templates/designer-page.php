@@ -582,10 +582,10 @@
     </button>
   </nav>
 
-  <select id="nb-type" class="nb-hidden" aria-hidden="true" tabindex="-1"></select>
-  <select id="nb-product" class="nb-hidden" aria-hidden="true" tabindex="-1"></select>
-  <select id="nb-color" class="nb-hidden" aria-hidden="true" tabindex="-1"></select>
-  <select id="nb-size" class="nb-hidden" aria-hidden="true" tabindex="-1"></select>
+  <select id="nb-type" class="nb-hidden" hidden aria-hidden="true" tabindex="-1"></select>
+  <select id="nb-product" class="nb-hidden" hidden aria-hidden="true" tabindex="-1"></select>
+  <select id="nb-color" class="nb-hidden" hidden aria-hidden="true" tabindex="-1"></select>
+  <select id="nb-size" class="nb-hidden" hidden aria-hidden="true" tabindex="-1"></select>
 
   <div class="nb-modal" id="nb-bulk-modal" hidden>
     <div class="nb-modal-backdrop" data-nb-close="bulk-modal"></div>
