@@ -11,6 +11,7 @@ A `/tervezd-meg/` oldal tervezője egyetlen, mobilra és asztali gépre egyarán
 - A kijelölt elem jobb felső sarkán ceruza gomb is van: megnyitja a Formázás panelt, szövegnél rögtön a felirat mezőjébe ugrik.
 - Mobilon a tervező a téma fejléce alatti helyet tölti ki, így a vászon alja a gyorsmenüvel görgetés nélkül is látszik a fülsor fölött.
 - Ha a téma egy szülőelemen `transform`, `filter`, `will-change`, `contain` stb. tulajdonságot használ (pl. csúszó menühöz), a tervező oldalán ezek kikapcsolódnak, különben az alsó fülsor és a panelek a képernyőn kívül nyílnának meg.
+- A scriptek a LiteSpeed Cache JS-minifikálásával is működnek (a `tests/minify-check.php` ellenőrzi); a MIME-típust szöveg-összehasonlítás vizsgálja, mert a `/^image\//` reguláris kifejezést a minifikáló megjegyzésnek nézte, és az egész tervező leállt.
 - Hibakereséshez az oldal `?nb_debug=1` címmel megnyitva felül egy panelt mutat: verzió, betöltött termékek, fabric.js, stíluslap, gombok száma, a fülsor helye, a kikapcsolt szülő-tulajdonságok és a JavaScript-hibák. Telefonon képernyőképpel továbbítható.
 - A szín- és méretválasztás közvetlenül a Termék panelen történik. Több méret esetén a vásárlónak kifejezetten választania kell; a Kosárba gomb ilyenkor megmutatja, mi hiányzik.
 - A feliratot szövegmezőben lehet beírni és később szerkeszteni, ami telefonon is megbízhatóan működik.

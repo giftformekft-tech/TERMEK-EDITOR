@@ -5381,9 +5381,15 @@
     reader.readAsDataURL(file);
   }
 
+  // MIME-típus: szöveg-összehasonlítás reguláris kifejezés helyett, mert a LiteSpeed Cache
+  // JS-minifikálója a /^image\// alakot megjegyzésnek nézi, és a script szintaktikai hibára fut.
+  function isImageMime(type) {
+    return String(type || '').toLowerCase().indexOf('image' + '/') === 0;
+  }
+
   function firstImageFile(fileList) {
     const files = Array.from(fileList || []);
-    return files.find(f => /^image\//i.test(f.type || '') || /\.(png|jpe?g|svg|webp)$/i.test(f.name || '')) || files[0] || null;
+    return files.find(f => isImageMime(f.type) || /\.(png|jpe?g|svg|webp)$/i.test(f.name || '')) || files[0] || null;
   }
 
   function enableFileDrop(zone) {
@@ -5423,7 +5429,7 @@
     if (isTypingTarget(evt.target)) return;
     if (!appEl || !document.body.contains(appEl)) return;
     const items = Array.from((evt.clipboardData && evt.clipboardData.items) || []);
-    const item = items.find(i => i.kind === 'file' && /^image\//i.test(i.type || ''));
+    const item = items.find(i => i.kind === 'file' && isImageMime(i.type));
     if (!item) return;
     const file = item.getAsFile();
     if (!file) return;
