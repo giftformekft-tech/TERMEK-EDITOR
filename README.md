@@ -8,6 +8,8 @@ A `/tervezd-meg/` oldal tervezője egyetlen, mobilra és asztali gépre egyarán
 - **Tableten** az eszközpanel lebegve nyílik a vászon fölött, és hozzáadás után magától bezárul.
 - **Mobilon** felül a termék (szín, méret) és a Kosárba gomb az árral, középen a vászon, alul öt fül. A panelek alsó lapként nyílnak, a fülsor közben is elérhető marad, a vászon pedig a lap fölötti részre igazodik.
 - A kijelölt elemhez a vászon alján gyorsmenü jelenik meg (Formázás, Másolat, Előre, Hátra, Középre, Törlés).
+- A kijelölt elem jobb felső sarkán ceruza gomb is van: megnyitja a Formázás panelt, szövegnél rögtön a felirat mezőjébe ugrik.
+- Mobilon a tervező a téma fejléce alatti helyet tölti ki, így a vászon alja a gyorsmenüvel görgetés nélkül is látszik a fülsor fölött.
 - A szín- és méretválasztás közvetlenül a Termék panelen történik. Több méret esetén a vásárlónak kifejezetten választania kell; a Kosárba gomb ilyenkor megmutatja, mi hiányzik.
 - A feliratot szövegmezőben lehet beírni és később szerkeszteni, ami telefonon is megbízhatóan működik.
 - A Hátlap gombbal azonnal bekapcsolható a kétoldalas nyomtatás; a felár a gomb mellett látszik, és csak akkor kerül az árba, ha a hátlapon is van minta.

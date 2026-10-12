@@ -243,6 +243,26 @@ const orderTotal = async page => (await page.locator('#nb-price-total').textCont
     await page.waitForFunction(()=>window.qaCanvas.getObjects().some(o=>o.text==='Piszkozat'));
     assert.equal(await page.locator('#nb-size').inputValue(),'L','draft restores the size');
 
+    // A theme header above the designer: the stage still ends at the tab bar, so the
+    // selection toolbar is visible without scrolling.
+    await page.evaluate(()=>{const h=document.createElement('header');h.id='qa-theme-header';h.style.height='70px';document.body.prepend(h);});
+    await page.evaluate(()=>{const c=window.qaCanvas;c.setActiveObject(c.getObjects().find(o=>o.text==='Piszkozat'));c.requestRenderAll();});
+    await page.waitForTimeout(400);
+    const fit=await page.evaluate(()=>{const r=id=>document.getElementById(id).getBoundingClientRect();return {app:r('nb-designer').bottom,tab:r('nb-tabbar').top,quick:r('nb-quickbar').bottom};});
+    assert.ok(Math.abs(fit.app-fit.tab)<=1,'designer ends at the tab bar below a theme header');
+    assert.ok(fit.quick<=fit.tab && await page.locator('#nb-quickbar').isVisible(),'selection toolbar visible above the tab bar');
+
+    // The edit button on the selected object's corner opens the formatting sheet with the text field.
+    const edit=await page.evaluate(()=>{const c=window.qaCanvas,o=c.getActiveObject();o.setCoords();const p=o.oCoords.nb_edit,r=c.upperCanvasEl.getBoundingClientRect(),s=r.width/c.getWidth();return {x:r.left+p.x*s,y:r.top+p.y*s,visible:o.isControlVisible('nb_edit'),left:o.left};});
+    assert.ok(edit.visible,'edit button on the selected object');
+    await page.mouse.click(edit.x,edit.y);
+    await page.locator('#nb-inspector.is-open').waitFor({state:'visible'});
+    await page.waitForFunction(()=>document.activeElement&&document.activeElement.id==='nb-text-content');
+    assert.equal(await page.evaluate(()=>window.qaCanvas.getActiveObject().left),edit.left,'edit button does not move the object');
+    await page.locator('#nb-inspector .nb-panel-close').click();
+    await page.evaluate(()=>document.getElementById('qa-theme-header').remove());
+    await page.waitForTimeout(300);
+
     cartSucceeds=true;
     const successfulCartBefore=cartRequests;
     await page.locator('#nb-studio-order').click();
@@ -252,6 +272,6 @@ const orderTotal = async page => (await page.locator('#nb-price-total').textCont
     assert.equal(cartRequests,successfulCartBefore+1,'successful mobile cart redirects exactly once');
     assert.equal(await page.evaluate(()=>localStorage.getItem('nb_designer_draft_v1')),null,'draft cleared after a successful order');
     assert.deepEqual(errors,[],'JavaScript errors across all interactions');
-    console.log('PASS: panels on desktop/tablet/mobile, inline colour and size choice with explicit size, text field editing, layers, undo/redo, stable object positions, back-side offer and surcharge, preview, templates with confirmation, cart error recovery and success, theme colours, touch targets, cold-start and numeric price, draft restore, responsive widths 1440/1024/768/390/320.');
+    console.log('PASS: panels on desktop/tablet/mobile, inline colour and size choice with explicit size, text field editing, layers, undo/redo, stable object positions, back-side offer and surcharge, preview, templates with confirmation, cart error recovery and success, theme colours, touch targets, cold-start and numeric price, draft restore, edit button on the selected object, fit below a theme header, responsive widths 1440/1024/768/390/320.');
   }finally{await page.screenshot({path:'tmp/ui-qa/last-state.png',fullPage:true}).catch(()=>{});await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

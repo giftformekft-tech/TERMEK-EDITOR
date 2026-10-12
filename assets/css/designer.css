@@ -1943,7 +1943,8 @@
     flex-direction: column;
     width: 100%;
     max-width: none;
-    height: calc(100vh - var(--tabbar-h));
+    /* A téma fejléce fölötte van: annyival kisebb, hogy a vászon alja (gyorsmenü) ne csússzon a fülsor mögé. */
+    height: calc(100vh - var(--tabbar-h) - var(--nb-page-offset, 0px));
     min-height: 480px;
     margin: 0;
     padding: 0;
@@ -1953,7 +1954,7 @@
   }
 
   @supports (height: 100dvh) {
-    #nb-designer { height: calc(100dvh - var(--tabbar-h) - var(--safe-bottom)); }
+    #nb-designer { height: calc(100dvh - var(--tabbar-h) - var(--safe-bottom) - var(--nb-page-offset, 0px)); }
   }
 
   #nb-designer .nb-field input[type="text"],

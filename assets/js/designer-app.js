@@ -5523,6 +5523,90 @@
     });
   });
 
+  // Szerkesztés gomb a kijelölt elem jobb felső sarkán: megnyitja a Formázás panelt,
+  // szövegnél a felirat mezőjébe ugrik. A mérete képernyőn mindig ugyanakkora,
+  // mint a fogópontoké (a vászon CSS-méretezését kiegyenlítjük).
+  (function () {
+    const EDIT_CSS_SIZE = 30;
+    const EDIT_CSS_GAP = 16;
+    const pencil = typeof Path2D === 'function' ? new Path2D('M4 20h4L19 9l-4-4L4 16v4Zm9.5-13.5 4 4') : null;
+    const logical = cssPx => cssPx / (canvasCssScale > 0 ? canvasCssScale : 1);
+    const themeColor = (name, fallback) => {
+      const value = appEl ? getComputedStyle(appEl).getPropertyValue(name).trim() : '';
+      return value || fallback;
+    };
+
+    function editVisible(obj) {
+      return isDesignObject(obj) && obj.type !== 'activeSelection' && !cropSession && !uiState.preview;
+    }
+
+    function renderEdit(ctx, left, top, styleOverride, obj) {
+      if (!editVisible(obj)) return;
+      const size = logical(EDIT_CSS_SIZE);
+      ctx.save();
+      ctx.translate(left, top);
+      ctx.shadowColor = 'rgba(20, 20, 18, .28)';
+      ctx.shadowBlur = logical(6);
+      ctx.shadowOffsetY = logical(1);
+      ctx.beginPath();
+      ctx.arc(0, 0, size / 2, 0, 2 * Math.PI);
+      ctx.fillStyle = themeColor('--c-accent', '#f4d35e');
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.lineWidth = logical(2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      if (pencil) {
+        const scale = (size * 0.56) / 24;
+        ctx.scale(scale, scale);
+        ctx.translate(-12, -12);
+        ctx.lineWidth = 2.1;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = themeColor('--c-accent-text', '#20211f');
+        ctx.stroke(pencil);
+      }
+      ctx.restore();
+    }
+
+    function openEdit(obj) {
+      openInspector('properties');
+      if (obj && obj.type === 'textbox' && textContentEl) {
+        setTimeout(() => {
+          try { textContentEl.focus({ preventScroll: true }); } catch (e) { textContentEl.focus(); }
+        }, 60);
+      }
+    }
+
+    const editControl = new fabric.Control({
+      x: 0.5,
+      y: -0.5,
+      cursorStyle: 'pointer',
+      actionName: 'nb_edit',
+      mouseUpHandler: (eventData, transform) => {
+        const target = (transform && transform.target) || activeDesignObject();
+        if (!editVisible(target)) return false;
+        openEdit(target);
+        return true;
+      },
+      render: renderEdit
+    });
+    // A gomb a sarokfogótól átlósan kifelé ül, hogy ne takarja a méretezést.
+    Object.defineProperties(editControl, {
+      offsetX: { get: () => logical(EDIT_CSS_GAP + EDIT_CSS_SIZE / 2) },
+      offsetY: { get: () => -logical(EDIT_CSS_GAP + EDIT_CSS_SIZE / 2) },
+      sizeX: { get: () => logical(EDIT_CSS_SIZE) },
+      sizeY: { get: () => logical(EDIT_CSS_SIZE) },
+      touchSizeX: { get: () => logical(44) },
+      touchSizeY: { get: () => logical(44) }
+    });
+    editControl.getVisibility = obj => editVisible(obj);
+    // A Textbox saját vezérlőkészletet használ, abba is fel kell venni.
+    [fabric.Object.prototype.controls, fabric.Textbox && fabric.Textbox.prototype.controls].forEach(set => {
+      if (set) set.nb_edit = editControl;
+    });
+  }());
+
   // Auto-load saved design from URL ?nb_design_id=ID (set by "Saját Terveim" edit button)
   const urlNbDesignId = (typeof NB_DESIGNER !== 'undefined' && NB_DESIGNER.nb_design_id) ? parseInt(NB_DESIGNER.nb_design_id, 10) : 0;
   if (urlNbDesignId) {
@@ -6167,6 +6251,32 @@
     });
   }
   window.addEventListener('resize', scheduleStageResize);
+
+  // Mobilon a tervező a téma fejléce alatti helyet tölti ki: a magasságából levonjuk,
+  // milyen messze kezdődik az oldal tetejétől, így görgetés nélkül is látszik a vászon alja.
+  let pageOffsetRaf = null;
+  function syncPageOffset() {
+    pageOffsetRaf = null;
+    if (!appEl) return;
+    if (!isMobileUi()) {
+      appEl.style.removeProperty('--nb-page-offset');
+      return;
+    }
+    const top = Math.max(0, Math.round(appEl.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0)));
+    const current = parseInt(appEl.style.getPropertyValue('--nb-page-offset'), 10) || 0;
+    if (Math.abs(current - top) > 1) appEl.style.setProperty('--nb-page-offset', top + 'px');
+  }
+  function schedulePageOffset() {
+    if (pageOffsetRaf) cancelAnimationFrame(pageOffsetRaf);
+    pageOffsetRaf = requestAnimationFrame(syncPageOffset);
+  }
+  syncPageOffset();
+  window.addEventListener('resize', schedulePageOffset);
+  window.addEventListener('load', schedulePageOffset);
+  // A fejléc (pl. betöltődő logó, sütisáv) később is megváltozhat.
+  if (typeof ResizeObserver === 'function' && document.body) {
+    new ResizeObserver(schedulePageOffset).observe(document.body);
+  }
 
   if (typeof ResizeObserver === 'function' && canvasFrameEl) {
     const stageResizeObserver = new ResizeObserver(() => {
