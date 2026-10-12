@@ -51,65 +51,93 @@ function nb_enrich_catalog_for_designer($settings){
   return $settings;
 }
 
-add_action('wp_enqueue_scripts', function(){
-  if ( is_page() && has_shortcode(get_post()->post_content ?? '', 'nb_designer') ) {
-    $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.7.11';
-    wp_enqueue_style('nb-designer', NB_DESIGNER_URL.'assets/css/designer.css', [], $version);
-    wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
-    wp_enqueue_script('nb-qrcode', 'https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js', [], null, true);
-    wp_enqueue_script('nb-qrcode-utf8', 'https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode_UTF8.js', ['nb-qrcode'], null, true);
-    wp_enqueue_script('nb-designer', NB_DESIGNER_URL.'assets/js/designer-app.js', ['fabric','jquery','nb-qrcode-utf8'], $version, true);
-    $stored = nb_get_settings([]);
-    $settings = is_array($stored) ? $stored : [];
-    $cleaned = nb_clean_settings_unicode($settings);
-    // Clean settings but do not save on frontend load
-    $settings = nb_sync_mockup_references($cleaned);
-    wp_add_inline_style('nb-designer', nb_designer_appearance_inline_css($settings['appearance'] ?? []));
-    $settings = nb_enrich_catalog_for_designer($settings);
-    $initial_design_image_url = '';
-    $nb_product_id = isset($_GET['nb_product']) ? absint($_GET['nb_product']) : 0;
-    $nb_type = isset($_GET['nb_type']) ? sanitize_text_field(wp_unslash($_GET['nb_type'])) : '';
-    if ($nb_product_id) {
-      $attachment_id = (int) get_post_meta($nb_product_id, '_mg_last_design_attachment', true);
-      if ($attachment_id) {
-        $attachment_url = wp_get_attachment_url($attachment_id);
-        if ($attachment_url) {
-          $initial_design_image_url = $attachment_url;
-        }
+/** A tervező egy fájljának verziója: a fájl módosítási ideje is benne van, így frissítés után a böngésző és a gyorsítótár sem ad régit. */
+function nb_designer_asset_version($relative){
+  $version = defined('NB_DESIGNER_VERSION') ? NB_DESIGNER_VERSION : '1.7.11';
+  $file = NB_DESIGNER_PATH.$relative;
+  return file_exists($file) ? $version.'.'.filemtime($file) : $version;
+}
+
+/** Igaz, ha az aktuális oldal tartalmában ott a [nb_designer] shortcode. */
+function nb_designer_is_page(){
+  if (!is_singular()) return false;
+  $post = get_post();
+  return $post && has_shortcode((string)$post->post_content, 'nb_designer');
+}
+
+/**
+ * A tervező stíluslapja, scriptjei és adatai. A <head>-ben töltődik, ha az oldal tartalmában
+ * felismerjük a shortcode-ot; ha nem (oldalépítő, sablon, widget, mobil gyorsítótár), maga a
+ * shortcode hívja meg megjelenítéskor. Többszöri hívás nem tölt be semmit kétszer.
+ */
+function nb_designer_enqueue_assets(){
+  static $done = false;
+  if ($done) return;
+  $done = true;
+  $css_version = nb_designer_asset_version('assets/css/designer.css');
+  wp_enqueue_style('nb-designer', NB_DESIGNER_URL.'assets/css/designer.css', [], $css_version);
+  wp_enqueue_script('fabric', 'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', [], null, true);
+  wp_enqueue_script('nb-qrcode', 'https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js', [], null, true);
+  wp_enqueue_script('nb-qrcode-utf8', 'https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode_UTF8.js', ['nb-qrcode'], null, true);
+  wp_enqueue_script('nb-designer', NB_DESIGNER_URL.'assets/js/designer-app.js', ['fabric','jquery','nb-qrcode-utf8'], nb_designer_asset_version('assets/js/designer-app.js'), true);
+  $stored = nb_get_settings([]);
+  $settings = is_array($stored) ? $stored : [];
+  $cleaned = nb_clean_settings_unicode($settings);
+  // Clean settings but do not save on frontend load
+  $settings = nb_sync_mockup_references($cleaned);
+  $appearance_css = nb_designer_appearance_inline_css($settings['appearance'] ?? []);
+  wp_add_inline_style('nb-designer', $appearance_css);
+  $settings = nb_enrich_catalog_for_designer($settings);
+  $initial_design_image_url = '';
+  $nb_product_id = isset($_GET['nb_product']) ? absint($_GET['nb_product']) : 0;
+  $nb_type = isset($_GET['nb_type']) ? sanitize_text_field(wp_unslash($_GET['nb_type'])) : '';
+  if ($nb_product_id) {
+    $attachment_id = (int) get_post_meta($nb_product_id, '_mg_last_design_attachment', true);
+    if ($attachment_id) {
+      $attachment_url = wp_get_attachment_url($attachment_id);
+      if ($attachment_url) {
+        $initial_design_image_url = $attachment_url;
       }
-      if ($initial_design_image_url === '') {
-        $design_path = get_post_meta($nb_product_id, '_mg_last_design_path', true);
-        if ($design_path) {
-          $upload_dir = wp_upload_dir();
-          $normalized_path = wp_normalize_path($design_path);
-          $normalized_base = wp_normalize_path($upload_dir['basedir']);
-          if (strpos($normalized_path, $normalized_base) === 0) {
-            $relative_path = ltrim(substr($normalized_path, strlen($normalized_base)), '/');
-            $initial_design_image_url = $upload_dir['baseurl'].'/'.$relative_path;
-          }
+    }
+    if ($initial_design_image_url === '') {
+      $design_path = get_post_meta($nb_product_id, '_mg_last_design_path', true);
+      if ($design_path) {
+        $upload_dir = wp_upload_dir();
+        $normalized_path = wp_normalize_path($design_path);
+        $normalized_base = wp_normalize_path($upload_dir['basedir']);
+        if (strpos($normalized_path, $normalized_base) === 0) {
+          $relative_path = ltrim(substr($normalized_path, strlen($normalized_base)), '/');
+          $initial_design_image_url = $upload_dir['baseurl'].'/'.$relative_path;
         }
       }
     }
-    $nb_design_id = 0;
-    if (isset($_GET['nb_design_id'])) {
-      $raw_design_id = absint($_GET['nb_design_id']);
-      if ($raw_design_id) {
-        $design_post = get_post($raw_design_id);
-        if ($design_post && $design_post->post_type === 'nb_design') {
-          $nb_design_id = $raw_design_id;
-        }
-      }
-    }
-    wp_localize_script('nb-designer','NB_DESIGNER',[
-      'rest'  => esc_url_raw( rest_url('nb/v1/') ),
-      'nonce' => wp_create_nonce('wp_rest'),
-      'settings' => $settings,
-      'initial_design_image_url' => $initial_design_image_url,
-      'nb_product_id' => $nb_product_id,
-      'nb_type' => $nb_type,
-      'nb_design_id'  => $nb_design_id,
-    ]);
   }
+  $nb_design_id = 0;
+  if (isset($_GET['nb_design_id'])) {
+    $raw_design_id = absint($_GET['nb_design_id']);
+    if ($raw_design_id) {
+      $design_post = get_post($raw_design_id);
+      if ($design_post && $design_post->post_type === 'nb_design') {
+        $nb_design_id = $raw_design_id;
+      }
+    }
+  }
+  wp_localize_script('nb-designer','NB_DESIGNER',[
+    'rest'  => esc_url_raw( rest_url('nb/v1/') ),
+    'nonce' => wp_create_nonce('wp_rest'),
+    'settings' => $settings,
+    'initial_design_image_url' => $initial_design_image_url,
+    'nb_product_id' => $nb_product_id,
+    'nb_type' => $nb_type,
+    'nb_design_id'  => $nb_design_id,
+    // Ha egy gyorsító bővítmény kiszedi a stíluslapot az oldalból, a script ezekből tölti be újra.
+    'css_url' => add_query_arg('ver', $css_version, NB_DESIGNER_URL.'assets/css/designer.css'),
+    'appearance_css' => $appearance_css,
+  ]);
+}
+
+add_action('wp_enqueue_scripts', function(){
+  if (nb_designer_is_page()) nb_designer_enqueue_assets();
 });
 
 add_action('admin_enqueue_scripts', function($hook){

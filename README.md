@@ -14,6 +14,7 @@ A `/tervezd-meg/` oldal tervezője egyetlen, mobilra és asztali gépre egyarán
 - Képet a vászonra húzva vagy Ctrl+V-vel is fel lehet tenni, a sablonok a panelben böngészhetők, az előnézet mód segédvonalak nélkül mutatja a terméket.
 - A böngésző automatikusan megjegyzi a befejezetlen tervet, és visszatéréskor felajánlja a folytatást. Sikeres kosárba tétel után a piszkozat törlődik.
 - A vászon belső mérete fix, csak a megjelenítés méreteződik, így ablakméret-változáskor vagy a mobilbillentyűzet megjelenésekor a tervben lévő elemek nem mozdulnak el.
+- A stíluslap akkor is betöltődik, ha a fejlécből kimarad (oldalépítő, sablon, gyorsító bővítmény külön mobil gyorsítótárral vagy „nem használt CSS eltávolításával”): ilyenkor a shortcode a tervező elé is kiírja, és ha az oldalon mégsem érvényesül, a script maga tölti be. A CSS és JS verziója a fájl módosítási idejét is tartalmazza, így frissítés után nem marad régi példány a gyorsítótárban. A tervező gombjai a téma mobilos „teljes szélességű gomb” szabályától sem nyúlnak meg.
 
 ## Csapatruha tervező (2.3)
 

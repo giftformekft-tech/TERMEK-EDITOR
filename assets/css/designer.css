@@ -40,6 +40,8 @@
 /* ---------------------------------------------------------------- Alapok */
 
 #nb-designer {
+  /* A script ebből látja, hogy a stíluslap betöltődött (lásd designer-app.js eleje). */
+  --nb-css-ready: 1;
   --rail-w: 76px;
   --dock-w: 300px;
   --side-w: 300px;
@@ -102,6 +104,10 @@
 #nb-designer button {
   -webkit-appearance: none;
   appearance: none;
+  /* Sok téma mobilon minden gombot teljes szélességűre vesz; a tervező gombjai a saját méretüket tartják. */
+  width: auto;
+  max-width: none;
+  float: none;
   margin: 0;
   padding: 0;
   border: 0;

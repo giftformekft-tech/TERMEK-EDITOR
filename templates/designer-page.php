@@ -1,5 +1,5 @@
 <div id="nb-designer" class="nb-app">
-  <svg class="nb-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <svg class="nb-sprite" xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
     <symbol id="nb-i-shirt" viewBox="0 0 24 24"><path d="m8 3-5 3 2 5 3-1v11h8V10l3 1 2-5-5-3c-1 3-7 3-8 0Z"/></symbol>
     <symbol id="nb-i-upload" viewBox="0 0 24 24"><path d="M12 15V4m-5 5 5-5 5 5M4 15v5h16v-5"/></symbol>
     <symbol id="nb-i-text" viewBox="0 0 24 24"><path d="M5 7V4h14v3M12 4v16m-4 0h8"/></symbol>
@@ -63,13 +63,13 @@
         <strong id="nb-product-chip-title">Termék</strong>
         <small id="nb-product-chip-meta">Szín és méret</small>
       </span>
-      <svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-chevron-down"/></svg>
+      <svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-chevron-down"/></svg>
     </button>
     <button type="button" class="nb-icon-btn nb-topbar-help" data-nb-help-toggle aria-expanded="false" aria-controls="nb-studio-help" aria-label="Segítség">
-      <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-help"/></svg>
+      <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-help"/></svg>
     </button>
     <button type="button" class="nb-topbar-cta" id="nb-studio-order" aria-describedby="nb-studio-total">
-      <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-cart"/></svg>
+      <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-cart"/></svg>
       <span class="nb-topbar-cta-text">
         <span class="nb-topbar-cta-label">Kosárba</span>
         <strong id="nb-studio-total" aria-live="polite">Ár betöltése…</strong>
@@ -80,23 +80,23 @@
   <div class="nb-workspace">
     <nav class="nb-rail" id="nb-rail" aria-label="Eszközök">
       <button type="button" class="nb-tool-btn" data-nb-tool="product" aria-controls="nb-dock">
-        <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-shirt"/></svg>
+        <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-shirt"/></svg>
         <span class="nb-tool-label">Termék</span>
       </button>
       <button type="button" class="nb-tool-btn" data-nb-tool="upload" aria-controls="nb-dock">
-        <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-upload"/></svg>
+        <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-upload"/></svg>
         <span class="nb-tool-label">Feltöltés</span>
       </button>
       <button type="button" class="nb-tool-btn" data-nb-tool="text" aria-controls="nb-dock">
-        <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-text"/></svg>
+        <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-text"/></svg>
         <span class="nb-tool-label">Szöveg</span>
       </button>
       <button type="button" class="nb-tool-btn" data-nb-tool="elements" aria-controls="nb-dock">
-        <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-shapes"/></svg>
+        <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-shapes"/></svg>
         <span class="nb-tool-label">Elemek</span>
       </button>
       <button type="button" class="nb-tool-btn" data-nb-tool="templates" aria-controls="nb-dock">
-        <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-templates"/></svg>
+        <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-templates"/></svg>
         <span class="nb-tool-label">Sablonok</span>
       </button>
     </nav>
@@ -108,7 +108,7 @@
         <header class="nb-panel-header">
           <h2 id="nb-panel-title-product">Termék</h2>
           <button type="button" class="nb-icon-btn nb-panel-close" data-nb-sheet-close aria-label="Panel bezárása">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
           </button>
         </header>
         <div class="nb-panel-body">
@@ -154,12 +154,12 @@
         <header class="nb-panel-header">
           <h2 id="nb-panel-title-upload">Saját kép</h2>
           <button type="button" class="nb-icon-btn nb-panel-close" data-nb-sheet-close aria-label="Panel bezárása">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
           </button>
         </header>
         <div class="nb-panel-body">
           <label class="nb-dropzone" for="nb-upload">
-            <span class="nb-dropzone-icon"><svg class="nb-icon nb-icon--lg" aria-hidden="true" focusable="false"><use href="#nb-i-upload"/></svg></span>
+            <span class="nb-dropzone-icon"><svg class="nb-icon nb-icon--lg" width="28" height="28" aria-hidden="true" focusable="false"><use href="#nb-i-upload"/></svg></span>
             <strong>Kép kiválasztása</strong>
             <span class="nb-dropzone-alt">vagy húzd ide, illetve illeszd be (Ctrl+V)</span>
             <small>PNG, JPG, SVG vagy WEBP · legfeljebb 25 MB</small>
@@ -177,7 +177,7 @@
         <header class="nb-panel-header">
           <h2 id="nb-panel-title-text">Szöveg</h2>
           <button type="button" class="nb-icon-btn nb-panel-close" data-nb-sheet-close aria-label="Panel bezárása">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
           </button>
         </header>
         <div class="nb-panel-body">
@@ -186,7 +186,7 @@
             <textarea id="nb-text-input" rows="3" maxlength="300" placeholder="Írd be a feliratot…"></textarea>
           </label>
           <button type="button" id="nb-add-text" class="nb-btn nb-btn--primary nb-btn--block">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-plus"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-plus"/></svg>
             <span>Szöveg hozzáadása</span>
           </button>
           <p class="nb-hint">A betűtípust, a színt, az ívelést és a többi beállítást a hozzáadás után a Formázás panelen találod.</p>
@@ -197,19 +197,19 @@
         <header class="nb-panel-header">
           <h2 id="nb-panel-title-elements">Elemek</h2>
           <button type="button" class="nb-icon-btn nb-panel-close" data-nb-sheet-close aria-label="Panel bezárása">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
           </button>
         </header>
         <div class="nb-panel-body">
           <div class="nb-field-group">
             <h3 class="nb-group-title">Formák</h3>
             <div class="nb-shape-grid">
-              <button type="button" class="nb-shape-btn" data-nb-shape="rect"><svg class="nb-icon nb-icon--lg" aria-hidden="true" focusable="false"><use href="#nb-i-shape-rect"/></svg><span>Téglalap</span></button>
-              <button type="button" class="nb-shape-btn" data-nb-shape="circle"><svg class="nb-icon nb-icon--lg" aria-hidden="true" focusable="false"><use href="#nb-i-shape-circle"/></svg><span>Kör</span></button>
-              <button type="button" class="nb-shape-btn" data-nb-shape="triangle"><svg class="nb-icon nb-icon--lg" aria-hidden="true" focusable="false"><use href="#nb-i-shape-triangle"/></svg><span>Háromszög</span></button>
-              <button type="button" class="nb-shape-btn" data-nb-shape="line"><svg class="nb-icon nb-icon--lg" aria-hidden="true" focusable="false"><use href="#nb-i-shape-line"/></svg><span>Vonal</span></button>
-              <button type="button" class="nb-shape-btn" data-nb-shape="star"><svg class="nb-icon nb-icon--lg" aria-hidden="true" focusable="false"><use href="#nb-i-shape-star"/></svg><span>Csillag</span></button>
-              <button type="button" class="nb-shape-btn" data-nb-shape="heart"><svg class="nb-icon nb-icon--lg" aria-hidden="true" focusable="false"><use href="#nb-i-shape-heart"/></svg><span>Szív</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="rect"><svg class="nb-icon nb-icon--lg" width="28" height="28" aria-hidden="true" focusable="false"><use href="#nb-i-shape-rect"/></svg><span>Téglalap</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="circle"><svg class="nb-icon nb-icon--lg" width="28" height="28" aria-hidden="true" focusable="false"><use href="#nb-i-shape-circle"/></svg><span>Kör</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="triangle"><svg class="nb-icon nb-icon--lg" width="28" height="28" aria-hidden="true" focusable="false"><use href="#nb-i-shape-triangle"/></svg><span>Háromszög</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="line"><svg class="nb-icon nb-icon--lg" width="28" height="28" aria-hidden="true" focusable="false"><use href="#nb-i-shape-line"/></svg><span>Vonal</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="star"><svg class="nb-icon nb-icon--lg" width="28" height="28" aria-hidden="true" focusable="false"><use href="#nb-i-shape-star"/></svg><span>Csillag</span></button>
+              <button type="button" class="nb-shape-btn" data-nb-shape="heart"><svg class="nb-icon nb-icon--lg" width="28" height="28" aria-hidden="true" focusable="false"><use href="#nb-i-shape-heart"/></svg><span>Szív</span></button>
             </div>
           </div>
           <div class="nb-field-group nb-qr-tool">
@@ -219,7 +219,7 @@
               <input type="text" id="nb-qr-input" inputmode="url" autocomplete="off" placeholder="https://példa.hu">
             </label>
             <button type="button" class="nb-btn nb-btn--secondary nb-btn--block nb-qr-add" id="nb-qr-add" disabled>
-              <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-qr"/></svg>
+              <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-qr"/></svg>
               <span>QR-kód hozzáadása</span>
             </button>
             <p class="nb-hint nb-hint--warning" id="nb-qr-hint" hidden></p>
@@ -231,7 +231,7 @@
         <header class="nb-panel-header">
           <h2 id="nb-panel-title-templates">Sablonok</h2>
           <button type="button" class="nb-icon-btn nb-panel-close" data-nb-sheet-close aria-label="Panel bezárása">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
           </button>
         </header>
         <div class="nb-panel-body">
@@ -253,8 +253,8 @@
 
         <div class="nb-stage-top">
           <div class="nb-stage-group nb-history-controls" id="nb-history-controls">
-            <button type="button" class="nb-stage-btn" id="nb-undo-btn" aria-label="Visszavonás" title="Visszavonás (Ctrl+Z)" disabled><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-undo"/></svg></button>
-            <button type="button" class="nb-stage-btn" id="nb-redo-btn" aria-label="Ismétlés" title="Ismétlés (Ctrl+Shift+Z)" disabled><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-redo"/></svg></button>
+            <button type="button" class="nb-stage-btn" id="nb-undo-btn" aria-label="Visszavonás" title="Visszavonás (Ctrl+Z)" disabled><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-undo"/></svg></button>
+            <button type="button" class="nb-stage-btn" id="nb-redo-btn" aria-label="Ismétlés" title="Ismétlés (Ctrl+Shift+Z)" disabled><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-redo"/></svg></button>
           </div>
           <div class="nb-side-toggle" role="group" aria-label="Oldal választó">
             <button type="button" class="nb-side-button is-active" data-nb-side="front" aria-pressed="true"><span class="nb-side-dot" aria-hidden="true"></span>Előlap</button>
@@ -262,14 +262,14 @@
           </div>
           <div class="nb-stage-group nb-stage-tools">
             <div class="nb-zoom-controls" id="nb-zoom-controls">
-              <button type="button" class="nb-stage-btn" id="nb-zoom-out" aria-label="Kicsinyítés" title="Kicsinyítés (Ctrl+-)"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-minus"/></svg></button>
+              <button type="button" class="nb-stage-btn" id="nb-zoom-out" aria-label="Kicsinyítés" title="Kicsinyítés (Ctrl+-)"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-minus"/></svg></button>
               <span class="nb-zoom-level" id="nb-zoom-level">100%</span>
-              <button type="button" class="nb-stage-btn" id="nb-zoom-in" aria-label="Nagyítás" title="Nagyítás (Ctrl++)"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-plus"/></svg></button>
-              <button type="button" class="nb-stage-btn nb-zoom-btn--reset" id="nb-zoom-reset" aria-label="Nagyítás visszaállítása" title="Visszaállítás (Ctrl+0)"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-fit"/></svg></button>
+              <button type="button" class="nb-stage-btn" id="nb-zoom-in" aria-label="Nagyítás" title="Nagyítás (Ctrl++)"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-plus"/></svg></button>
+              <button type="button" class="nb-stage-btn nb-zoom-btn--reset" id="nb-zoom-reset" aria-label="Nagyítás visszaállítása" title="Visszaállítás (Ctrl+0)"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-fit"/></svg></button>
             </div>
-            <button type="button" class="nb-stage-btn" id="nb-preview-toggle" aria-pressed="false" aria-label="Előnézet" title="Előnézet segédvonalak nélkül"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-eye"/></svg></button>
+            <button type="button" class="nb-stage-btn" id="nb-preview-toggle" aria-pressed="false" aria-label="Előnézet" title="Előnézet segédvonalak nélkül"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-eye"/></svg></button>
             <button type="button" class="nb-stage-btn nb-layers-quick" id="nb-layers-quick" data-nb-inspector-open="layers" aria-label="Rétegek">
-              <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-layers"/></svg>
+              <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-layers"/></svg>
               <span class="nb-badge" data-nb-layer-count hidden></span>
             </button>
           </div>
@@ -278,29 +278,29 @@
         <div class="nb-canvas-empty-hint" id="nb-canvas-empty-hint" hidden>
           <p><strong>Kezdd el a tervezést</strong><span class="nb-desktop-only">Húzz ide egy képet, vagy válassz:</span></p>
           <div class="nb-empty-actions">
-            <button type="button" class="nb-chip" data-nb-tool-open="upload"><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-image"/></svg>Kép</button>
-            <button type="button" class="nb-chip" data-nb-tool-open="text"><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-text"/></svg>Szöveg</button>
-            <button type="button" class="nb-chip" data-nb-tool-open="templates"><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-templates"/></svg>Sablon</button>
+            <button type="button" class="nb-chip" data-nb-tool-open="upload"><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-image"/></svg>Kép</button>
+            <button type="button" class="nb-chip" data-nb-tool-open="text"><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-text"/></svg>Szöveg</button>
+            <button type="button" class="nb-chip" data-nb-tool-open="templates"><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-templates"/></svg>Sablon</button>
           </div>
         </div>
 
         <div class="nb-quickbar" id="nb-quickbar" role="toolbar" aria-label="Kijelölt elem műveletei" hidden>
-          <button type="button" class="nb-quick-btn nb-quick-btn--edit" data-nb-quick="edit"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-sliders"/></svg><span>Formázás</span></button>
-          <button type="button" class="nb-quick-btn" data-nb-quick="duplicate"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-copy"/></svg><span>Másolat</span></button>
-          <button type="button" class="nb-quick-btn" data-nb-quick="forward"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-arrow-up"/></svg><span>Előre</span></button>
-          <button type="button" class="nb-quick-btn" data-nb-quick="backward"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-arrow-down"/></svg><span>Hátra</span></button>
-          <button type="button" class="nb-quick-btn" data-nb-quick="center"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-target"/></svg><span>Középre</span></button>
-          <button type="button" class="nb-quick-btn nb-quick-btn--danger" data-nb-quick="delete"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-trash"/></svg><span>Törlés</span></button>
+          <button type="button" class="nb-quick-btn nb-quick-btn--edit" data-nb-quick="edit"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-sliders"/></svg><span>Formázás</span></button>
+          <button type="button" class="nb-quick-btn" data-nb-quick="duplicate"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-copy"/></svg><span>Másolat</span></button>
+          <button type="button" class="nb-quick-btn" data-nb-quick="forward"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-arrow-up"/></svg><span>Előre</span></button>
+          <button type="button" class="nb-quick-btn" data-nb-quick="backward"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-arrow-down"/></svg><span>Hátra</span></button>
+          <button type="button" class="nb-quick-btn" data-nb-quick="center"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-target"/></svg><span>Középre</span></button>
+          <button type="button" class="nb-quick-btn nb-quick-btn--danger" data-nb-quick="delete"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-trash"/></svg><span>Törlés</span></button>
         </div>
 
         <div class="nb-drop-overlay" aria-hidden="true">
-          <div><svg class="nb-icon nb-icon--lg" aria-hidden="true" focusable="false"><use href="#nb-i-upload"/></svg><span>Engedd el a képet a feltöltéshez</span></div>
+          <div><svg class="nb-icon nb-icon--lg" width="28" height="28" aria-hidden="true" focusable="false"><use href="#nb-i-upload"/></svg><span>Engedd el a képet a feltöltéshez</span></div>
         </div>
 
         <div class="nb-studio-help" id="nb-studio-help" hidden>
           <div class="nb-studio-help-head">
             <strong>Így készül a saját terméked</strong>
-            <button type="button" class="nb-icon-btn" data-nb-help-toggle aria-label="Segítség bezárása"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg></button>
+            <button type="button" class="nb-icon-btn" data-nb-help-toggle aria-label="Segítség bezárása"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg></button>
           </div>
           <ol>
             <li>Válaszd ki a terméket, a színt és a méretet.</li>
@@ -320,7 +320,7 @@
         <div class="nb-studio-header-tools">
           <span class="nb-status-pill" id="nb-studio-design-status" role="status">Még nincs mentve</span>
           <button type="button" class="nb-btn nb-btn--ghost" id="nb-studio-help-toggle" data-nb-help-toggle aria-expanded="false" aria-controls="nb-studio-help">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-help"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-help"/></svg>
             <span>Segítség</span>
           </button>
         </div>
@@ -333,26 +333,26 @@
         <header class="nb-inspector-header">
           <div class="nb-tabs" role="tablist" aria-label="Beállítások">
             <button type="button" class="nb-tab is-active" role="tab" id="nb-tab-properties" data-nb-inspector-tab="properties" aria-selected="true" aria-controls="nb-properties-panel">
-              <svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-sliders"/></svg>Formázás
+              <svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-sliders"/></svg>Formázás
             </button>
             <button type="button" class="nb-tab" role="tab" id="nb-tab-layers" data-nb-inspector-tab="layers" aria-selected="false" aria-controls="nb-layers-panel" tabindex="-1">
-              <svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-layers"/></svg>Rétegek
+              <svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-layers"/></svg>Rétegek
               <span class="nb-badge" data-nb-layer-count hidden></span>
             </button>
           </div>
           <button type="button" class="nb-icon-btn nb-panel-close" data-nb-sheet-close aria-label="Panel bezárása">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
           </button>
         </header>
 
         <div class="nb-inspector-body">
           <div class="nb-inspector-pane" id="nb-properties-panel" data-nb-inspector-pane="properties" role="tabpanel" aria-labelledby="nb-tab-properties">
             <div class="nb-props-empty" id="nb-properties-empty">
-              <svg class="nb-icon nb-icon--lg" aria-hidden="true" focusable="false"><use href="#nb-i-edit"/></svg>
+              <svg class="nb-icon nb-icon--lg" width="28" height="28" aria-hidden="true" focusable="false"><use href="#nb-i-edit"/></svg>
               <p>Jelölj ki egy elemet a vásznon, és itt szerkesztheted.</p>
               <div class="nb-empty-actions">
-                <button type="button" class="nb-chip" data-nb-tool-open="upload"><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-image"/></svg>Kép</button>
-                <button type="button" class="nb-chip" data-nb-tool-open="text"><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-text"/></svg>Szöveg</button>
+                <button type="button" class="nb-chip" data-nb-tool-open="upload"><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-image"/></svg>Kép</button>
+                <button type="button" class="nb-chip" data-nb-tool-open="text"><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-text"/></svg>Szöveg</button>
               </div>
             </div>
 
@@ -376,17 +376,17 @@
                   <span>Szín</span>
                 </label>
                 <div class="nb-segmented" role="group" aria-label="Betűstílus">
-                  <button type="button" class="nb-toggle" id="nb-font-bold" aria-pressed="false" aria-label="Félkövér"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-bold"/></svg></button>
-                  <button type="button" class="nb-toggle" id="nb-font-italic" aria-pressed="false" aria-label="Dőlt"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-italic"/></svg></button>
+                  <button type="button" class="nb-toggle" id="nb-font-bold" aria-pressed="false" aria-label="Félkövér"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-bold"/></svg></button>
+                  <button type="button" class="nb-toggle" id="nb-font-italic" aria-pressed="false" aria-label="Dőlt"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-italic"/></svg></button>
                 </div>
                 <div class="nb-segmented" role="group" aria-label="Szövegigazítás">
-                  <button type="button" class="nb-toggle" data-nb-align="left" aria-pressed="false" aria-label="Balra zárt"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-text-left"/></svg></button>
-                  <button type="button" class="nb-toggle" data-nb-align="center" aria-pressed="false" aria-label="Középre zárt"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-text-center"/></svg></button>
-                  <button type="button" class="nb-toggle" data-nb-align="right" aria-pressed="false" aria-label="Jobbra zárt"><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-text-right"/></svg></button>
+                  <button type="button" class="nb-toggle" data-nb-align="left" aria-pressed="false" aria-label="Balra zárt"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-text-left"/></svg></button>
+                  <button type="button" class="nb-toggle" data-nb-align="center" aria-pressed="false" aria-label="Középre zárt"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-text-center"/></svg></button>
+                  <button type="button" class="nb-toggle" data-nb-align="right" aria-pressed="false" aria-label="Jobbra zárt"><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-text-right"/></svg></button>
                 </div>
               </div>
               <details class="nb-details">
-                <summary>Körvonal és árnyék<svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-chevron-down"/></svg></summary>
+                <summary>Körvonal és árnyék<svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-chevron-down"/></svg></summary>
                 <div class="nb-details-body">
                   <div class="nb-field">
                     <div class="nb-field-head"><label class="nb-field-label" for="nb-font-stroke-width">Körvonal vastagsága</label><output id="nb-font-stroke-width-value">0 px</output></div>
@@ -405,7 +405,7 @@
                 </div>
               </details>
               <details class="nb-details">
-                <summary>Ívelt szöveg<svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-chevron-down"/></svg></summary>
+                <summary>Ívelt szöveg<svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-chevron-down"/></svg></summary>
                 <div class="nb-details-body">
                   <button type="button" class="nb-toggle nb-toggle--wide nb-curve-toggle" id="nb-text-curve-toggle" aria-pressed="false">Ívelés bekapcsolása</button>
                   <div class="nb-field">
@@ -416,7 +416,7 @@
                 </div>
               </details>
               <details class="nb-details">
-                <summary>Betű- és sorköz<svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-chevron-down"/></svg></summary>
+                <summary>Betű- és sorköz<svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-chevron-down"/></svg></summary>
                 <div class="nb-details-body">
                   <div class="nb-field">
                     <div class="nb-field-head"><label class="nb-field-label" for="nb-letter-spacing">Betűköz</label><output id="nb-letter-spacing-value">0</output></div>
@@ -433,12 +433,12 @@
             <div class="nb-prop-section" data-nb-section="image" hidden>
               <h3 class="nb-section-title">Kép</h3>
               <p class="nb-hint nb-hint--warning" id="nb-image-lowres-warning" hidden>
-                <svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-alert"/></svg>
+                <svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-alert"/></svg>
                 Alacsony felbontás – nyomtatásban pixeles lehet. Kicsinyítsd, vagy tölts fel nagyobb képet.
               </p>
               <div class="nb-button-row">
-                <button type="button" class="nb-btn nb-btn--secondary" id="nb-replace-image" disabled><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-replace"/></svg><span>Csere</span></button>
-                <button type="button" class="nb-btn nb-btn--secondary" id="nb-crop-image" disabled><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-crop"/></svg><span>Vágás</span></button>
+                <button type="button" class="nb-btn nb-btn--secondary" id="nb-replace-image" disabled><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-replace"/></svg><span>Csere</span></button>
+                <button type="button" class="nb-btn nb-btn--secondary" id="nb-crop-image" disabled><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-crop"/></svg><span>Vágás</span></button>
               </div>
               <input type="file" id="nb-replace-image-input" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden>
               <div class="nb-crop-toolbar" id="nb-crop-toolbar" hidden>
@@ -484,8 +484,8 @@
                 <input type="range" id="nb-opacity" min="0" max="100" step="1" value="100" disabled>
               </div>
               <div class="nb-segmented nb-segmented--wide" role="group" aria-label="Tükrözés">
-                <button type="button" class="nb-toggle" id="nb-flip-h" aria-pressed="false" disabled><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-flip-h"/></svg>Vízszintes tükrözés</button>
-                <button type="button" class="nb-toggle" id="nb-flip-v" aria-pressed="false" disabled><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-flip-v"/></svg>Függőleges tükrözés</button>
+                <button type="button" class="nb-toggle" id="nb-flip-h" aria-pressed="false" disabled><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-flip-h"/></svg>Vízszintes tükrözés</button>
+                <button type="button" class="nb-toggle" id="nb-flip-v" aria-pressed="false" disabled><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-flip-v"/></svg>Függőleges tükrözés</button>
               </div>
             </div>
 
@@ -493,16 +493,16 @@
               <h3 class="nb-section-title">Igazítás</h3>
               <p class="nb-hint">Egy elemet a nyomtatási területhez, több kijelölt elemet egymáshoz igazít.</p>
               <div class="nb-align-toolbar">
-                <button type="button" class="nb-icon-tool" data-nb-obj-align="left" aria-label="Balra igazítás" title="Balra" disabled><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-align-left"/></svg></button>
-                <button type="button" class="nb-icon-tool" data-nb-obj-align="center-h" aria-label="Vízszintesen középre" title="Vízszintesen középre" disabled><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-align-center-h"/></svg></button>
-                <button type="button" class="nb-icon-tool" data-nb-obj-align="right" aria-label="Jobbra igazítás" title="Jobbra" disabled><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-align-right"/></svg></button>
-                <button type="button" class="nb-icon-tool" data-nb-obj-align="top" aria-label="Felülre igazítás" title="Felülre" disabled><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-align-top"/></svg></button>
-                <button type="button" class="nb-icon-tool" data-nb-obj-align="center-v" aria-label="Függőlegesen középre" title="Függőlegesen középre" disabled><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-align-center-v"/></svg></button>
-                <button type="button" class="nb-icon-tool" data-nb-obj-align="bottom" aria-label="Alulra igazítás" title="Alulra" disabled><svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-align-bottom"/></svg></button>
+                <button type="button" class="nb-icon-tool" data-nb-obj-align="left" aria-label="Balra igazítás" title="Balra" disabled><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-align-left"/></svg></button>
+                <button type="button" class="nb-icon-tool" data-nb-obj-align="center-h" aria-label="Vízszintesen középre" title="Vízszintesen középre" disabled><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-align-center-h"/></svg></button>
+                <button type="button" class="nb-icon-tool" data-nb-obj-align="right" aria-label="Jobbra igazítás" title="Jobbra" disabled><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-align-right"/></svg></button>
+                <button type="button" class="nb-icon-tool" data-nb-obj-align="top" aria-label="Felülre igazítás" title="Felülre" disabled><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-align-top"/></svg></button>
+                <button type="button" class="nb-icon-tool" data-nb-obj-align="center-v" aria-label="Függőlegesen középre" title="Függőlegesen középre" disabled><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-align-center-v"/></svg></button>
+                <button type="button" class="nb-icon-tool" data-nb-obj-align="bottom" aria-label="Alulra igazítás" title="Alulra" disabled><svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-align-bottom"/></svg></button>
               </div>
               <div class="nb-button-row">
-                <button type="button" class="nb-btn nb-btn--secondary" id="nb-distribute-h" title="Legalább 3 kijelölt elemnél" disabled><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-distribute-h"/></svg><span>Vízszintes elosztás</span></button>
-                <button type="button" class="nb-btn nb-btn--secondary" id="nb-distribute-v" title="Legalább 3 kijelölt elemnél" disabled><svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-distribute-v"/></svg><span>Függőleges elosztás</span></button>
+                <button type="button" class="nb-btn nb-btn--secondary" id="nb-distribute-h" title="Legalább 3 kijelölt elemnél" disabled><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-distribute-h"/></svg><span>Vízszintes elosztás</span></button>
+                <button type="button" class="nb-btn nb-btn--secondary" id="nb-distribute-v" title="Legalább 3 kijelölt elemnél" disabled><svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-distribute-v"/></svg><span>Függőleges elosztás</span></button>
               </div>
             </div>
           </div>
@@ -514,7 +514,7 @@
             </div>
             <div class="nb-layer-list" id="nb-layer-list"></div>
             <button type="button" id="nb-clear-design" class="nb-btn nb-btn--ghost nb-btn--danger nb-btn--block">
-              <svg class="nb-icon nb-icon--sm" aria-hidden="true" focusable="false"><use href="#nb-i-trash"/></svg>
+              <svg class="nb-icon nb-icon--sm" width="16" height="16" aria-hidden="true" focusable="false"><use href="#nb-i-trash"/></svg>
               <span>Oldal ürítése</span>
             </button>
           </div>
@@ -529,7 +529,7 @@
             <h2 id="nb-product-title">Termék</h2>
           </div>
           <button type="button" class="nb-icon-btn nb-panel-close" data-nb-sheet-close aria-label="Panel bezárása">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
           </button>
         </header>
         <ul class="nb-checklist" id="nb-order-checklist"></ul>
@@ -549,7 +549,7 @@
         </div>
         <div class="nb-order-actions">
           <button type="button" id="nb-add-to-cart" class="nb-btn nb-btn--primary nb-btn--lg nb-btn--block nb-cart-button" aria-describedby="nb-studio-selection-hint">
-            <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-cart"/></svg>
+            <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-cart"/></svg>
             <span>Kosárba</span>
           </button>
           <button type="button" id="nb-bulk-modal-trigger" class="nb-btn nb-btn--secondary nb-btn--block">Több méretben rendelek</button>
@@ -561,23 +561,23 @@
 
   <nav class="nb-tabbar" id="nb-tabbar" aria-label="Tervezőeszközök">
     <button type="button" class="nb-tool-btn" data-nb-tool="product" aria-controls="nb-dock">
-      <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-shirt"/></svg>
+      <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-shirt"/></svg>
       <span class="nb-tool-label">Termék</span>
     </button>
     <button type="button" class="nb-tool-btn" data-nb-tool="upload" aria-controls="nb-dock">
-      <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-upload"/></svg>
+      <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-upload"/></svg>
       <span class="nb-tool-label">Kép</span>
     </button>
     <button type="button" class="nb-tool-btn" data-nb-tool="text" aria-controls="nb-dock">
-      <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-text"/></svg>
+      <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-text"/></svg>
       <span class="nb-tool-label">Szöveg</span>
     </button>
     <button type="button" class="nb-tool-btn" data-nb-tool="elements" aria-controls="nb-dock">
-      <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-shapes"/></svg>
+      <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-shapes"/></svg>
       <span class="nb-tool-label">Elemek</span>
     </button>
     <button type="button" class="nb-tool-btn" data-nb-tool="templates" aria-controls="nb-dock">
-      <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-templates"/></svg>
+      <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-templates"/></svg>
       <span class="nb-tool-label">Sablonok</span>
     </button>
   </nav>
@@ -593,7 +593,7 @@
       <div class="nb-modal-header">
         <h2 id="nb-bulk-modal-title">Rendelés több méretben</h2>
         <button type="button" class="nb-icon-btn nb-modal-close" data-nb-close="bulk-modal" aria-label="Bezárás">
-          <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
+          <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-close"/></svg>
         </button>
       </div>
       <div class="nb-modal-body">
@@ -612,7 +612,7 @@
       <div class="nb-modal-footer">
         <button type="button" class="nb-btn nb-btn--secondary" data-nb-close="bulk-modal">Mégse</button>
         <button type="button" class="nb-btn nb-btn--primary" id="nb-bulk-confirm">
-          <svg class="nb-icon" aria-hidden="true" focusable="false"><use href="#nb-i-cart"/></svg>
+          <svg class="nb-icon" width="20" height="20" aria-hidden="true" focusable="false"><use href="#nb-i-cart"/></svg>
           <span>Kosárba</span>
         </button>
       </div>

@@ -1,3 +1,32 @@
+// Ha egy gyorsító bővítmény (külön mobil gyorsítótár, „nem használt CSS eltávolítása”,
+// késleltetett stíluslap) miatt a tervező stíluslapja nem érvényesül, betöltjük újra,
+// különben a felület stílus nélkül, óriás ikonokkal jelenik meg.
+(function () {
+  const root = document.getElementById('nb-designer');
+  const data = typeof NB_DESIGNER !== 'undefined' ? NB_DESIGNER : null;
+  if (!root || !data || !data.css_url) return;
+  const styled = () => getComputedStyle(root).getPropertyValue('--nb-css-ready').trim() === '1';
+  if (styled()) return;
+  const inject = () => {
+    if (styled() || document.getElementById('nb-designer-rescue-css')) return;
+    if (data.appearance_css) {
+      const vars = document.createElement('style');
+      vars.id = 'nb-designer-rescue-inline-css';
+      vars.textContent = data.appearance_css;
+      document.head.appendChild(vars);
+    }
+    const link = document.createElement('link');
+    link.id = 'nb-designer-rescue-css';
+    link.rel = 'stylesheet';
+    link.href = data.css_url;
+    document.head.appendChild(link);
+  };
+  // Egy éppen még töltődő stíluslapnak adunk egy kis időt, mielőtt sajátot töltünk.
+  if (document.readyState === 'complete') inject();
+  else window.addEventListener('load', inject, { once: true });
+  setTimeout(inject, 1500);
+})();
+
 (function () {
   if (typeof fabric === 'undefined') return;
   const canvasEl = document.getElementById('nb-canvas');
@@ -609,7 +638,7 @@
   }
 
   function checklistIcon(done) {
-    return '<span class="nb-check-mark" aria-hidden="true">' + (done ? '<svg class="nb-icon"><use href="#nb-i-check"/></svg>' : '') + '</span>';
+    return '<span class="nb-check-mark" aria-hidden="true">' + (done ? '<svg class="nb-icon" width="20" height="20" aria-hidden="true"><use href="#nb-i-check"/></svg>' : '') + '</span>';
   }
 
   function renderOrderChecklist() {
@@ -1389,7 +1418,7 @@
         textWrap.appendChild(metaEl);
       }
       btn.appendChild(textWrap);
-      btn.insertAdjacentHTML('beforeend', '<svg class="nb-icon" aria-hidden="true"><use href="#nb-i-check"/></svg>');
+      btn.insertAdjacentHTML('beforeend', '<svg class="nb-icon" width="20" height="20" aria-hidden="true"><use href="#nb-i-check"/></svg>');
       btn.addEventListener('click', () => {
         if (productSel.value !== key) {
           productSel.value = key;
@@ -2899,7 +2928,8 @@
   }
 
   function iconMarkup(name, extraClass) {
-    return `<svg class="nb-icon${extraClass ? ' ' + extraClass : ''}" aria-hidden="true" focusable="false"><use href="#nb-i-${name}"/></svg>`;
+    const size = extraClass === 'nb-icon--sm' ? 16 : (extraClass === 'nb-icon--lg' ? 28 : 20);
+    return `<svg class="nb-icon${extraClass ? ' ' + extraClass : ''}" width="${size}" height="${size}" aria-hidden="true" focusable="false"><use href="#nb-i-${name}"/></svg>`;
   }
 
   function layerIconName(obj) {
